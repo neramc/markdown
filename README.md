@@ -80,7 +80,7 @@ magick convert your-image.png -resize 164x314! installer-sidebar.bmp
 
 ### 4. 라이센스 파일 생성
 
-프로젝트 루트에 `LICENSE.txt` 파일을 생성하세요.
+프로젝트 루트에 `LICENSE` 파일을 생성하세요.
 
 ```txt
 MIT License
@@ -225,5 +225,6 @@ function hello() {
 Apache 2.0 License
 
 ## 문의
+
 
 문제가 발생하거나 기능 제안이 있으시면 이슈를 등록해주세요.
