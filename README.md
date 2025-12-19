@@ -222,7 +222,7 @@ function hello() {
 
 ## 라이센스
 
-MIT License
+Apache 2.0 License
 
 ## 문의
 
