@@ -2,9 +2,9 @@
 
 # 📝 Markdown Editor & Viewer
 
-<img src="icon.ico" alt="Markdown Editor Logo" width="128" height="128">
+<img src="icon.ico" alt="Markdown Editor 로고" width="128" height="128">
 
-### ✨ Beautiful Windows Markdown Editor with WinUI 3 Style ✨
+### ✨ WinUI 3 스타일의 아름다운 Windows 마크다운 에디터 ✨
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE.txt)
 [![Electron](https://img.shields.io/badge/Electron-28.0+-9FEAF9?logo=electron&logoColor=white)](https://www.electronjs.org/)
@@ -16,38 +16,36 @@
 [![GitHub Forks](https://img.shields.io/github/forks/yourusername/markdown-editor?style=social)](https://github.com/yourusername/markdown-editor)
 [![GitHub Issues](https://img.shields.io/github/issues/yourusername/markdown-editor)](https://github.com/yourusername/markdown-editor/issues)
 
-[🚀 Download](#-download) • [📖 Features](#-features) • [🎨 Screenshots](#-screenshots) • [⚙️ Installation](#️-installation) • [📚 Documentation](#-documentation)
+[🚀 다운로드](#-다운로드) • [📖 기능](#-기능) • [🎨 스크린샷](#-스크린샷) • [⚙️ 설치](#️-설치) • [📚 문서](#-사용법)
 
 ---
 
-**A modern, feature-rich Markdown editor and viewer for Windows with stunning WinUI 3 acrylic effects, real-time preview, and comprehensive Markdown support.**
-
-[English](#) | [한국어](#)
+**멋진 WinUI 3 아크릴 효과, 실시간 미리보기, 완벽한 마크다운 지원을 제공하는 현대적이고 기능이 풍부한 Windows용 마크다운 에디터입니다.**
 
 </div>
 
 ---
 
-## 🌟 Highlights
+## 🌟 주요 특징
 
 <table>
 <tr>
 <td width="50%">
 
-### 🎨 **Beautiful UI/UX**
-- **WinUI 3 Style Design** with translucent acrylic effects
-- **Light & Dark Mode** support with smooth transitions
-- **Custom Title Bar** with modern window controls
-- **Responsive Layout** optimized for all screen sizes
+### 🎨 **아름다운 UI/UX**
+- 반투명 아크릴 효과가 적용된 **WinUI 3 스타일 디자인**
+- 부드러운 전환 효과의 **라이트 & 다크 모드** 지원
+- 현대적인 창 컨트롤이 있는 **커스텀 타이틀바**
+- 모든 화면 크기에 최적화된 **반응형 레이아웃**
 
 </td>
 <td width="50%">
 
-### ⚡ **Powerful Features**
-- **Real-time Preview** with instant markdown rendering
-- **Smart Auto-complete** for markdown syntax
-- **Syntax Highlighting** powered by Highlight.js
-- **Image Support** with relative/absolute paths
+### ⚡ **강력한 기능**
+- 즉시 마크다운 렌더링되는 **실시간 미리보기**
+- 마크다운 문법을 위한 **스마트 자동완성**
+- Highlight.js 기반 **구문 강조**
+- 상대/절대 경로 지원하는 **이미지 지원**
 
 </td>
 </tr>
@@ -55,463 +53,464 @@
 
 ---
 
-## ✨ Features
+## ✨ 기능
 
-### 📝 Editor
+### 📝 에디터
 
 <details open>
-<summary><b>Click to expand</b></summary>
+<summary><b>클릭하여 펼치기</b></summary>
 
-- 🎯 **Dual Mode**: Seamlessly switch between Viewer and Editor modes
-- ⚡ **Live Preview**: See your changes in real-time
-- 🔮 **Auto-completion**: Intelligent markdown syntax suggestions
-- 🎨 **Syntax Highlighting**: Beautiful code blocks with 190+ languages support
-- 📏 **Line Numbers**: Toggle line numbers on/off
-- 🔄 **Auto Line Wrap**: Comfortable reading experience
-- 💾 **Auto-save**: Never lose your work
-- ⌨️ **Keyboard Shortcuts**: Boost your productivity
+- 🎯 **듀얼 모드**: 뷰어와 에디터 모드 간 원활한 전환
+- ⚡ **라이브 프리뷰**: 변경사항을 실시간으로 확인
+- 🔮 **자동완성**: 지능형 마크다운 문법 제안
+- 🎨 **구문 강조**: 190개 이상의 언어를 지원하는 아름다운 코드 블록
+- 📏 **줄 번호**: 줄 번호 표시/숨김 토글
+- 🔄 **자동 줄 바꿈**: 편안한 읽기 경험
+- 💾 **자동 저장**: 작업 내용을 절대 잃지 않음
+- ⌨️ **키보드 단축키**: 생산성 향상
 
 </details>
 
-### 📋 Markdown Support
+### 📋 마크다운 지원
 
 <details open>
-<summary><b>Full Markdown Specification</b></summary>
+<summary><b>전체 마크다운 규격</b></summary>
 
-#### ✅ Supported Syntax
+#### ✅ 지원되는 문법
 
-| Category | Elements |
+| 카테고리 | 요소 |
 |----------|----------|
-| **Headings** | H1 ~ H6 |
-| **Emphasis** | Bold, Italic, Strikethrough |
-| **Code** | Inline code, Code blocks with syntax highlighting |
-| **Links** | URLs, Reference links, Auto-links |
-| **Images** | Inline images, Reference images, Image URLs |
-| **Lists** | Ordered lists, Unordered lists, Nested lists |
-| **Tasks** | Task lists with checkboxes |
-| **Quotes** | Blockquotes with nesting |
-| **Tables** | GitHub Flavored Markdown tables |
-| **HTML** | Inline HTML tags |
-| **Scripts** | Optional JavaScript execution |
-| **Horizontal Rules** | Dividers |
+| **제목** | H1 ~ H6 |
+| **강조** | 굵게, 기울임, 취소선 |
+| **코드** | 인라인 코드, 구문 강조가 있는 코드 블록 |
+| **링크** | URL, 참조 링크, 자동 링크 |
+| **이미지** | 인라인 이미지, 참조 이미지, 이미지 URL |
+| **목록** | 순서 목록, 비순서 목록, 중첩 목록 |
+| **작업** | 체크박스가 있는 작업 목록 |
+| **인용** | 중첩 가능한 인용구 |
+| **표** | GitHub Flavored Markdown 표 |
+| **HTML** | 인라인 HTML 태그 |
+| **스크립트** | 선택적 JavaScript 실행 |
+| **구분선** | 수평선 |
 
 </details>
 
-### 🖼️ Image Handling
+### 🖼️ 이미지 처리
 
-- 📁 **Relative Path**: `![alt](./images/photo.jpg)`
-- 🌐 **Absolute Path**: `![alt](C:/Users/photo.jpg)`
-- 🔗 **URL Images**: `![alt](https://example.com/image.png)`
-- 🏷️ **HTML Images**: `<img src="path" alt="description">`
+- 📁 **상대 경로**: `![alt](./images/photo.jpg)`
+- 🌐 **절대 경로**: `![alt](C:/Users/photo.jpg)`
+- 🔗 **URL 이미지**: `![alt](https://example.com/image.png)`
+- 🏷️ **HTML 이미지**: `<img src="path" alt="description">`
 
-### ⚙️ Settings
+### ⚙️ 설정
 
 <table>
 <tr>
 <td align="center">🔒</td>
-<td><b>Script Execution Control</b><br/>Enable/disable JavaScript in markdown</td>
+<td><b>스크립트 실행 제어</b><br/>마크다운 내 JavaScript 활성화/비활성화</td>
 </tr>
 <tr>
 <td align="center">🔮</td>
-<td><b>Auto-complete Toggle</b><br/>Turn smart suggestions on/off</td>
+<td><b>자동완성 토글</b><br/>스마트 제안 켜기/끄기</td>
 </tr>
 <tr>
 <td align="center">📏</td>
-<td><b>Line Numbers</b><br/>Show/hide line numbers</td>
+<td><b>줄 번호</b><br/>줄 번호 표시/숨김</td>
 </tr>
 <tr>
 <td align="center">🔄</td>
-<td><b>Line Wrapping</b><br/>Enable automatic line wrapping</td>
+<td><b>줄 바꿈</b><br/>자동 줄 바꿈 활성화</td>
 </tr>
 <tr>
 <td align="center">🌓</td>
-<td><b>Theme Switching</b><br/>Toggle between light and dark modes</td>
+<td><b>테마 전환</b><br/>라이트 모드와 다크 모드 간 토글</td>
 </tr>
 </table>
 
 ---
 
-## 🎨 Screenshots
+## 🎨 스크린샷
 
 <div align="center">
 
-### Light Mode - Viewer
-![Light Mode Viewer](https://via.placeholder.com/800x500/F3F3F3/333333?text=Light+Mode+Viewer)
+### 라이트 모드 - 뷰어
+![라이트 모드 뷰어](https://via.placeholder.com/800x500/F3F3F3/333333?text=Light+Mode+Viewer)
 
-### Dark Mode - Editor
-![Dark Mode Editor](https://via.placeholder.com/800x500/202020/E0E0E0?text=Dark+Mode+Editor)
+### 다크 모드 - 에디터
+![다크 모드 에디터](https://via.placeholder.com/800x500/202020/E0E0E0?text=Dark+Mode+Editor)
 
-### Settings Panel
-![Settings](https://via.placeholder.com/400x300/FFFFFF/000000?text=Settings+Panel)
+### 설정 패널
+![설정](https://via.placeholder.com/400x300/FFFFFF/000000?text=Settings+Panel)
 
 </div>
 
 ---
 
-## 🚀 Download
+## 🚀 다운로드
 
-### Latest Release
+### 최신 릴리즈
 
 <div align="center">
 
-[![Download](https://img.shields.io/badge/Download-Latest%20Release-success?style=for-the-badge&logo=windows)](https://github.com/yourusername/markdown-editor/releases/latest)
+[![다운로드](https://img.shields.io/badge/다운로드-최신%20릴리즈-success?style=for-the-badge&logo=windows)](https://github.com/neramc/markdown/releases/latest)
 
-**Version 1.0.0** • Released: 2024-12-20
+**버전 1.0.0** • 릴리즈: 2024-12-20
 
 </div>
 
-### System Requirements
+### 시스템 요구사항
 
-- 🪟 **OS**: Windows 10 or later (64-bit)
-- 💻 **RAM**: 4 GB minimum, 8 GB recommended
-- 💾 **Storage**: 200 MB free space
-- 🖥️ **Display**: 1280x720 or higher resolution
+- 🪟 **OS**: Windows 10 이상 (64비트)
+- 💻 **RAM**: 최소 4 GB, 권장 8 GB
+- 💾 **저장공간**: 200 MB 여유 공간
+- 🖥️ **디스플레이**: 1280x720 이상 해상도
 
 ---
 
-## ⚙️ Installation
+## ⚙️ 설치
 
-### 📦 For End Users
+### 📦 일반 사용자용
 
-1. **Download** the installer: `MarkdownEditor-Setup-1.0.0.exe`
-2. **Run** the installer with administrator privileges
-3. **Choose** installation directory
-4. **Select** optional features:
-   - ✅ Create desktop shortcut
-   - ✅ Associate `.md` files
-5. **Launch** the application
+1. 설치 파일 **다운로드**: `MarkdownEditor-Setup-1.0.0.exe`
+2. 관리자 권한으로 설치 프로그램 **실행**
+3. 설치 디렉터리 **선택**
+4. 선택적 기능 **선택**:
+   - ✅ 바탕화면 바로가기 생성
+   - ✅ `.md` 파일 연결
+5. 애플리케이션 **실행**
 
-### 🛠️ For Developers
+### 🛠️ 개발자용
 
 <details>
-<summary><b>Building from Source</b></summary>
+<summary><b>소스에서 빌드하기</b></summary>
 
-#### Prerequisites
+#### 사전 요구사항
 
 ```bash
-# Required
+# 필수
 Node.js >= 16.0.0
 npm >= 8.0.0
 
-# Optional (for building installer)
+# 선택사항 (설치 프로그램 빌드용)
 Inno Setup >= 6.0.0
-ImageMagick (for image conversion)
+ImageMagick (이미지 변환용)
 ```
 
-#### Clone Repository
+#### 저장소 복제
 
 ```bash
-git clone https://github.com/yourusername/markdown-editor.git
+git clone https://github.com/neramc/markdown.git
 cd markdown-editor
 ```
 
-#### Install Dependencies
+#### 의존성 설치
 
 ```bash
 npm install
 ```
 
-#### Development Mode
+#### 개발 모드
 
 ```bash
 npm start
 ```
 
-#### Build Application
+#### 애플리케이션 빌드
 
 ```bash
-# Build Electron app
+# Electron 앱 빌드
 npm run build
 
-# Output: dist/win-unpacked/
+# 출력: dist/win-unpacked/
 ```
 
-#### Create Installer
+#### 설치 프로그램 생성
 
-##### Option 1: Automatic Build Script (Recommended)
+##### 방법 1: 자동 빌드 스크립트 (권장)
 
 ```bash
-# Windows Batch Script
+# Windows 배치 스크립트
 build-innosetup.bat
 ```
 
-##### Option 2: Manual Build
+##### 방법 2: 수동 빌드
 
 ```bash
-# 1. Install Inno Setup
+# 1. Inno Setup 설치
 choco install innosetup
 
-# 2. Build Electron app
+# 2. Electron 앱 빌드
 npm run build
 
-# 3. Compile installer
+# 3. 설치 프로그램 컴파일
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
 ```
 
-#### Output
+#### 출력
 
 ```
 dist/
-├── win-unpacked/                          # Portable app
-└── MarkdownEditor-Setup-1.0.0.exe         # Installer
+├── win-unpacked/                          # 포터블 앱
+└── MarkdownEditor-Setup-1.0.0.exe         # 설치 프로그램
 ```
 
 </details>
 
 ---
 
-## 📁 Project Structure
+## 📁 프로젝트 구조
 
 ```
 markdown-editor/
 │
-├── 📄 main.js                   # Electron main process
-├── 🌐 index.html                # Application UI structure
-├── 🎨 styles.css                # WinUI 3 styling
-├── ⚙️ renderer.js               # Renderer process logic
+├── 📄 main.js                   # Electron 메인 프로세스
+├── 🌐 index.html                # 애플리케이션 UI 구조
+├── 🎨 styles.css                # WinUI 3 스타일링
+├── ⚙️ renderer.js               # 렌더러 프로세스 로직
 │
-├── 📦 package.json              # Project configuration
-├── 🔧 installer.iss             # Inno Setup script
-├── 🚀 build-innosetup.bat       # Automated build script
+├── 📦 package.json              # 프로젝트 설정
+├── 🔧 installer.iss             # Inno Setup 스크립트
+├── 🚀 build-innosetup.bat       # 자동 빌드 스크립트
 │
-├── 🖼️ icon.ico                  # Application icon
-├── 🖼️ installer-header.bmp      # Installer header (55x58)
-├── 🖼️ installer-sidebar.bmp     # Installer sidebar (164x314)
+├── 🖼️ icon.ico                  # 애플리케이션 아이콘
+├── 🖼️ installer-header.bmp      # 설치 프로그램 헤더 (55x58)
+├── 🖼️ installer-sidebar.bmp     # 설치 프로그램 사이드바 (164x314)
 │
-├── 📜 LICENSE.txt               # Apache 2.0 license
-└── 📖 README.md                 # This file
+├── 📜 LICENSE.txt               # Apache 2.0 라이센스
+├── 📖 README.md                 # 영문 README
+└── 📖 README.kr.md              # 한글 README (이 파일)
 ```
 
 ---
 
-## 🎯 Usage
+## 🎯 사용법
 
-### ⌨️ Keyboard Shortcuts
+### ⌨️ 키보드 단축키
 
-| Shortcut | Action |
+| 단축키 | 동작 |
 |----------|--------|
-| `Ctrl + O` | Open file |
-| `Ctrl + S` | Save file |
-| `Ctrl + Shift + S` | Save as |
-| `Ctrl + Space` | Trigger auto-complete |
-| `F11` | Toggle fullscreen |
+| `Ctrl + O` | 파일 열기 |
+| `Ctrl + S` | 파일 저장 |
+| `Ctrl + Shift + S` | 다른 이름으로 저장 |
+| `Ctrl + Space` | 자동완성 트리거 |
+| `F11` | 전체화면 토글 |
 
-### 🔄 Mode Switching
+### 🔄 모드 전환
 
-- **👁️ Viewer Mode**: Read and preview rendered markdown
-- **✏️ Editor Mode**: Write and edit markdown with live preview
+- **👁️ 뷰어 모드**: 렌더링된 마크다운 읽기 및 미리보기
+- **✏️ 에디터 모드**: 실시간 미리보기와 함께 마크다운 작성 및 편집
 
-### 📝 Markdown Examples
+### 📝 마크다운 예제
 
 <details>
-<summary><b>Basic Syntax Examples</b></summary>
+<summary><b>기본 문법 예제</b></summary>
 
-#### Headings
+#### 제목
 ```markdown
-# H1 Heading
-## H2 Heading
-### H3 Heading
+# H1 제목
+## H2 제목
+### H3 제목
 ```
 
-#### Emphasis
+#### 강조
 ```markdown
-**Bold Text**
-*Italic Text*
-~~Strikethrough~~
-`Inline Code`
+**굵은 텍스트**
+*기울임 텍스트*
+~~취소선~~
+`인라인 코드`
 ```
 
-#### Links & Images
+#### 링크 & 이미지
 ```markdown
-[Link Text](https://example.com)
-![Image Description](./images/photo.jpg)
+[링크 텍스트](https://example.com)
+![이미지 설명](./images/photo.jpg)
 ```
 
-#### Lists
+#### 목록
 ```markdown
-- Unordered item 1
-- Unordered item 2
-  - Nested item
+- 비순서 항목 1
+- 비순서 항목 2
+  - 중첩된 항목
 
-1. Ordered item 1
-2. Ordered item 2
+1. 순서 항목 1
+2. 순서 항목 2
 ```
 
-#### Task Lists
+#### 작업 목록
 ```markdown
-- [ ] Unchecked task
-- [x] Completed task
+- [ ] 미완료 작업
+- [x] 완료된 작업
 ```
 
-#### Code Blocks
+#### 코드 블록
 ````markdown
 ```javascript
 function hello() {
-  console.log("Hello, World!");
+  console.log("안녕하세요!");
 }
 ```
 ````
 
-#### Tables
+#### 표
 ```markdown
-| Column 1 | Column 2 | Column 3 |
+| 열 1 | 열 2 | 열 3 |
 |----------|----------|----------|
-| Value 1  | Value 2  | Value 3  |
+| 값 1  | 값 2  | 값 3  |
 ```
 
-#### Blockquotes
+#### 인용구
 ```markdown
-> This is a blockquote
-> It can span multiple lines
+> 이것은 인용구입니다
+> 여러 줄에 걸쳐 작성할 수 있습니다
 ```
 
 </details>
 
 ---
 
-## 🛠️ Technology Stack
+## 🛠️ 기술 스택
 
 <div align="center">
 
-| Technology | Purpose | Version |
+| 기술 | 용도 | 버전 |
 |------------|---------|---------|
-| ![Electron](https://img.shields.io/badge/Electron-47848F?style=flat&logo=electron&logoColor=white) | Desktop framework | 28.0+ |
-| ![Node.js](https://img.shields.io/badge/Node.js-339933?style=flat&logo=node.js&logoColor=white) | Runtime environment | 16.0+ |
-| ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=flat&logo=javascript&logoColor=black) | Programming language | ES6+ |
-| ![CodeMirror](https://img.shields.io/badge/CodeMirror-D30707?style=flat&logo=codemirror&logoColor=white) | Code editor | 5.65 |
-| ![Marked](https://img.shields.io/badge/Marked-000000?style=flat&logo=markdown&logoColor=white) | Markdown parser | 11.0+ |
-| ![Highlight.js](https://img.shields.io/badge/Highlight.js-23272A?style=flat) | Syntax highlighting | 11.9+ |
-| ![Inno Setup](https://img.shields.io/badge/Inno%20Setup-264F73?style=flat) | Installer builder | 6.0+ |
+| ![Electron](https://img.shields.io/badge/Electron-47848F?style=flat&logo=electron&logoColor=white) | 데스크톱 프레임워크 | 28.0+ |
+| ![Node.js](https://img.shields.io/badge/Node.js-339933?style=flat&logo=node.js&logoColor=white) | 런타임 환경 | 16.0+ |
+| ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=flat&logo=javascript&logoColor=black) | 프로그래밍 언어 | ES6+ |
+| ![CodeMirror](https://img.shields.io/badge/CodeMirror-D30707?style=flat&logo=codemirror&logoColor=white) | 코드 에디터 | 5.65 |
+| ![Marked](https://img.shields.io/badge/Marked-000000?style=flat&logo=markdown&logoColor=white) | 마크다운 파서 | 11.0+ |
+| ![Highlight.js](https://img.shields.io/badge/Highlight.js-23272A?style=flat) | 구문 강조 | 11.9+ |
+| ![Inno Setup](https://img.shields.io/badge/Inno%20Setup-264F73?style=flat) | 설치 프로그램 빌더 | 6.0+ |
 
 </div>
 
 ---
 
-## 🎨 Customization
+## 🎨 커스터마이징
 
-### 🖼️ Installer Images
+### 🖼️ 설치 프로그램 이미지
 
-For Inno Setup installer, prepare these images:
+Inno Setup 설치 프로그램용으로 다음 이미지를 준비하세요:
 
-#### Header Image (Small Logo)
-- **Size**: 55 × 58 pixels
-- **Format**: BMP
-- **Location**: Top-right corner of installer
+#### 헤더 이미지 (작은 로고)
+- **크기**: 55 × 58 픽셀
+- **형식**: BMP
+- **위치**: 설치 프로그램 우측 상단
 
-#### Sidebar Image (Vertical Banner)
-- **Size**: 164 × 314 pixels
-- **Format**: BMP
-- **Location**: Left side of installer
+#### 사이드바 이미지 (세로 배너)
+- **크기**: 164 × 314 픽셀
+- **형식**: BMP
+- **위치**: 설치 프로그램 좌측
 
-#### Converting Images
+#### 이미지 변환
 
 ```bash
-# Install ImageMagick
+# ImageMagick 설치
 choco install imagemagick
 
-# Convert header (55x58)
+# 헤더 변환 (55x58)
 magick convert your-banner.png -resize 55x58! installer-header.bmp
 
-# Convert sidebar (164x314)
+# 사이드바 변환 (164x314)
 magick convert your-banner.png -resize 164x314! installer-sidebar.bmp
 ```
 
-### 🎨 Theming
+### 🎨 테마 설정
 
-The application supports custom themes. Edit `styles.css` to customize:
+애플리케이션은 커스텀 테마를 지원합니다. `styles.css`를 편집하여 커스터마이징하세요:
 
-- Colors
-- Font sizes
-- Spacing
-- Acrylic effects
-- Window chrome
+- 색상
+- 글꼴 크기
+- 간격
+- 아크릴 효과
+- 창 크롬
 
 ---
 
-## 🤝 Contributing
+## 🤝 기여하기
 
-Contributions are welcome! Here's how you can help:
+기여는 언제나 환영합니다! 다음과 같이 도울 수 있습니다:
 
 <div align="center">
 
-[![Contribute](https://img.shields.io/badge/Contribute-Guide-brightgreen?style=for-the-badge)](CONTRIBUTING.md)
+[![기여하기](https://img.shields.io/badge/기여-가이드-brightgreen?style=for-the-badge)](CONTRIBUTING.md)
 
 </div>
 
-### 🐛 Reporting Bugs
+### 🐛 버그 리포트
 
-Found a bug? Please [open an issue](https://github.com/yourusername/markdown-editor/issues/new?template=bug_report.md) with:
-- Description of the bug
-- Steps to reproduce
-- Expected behavior
-- Screenshots (if applicable)
-- System information
+버그를 발견하셨나요? 다음 정보와 함께 [이슈를 열어주세요](https://github.com/neramc/markdown/issues/new?template=bug_report.md):
+- 버그 설명
+- 재현 단계
+- 예상 동작
+- 스크린샷 (해당되는 경우)
+- 시스템 정보
 
-### 💡 Feature Requests
+### 💡 기능 요청
 
-Have an idea? [Submit a feature request](https://github.com/yourusername/markdown-editor/issues/new?template=feature_request.md)!
+아이디어가 있으신가요? [기능 요청을 제출하세요](https://github.com/neramc/markdown/issues/new?template=feature_request.md)!
 
-### 🔧 Pull Requests
+### 🔧 풀 리퀘스트
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
----
-
-## 📋 Roadmap
-
-- [x] Basic markdown editing and preview
-- [x] Light/Dark mode support
-- [x] Auto-completion
-- [x] File association
-- [ ] Plugin system
-- [ ] Export to PDF/HTML
-- [ ] Cloud sync support
-- [ ] Multi-language UI
-- [ ] Vim/Emacs keybindings
-- [ ] Git integration
-- [ ] Collaborative editing
+1. 저장소 포크
+2. 기능 브랜치 생성 (`git checkout -b feature/AmazingFeature`)
+3. 변경사항 커밋 (`git commit -m 'Add some AmazingFeature'`)
+4. 브랜치에 푸시 (`git push origin feature/AmazingFeature`)
+5. Pull Request 열기
 
 ---
 
-## ❓ FAQ
+## 📋 로드맵
+
+- [x] 기본 마크다운 편집 및 미리보기
+- [x] 라이트/다크 모드 지원
+- [x] 자동완성
+- [x] 파일 연결
+- [ ] 플러그인 시스템
+- [ ] PDF/HTML로 내보내기
+- [ ] 클라우드 동기화 지원
+- [ ] 다국어 UI
+- [ ] Vim/Emacs 키바인딩
+- [ ] Git 통합
+- [ ] 협업 편집
+
+---
+
+## ❓ 자주 묻는 질문
 
 <details>
-<summary><b>How do I associate .md files with this editor?</b></summary>
+<summary><b>.md 파일을 이 에디터와 연결하는 방법은?</b></summary>
 
-During installation, check the "Associate .md files" option. If you missed it, right-click any `.md` file → "Open with" → "Choose another app" → Select Markdown Editor → Check "Always use this app".
+설치 중에 ".md 파일 연결" 옵션을 선택하세요. 놓쳤다면, 아무 `.md` 파일에서 마우스 우클릭 → "연결 프로그램" → "다른 앱 선택" → Markdown Editor 선택 → "항상 이 앱 사용" 체크.
 
 </details>
 
 <details>
-<summary><b>Can I use custom fonts?</b></summary>
+<summary><b>사용자 정의 글꼴을 사용할 수 있나요?</b></summary>
 
-Yes! Edit the `font-family` property in `styles.css` and rebuild the application.
-
-</details>
-
-<details>
-<summary><b>Is script execution safe?</b></summary>
-
-Script execution is disabled by default. Enable it only for trusted markdown files. The app sandboxes scripts but cannot guarantee complete security.
+네! `styles.css`의 `font-family` 속성을 편집하고 애플리케이션을 다시 빌드하세요.
 
 </details>
 
 <details>
-<summary><b>How do I report security vulnerabilities?</b></summary>
+<summary><b>스크립트 실행이 안전한가요?</b></summary>
 
-Please email security concerns to security@yourproject.com instead of opening public issues.
+스크립트 실행은 기본적으로 비활성화되어 있습니다. 신뢰할 수 있는 마크다운 파일에 대해서만 활성화하세요. 앱은 스크립트를 샌드박스 처리하지만 완전한 보안을 보장할 수는 없습니다.
+
+</details>
+
+<details>
+<summary><b>보안 취약점은 어떻게 보고하나요?</b></summary>
+
+공개 이슈를 여는 대신 보안 문제는 madmovie@icloud.com 으로 이메일을 보내주세요.
 
 </details>
 
 ---
 
-## 📄 License
+## 📄 라이센스
 
-This project is licensed under the **Apache License 2.0** - see the [LICENSE.txt](LICENSE.txt) file for details.
+이 프로젝트는 **Apache License 2.0** 하에 라이센스가 부여됩니다 - 자세한 내용은 [LICENSE](LICENSE) 파일을 참조하세요.
 
 ```
 Copyright 2024 Markdown Editor Team
@@ -531,31 +530,31 @@ limitations under the License.
 
 ---
 
-## 🙏 Acknowledgments
+## 🙏 감사의 말
 
-- **[Electron](https://www.electronjs.org/)** - Cross-platform desktop apps
-- **[CodeMirror](https://codemirror.net/)** - Versatile text editor
-- **[Marked](https://marked.js.org/)** - Markdown parser and compiler
-- **[Highlight.js](https://highlightjs.org/)** - Syntax highlighting
-- **[Inno Setup](https://jrsoftware.org/isinfo.php)** - Installer for Windows
-- **Microsoft** - WinUI 3 design inspiration
+- **[Electron](https://www.electronjs.org/)** - 크로스 플랫폼 데스크톱 앱
+- **[CodeMirror](https://codemirror.net/)** - 다목적 텍스트 에디터
+- **[Marked](https://marked.js.org/)** - 마크다운 파서 및 컴파일러
+- **[Highlight.js](https://highlightjs.org/)** - 구문 강조
+- **[Inno Setup](https://jrsoftware.org/isinfo.php)** - Windows용 설치 프로그램
+- **Microsoft** - WinUI 3 디자인 영감
 
 ---
 
-## 🌐 Links
+## 🌐 링크
 
 <div align="center">
 
-[![Website](https://img.shields.io/badge/Website-Visit-blue?style=for-the-badge)](https://yourwebsite.com)
-[![Documentation](https://img.shields.io/badge/Docs-Read-green?style=for-the-badge)](https://docs.yourwebsite.com)
-[![Discord](https://img.shields.io/badge/Discord-Join-7289DA?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/yourserver)
-[![Twitter](https://img.shields.io/badge/Twitter-Follow-1DA1F2?style=for-the-badge&logo=twitter&logoColor=white)](https://twitter.com/yourhandle)
+[![웹사이트](https://img.shields.io/badge/웹사이트-방문-blue?style=for-the-badge)](https://yourwebsite.com)
+[![문서](https://img.shields.io/badge/문서-읽기-green?style=for-the-badge)](https://docs.yourwebsite.com)
+[![Discord](https://img.shields.io/badge/Discord-참여-7289DA?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/yourserver)
+[![Twitter](https://img.shields.io/badge/Twitter-팔로우-1DA1F2?style=for-the-badge&logo=twitter&logoColor=white)](https://twitter.com/yourhandle)
 
 </div>
 
 ---
 
-## 📊 Statistics
+## 📊 통계
 
 <div align="center">
 
@@ -569,19 +568,16 @@ limitations under the License.
 
 ---
 
-## 💖 Support
+## 💖 지원
 
-If you find this project helpful, please consider:
+이 프로젝트가 도움이 되었다면 다음과 같이 지원해주세요:
 
 <div align="center">
 
-⭐ **Star this repository**  
-🔀 **Fork and contribute**  
-🐛 **Report issues**  
-💬 **Spread the word**
-
-[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Donate-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/yourhandle)
-[![PayPal](https://img.shields.io/badge/PayPal-Donate-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://paypal.me/yourhandle)
+⭐ **이 저장소에 스타 주기**  
+🔀 **포크하고 기여하기**  
+🐛 **이슈 리포트하기**  
+💬 **입소문 내기**
 
 </div>
 
@@ -589,10 +585,10 @@ If you find this project helpful, please consider:
 
 <div align="center">
 
-### Made with ❤️ by [Your Name](https://github.com/yourusername)
+### ❤️로 만든 [neramc](https://github.com/neramc)
 
-**⭐ Star us on GitHub — it helps!**
+**⭐ GitHub에서 스타를 주세요 — 도움이 됩니다!**
 
-[🔝 Back to Top](#-markdown-editor--viewer)
+[🔝 맨 위로](#-markdown-editor--viewer)
 
 </div>
