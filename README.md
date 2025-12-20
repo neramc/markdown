@@ -134,13 +134,16 @@
 <div align="center">
 
 ### 라이트 모드 - 뷰어
-![라이트 모드 뷰어](https://via.placeholder.com/800x500/F3F3F3/333333?text=Light+Mode+Viewer)
+![라이트 모드 뷰어](https://github.com/user-attachments/assets/8dc06e10-3343-4454-9a5f-2c1fe8c15def)
+
 
 ### 다크 모드 - 에디터
-![다크 모드 에디터](https://via.placeholder.com/800x500/202020/E0E0E0?text=Dark+Mode+Editor)
+![다크 모드 에디터](https://github.com/user-attachments/assets/00a60328-e5ca-4d1a-92e4-b345f6009da0)
+
 
 ### 설정 패널
-![설정](https://via.placeholder.com/400x300/FFFFFF/000000?text=Settings+Panel)
+![설정](https://github.com/user-attachments/assets/4e7e1936-c8a8-432a-87d8-712504470f9b)
+
 
 </div>
 
@@ -578,4 +581,5 @@ limitations under the License.
 [🔝 맨 위로](#-markdown-editor--viewer)
 
 </div>
+
 
