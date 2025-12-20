@@ -12,9 +12,9 @@
 [![CodeMirror](https://img.shields.io/badge/CodeMirror-5.65-D30707?logo=codemirror&logoColor=white)](https://codemirror.net/)
 [![Inno Setup](https://img.shields.io/badge/Inno%20Setup-6.0+-264F73)](https://jrsoftware.org/isinfo.php)
 
-[![GitHub Stars](https://img.shields.io/github/stars/yourusername/markdown-editor?style=social)](https://github.com/yourusername/markdown-editor)
-[![GitHub Forks](https://img.shields.io/github/forks/yourusername/markdown-editor?style=social)](https://github.com/yourusername/markdown-editor)
-[![GitHub Issues](https://img.shields.io/github/issues/yourusername/markdown-editor)](https://github.com/yourusername/markdown-editor/issues)
+[![GitHub Stars](https://img.shields.io/github/stars/neramc/markdown?style=social)](https://github.com/neramc/markdown)
+[![GitHub Forks](https://img.shields.io/github/forks/neramc/markdown?style=social)](https://github.com/neramc/markdown)
+[![GitHub Issues](https://img.shields.io/github/issues/neramc/markdown)](https://github.com/neramc/markdown/issues)
 
 [🚀 다운로드](#-다운로드) • [📖 기능](#-기능) • [🎨 스크린샷](#-스크린샷) • [⚙️ 설치](#️-설치) • [📚 문서](#-사용법)
 
@@ -592,3 +592,4 @@ limitations under the License.
 [🔝 맨 위로](#-markdown-editor--viewer)
 
 </div>
+
