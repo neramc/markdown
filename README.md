@@ -541,28 +541,15 @@ limitations under the License.
 
 ---
 
-## 🌐 링크
-
-<div align="center">
-
-[![웹사이트](https://img.shields.io/badge/웹사이트-방문-blue?style=for-the-badge)](https://yourwebsite.com)
-[![문서](https://img.shields.io/badge/문서-읽기-green?style=for-the-badge)](https://docs.yourwebsite.com)
-[![Discord](https://img.shields.io/badge/Discord-참여-7289DA?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/yourserver)
-[![Twitter](https://img.shields.io/badge/Twitter-팔로우-1DA1F2?style=for-the-badge&logo=twitter&logoColor=white)](https://twitter.com/yourhandle)
-
-</div>
-
----
-
 ## 📊 통계
 
 <div align="center">
 
 ![Alt](https://repobeats.axiom.co/api/embed/yourhash.svg "Repobeats analytics image")
 
-[![GitHub Activity](https://img.shields.io/github/commit-activity/m/yourusername/markdown-editor)](https://github.com/yourusername/markdown-editor/commits)
-[![GitHub Contributors](https://img.shields.io/github/contributors/yourusername/markdown-editor)](https://github.com/yourusername/markdown-editor/graphs/contributors)
-[![GitHub Last Commit](https://img.shields.io/github/last-commit/yourusername/markdown-editor)](https://github.com/yourusername/markdown-editor/commits)
+[![GitHub Activity](https://img.shields.io/github/commit-activity/m/neramc/markdown)](https://github.com/neramc/markdown/commits)
+[![GitHub Contributors](https://img.shields.io/github/contributors/neramc/markdown)](https://github.com/neramc/markdown/graphs/contributors)
+[![GitHub Last Commit](https://img.shields.io/github/last-commit/neramc/markdown)](https://github.com/neramc/markdown/commits)
 
 </div>
 
@@ -592,4 +579,5 @@ limitations under the License.
 [🔝 맨 위로](#-markdown-editor--viewer)
 
 </div>
+
 
