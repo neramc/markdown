@@ -277,8 +277,7 @@ markdown-editor/
 ├── 🖼️ installer-sidebar.bmp     # 설치 프로그램 사이드바 (164x314)
 │
 ├── 📜 LICENSE.txt               # Apache 2.0 라이센스
-├── 📖 README.md                 # 영문 README
-└── 📖 README.kr.md              # 한글 README (이 파일)
+└── 📖 README.md              # 설명
 ```
 
 ---
@@ -579,3 +578,4 @@ limitations under the License.
 [🔝 맨 위로](#-markdown-editor--viewer)
 
 </div>
+
