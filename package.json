@@ -1,0 +1,47 @@
+{
+  "name": "markdown-viewer",
+  "version": "1.5.4",
+  "description": "Windows Markdown Editor and Viewer",
+  "main": "main.js",
+  "author": "Madmovies <madmovie@icloud.com>",
+  "license": "Apache-2.0",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "dist": "electron-builder"
+  },
+  "build": {
+    "appId": "com.markdowneditor.app",
+    "productName": "Markdown Editor",
+    "win": {
+      "target": [
+        {
+          "target": "dir",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "icon.ico",
+      "fileAssociations": [
+        {
+          "ext": "md",
+          "name": "Markdown File",
+          "description": "Markdown Document",
+          "icon": "icon.ico",
+          "role": "Editor"
+        }
+      ]
+    },
+    "directories": {
+      "output": "dist"
+    }
+  },
+  "dependencies": {
+    "marked": "^11.1.1",
+    "highlight.js": "^11.9.0",
+    "codemirror": "^5.65.16"
+  },
+  "devDependencies": {
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1"
+  }
+}
