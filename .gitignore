@@ -111,3 +111,22 @@ dist
 
 # TernJS port file
 .tern-port
+
+# ---- Quill build outputs ----
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Rust
+target/
+
+# .NET
+bin/
+obj/
+*.user
+
+# IDE
+.idea/
+*.iml
+.vscode/

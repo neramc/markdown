@@ -1,0 +1,39 @@
+[package]
+name = "quill_core"
+version = "1.0.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Quill markdown editor core engine: document model, parsing, highlighting, search and export."
+license = "Apache-2.0"
+publish = false
+
+[lib]
+# cdylib is what the JVM loads through the Panama FFM API; rlib lets `cargo test`
+# link the crate for the unit tests.
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Markdown parsing. Default features pull in the CLI, `bon` and syntect's Oniguruma
+# backend -- none of which belong inside a shared library.
+comrak = { version = "0.54", default-features = false }
+
+# Rope buffer. Gives O(log n) edits plus native UTF-8 <-> UTF-16 index conversion,
+# which is what keeps offsets consistent with the JVM side.
+ropey = "1.6"
+
+# Syntax highlighting for fenced code blocks. `default-fancy` selects the pure-Rust
+# fancy-regex backend instead of the Oniguruma C library, so the cdylib has no
+# native build dependency and cross-compiles cleanly.
+syntect = { version = "5.3", default-features = false, features = ["default-fancy"] }
+two-face = { version = "0.5", default-features = false, features = ["syntect-fancy"] }
+
+regex = "1"
+parking_lot = "0.12"
+thiserror = "2"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "unwind" # required: extern "C" entry points rely on catch_unwind
+strip = "debuginfo"

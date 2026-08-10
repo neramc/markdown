@@ -1,0 +1,50 @@
+[versions]
+# Toolchain -----------------------------------------------------------------
+# JetBrains Runtime, not a stock JDK: Jewel's DecoratedWindow uses JBR-only window
+# decoration APIs. JBR 25 is also past JDK 22, so the finalized java.lang.foreign
+# API is available. Bytecode targets 22 -- the oldest JDK with finalized FFM, and
+# well inside ProGuard's supported class-file range.
+jdkToolchain = "25"
+jvmTarget = "22"
+
+# Kotlin / Compose ----------------------------------------------------------
+# Jewel 0.39.1's class files carry Kotlin 2.4 metadata, so the compiler must be at
+# least 2.4 to read them; 2.2.20 fails with "metadata version 2.4.0, expected
+# 2.2.0" on every Jewel type. Compose Multiplatform 1.11.1 is the release Jewel is
+# built against and resolves kotlinx-coroutines 1.9.0.
+kotlin = "2.4.10"
+compose = "1.11.1"
+coroutines = "1.9.0"
+
+# Jewel (IntelliJ Platform look & feel for Compose for Desktop) --------------
+jewel = "0.39.1-262.9437.29"
+
+# Build tooling -------------------------------------------------------------
+foojayResolver = "1.0.0"
+proguard = "7.9.1"
+
+# Testing -------------------------------------------------------------------
+junit = "5.14.4"
+
+[libraries]
+# --- Jewel ---
+jewel-intUi-standalone = { module = "org.jetbrains.jewel:jewel-int-ui-standalone", version.ref = "jewel" }
+jewel-decoratedWindow = { module = "org.jetbrains.jewel:jewel-decorated-window", version.ref = "jewel" }
+jewel-markdown-core = { module = "org.jetbrains.jewel:jewel-markdown-core", version.ref = "jewel" }
+jewel-markdown-intUiStyling = { module = "org.jetbrains.jewel:jewel-markdown-int-ui-standalone-styling", version.ref = "jewel" }
+jewel-markdown-ext-strikethrough = { module = "org.jetbrains.jewel:jewel-markdown-extensions-gfm-strikethrough", version.ref = "jewel" }
+jewel-markdown-ext-alerts = { module = "org.jetbrains.jewel:jewel-markdown-extensions-gfm-alerts", version.ref = "jewel" }
+
+# --- Kotlin ---
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "coroutines" }
+
+# --- Testing ---
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+compose = { id = "org.jetbrains.compose", version.ref = "compose" }
