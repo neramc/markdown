@@ -118,6 +118,9 @@ dist
 build/
 !gradle/wrapper/gradle-wrapper.jar
 
+# Kotlin compiler session data
+.kotlin/
+
 # Rust
 target/
 
