@@ -1,0 +1,40 @@
+<Project>
+
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
+    <InvariantGlobalization>true</InvariantGlobalization>
+
+    <!--
+      The Windows-targeting reference assemblies are needed to compile the net10.0-windows target
+      from a non-Windows machine, which is exactly how this solution is built in CI.
+    -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+
+    <Product>Quill</Product>
+    <Company>neramc</Company>
+    <Copyright>Copyright (c) 2026 neramc</Copyright>
+    <Version>0.1.0</Version>
+
+    <!-- Keep the published installer honest about what it is. -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <!--
+    Single-file publish trims nothing but does need the runtime to be compiled in. NativeAOT is
+    deliberately not used: it cannot cross-compile to Windows from Linux, and the COM interop the
+    shortcut writer relies on would need extra annotation. Trimming is off because Avalonia's XAML
+    loader and the COM interop both resolve types at runtime.
+  -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <PublishTrimmed>false</PublishTrimmed>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+</Project>

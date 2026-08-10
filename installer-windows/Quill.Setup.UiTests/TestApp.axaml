@@ -1,0 +1,24 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Quill.Setup.UiTests.TestApp"
+             RequestedThemeVariant="Light">
+
+    <Application.Styles>
+        <FluentTheme />
+    </Application.Styles>
+
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!--
+                    The real palettes from both executables, not copies. If either app adds or renames
+                    a brush its window stops resolving here and the test fails, which is exactly the
+                    coupling that keeps this from drifting into a stand-in that proves nothing.
+                -->
+                <ResourceInclude Source="avares://QuillSetup/Themes/Palette.axaml" />
+                <ResourceInclude Source="avares://QuillUninstall/Themes/Palette.axaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+
+</Application>

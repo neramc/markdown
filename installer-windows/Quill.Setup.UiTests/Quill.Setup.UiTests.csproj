@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+
+    <PublishSingleFile>false</PublishSingleFile>
+    <SelfContained>false</SelfContained>
+
+    <!-- See the note in Quill.Setup.Tests: these tests are millisecond-scale and local. -->
+    <NoWarn>$(NoWarn);xUnit1051</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
+
+    <!--
+      Avalonia's headless platform with the real Skia renderer behind it. This is what lets the
+      wizard be laid out, drawn and captured to a bitmap with no display server, which is the only
+      way to check the UI on the Linux machine that builds the Windows installer.
+    -->
+    <PackageReference Include="Avalonia.Headless" Version="12.1.1" />
+    <PackageReference Include="Avalonia.Headless.XUnit" Version="12.1.1" />
+    <PackageReference Include="Avalonia.Skia" Version="12.1.1" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.1" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Quill.Setup.Core/Quill.Setup.Core.csproj" />
+    <ProjectReference Include="../Quill.Installer/Quill.Installer.csproj" />
+    <ProjectReference Include="../Quill.Uninstaller/Quill.Uninstaller.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Themes/**" />
+  </ItemGroup>
+
+</Project>

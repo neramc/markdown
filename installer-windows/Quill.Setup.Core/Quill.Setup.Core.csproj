@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!--
+      Two targets on purpose. Everything except the Windows integration is plain .NET and compiles
+      into net10.0, which is what lets the whole install and uninstall pipeline be tested on Linux.
+      The registry, shell-link and elevation code lives behind the WINDOWS symbol and only exists in
+      the net10.0-windows target that the shipped installer is published from.
+    -->
+    <TargetFrameworks>net10.0;net10.0-windows</TargetFrameworks>
+    <RootNamespace>Quill.Setup.Core</RootNamespace>
+    <AssemblyName>Quill.Setup.Core</AssemblyName>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <!--
+    The Windows target stays on the default platform version rather than pinning a Windows 10 SDK
+    version: nothing here needs a WinRT API, only the registry, shell32 and user32, all of which are
+    reachable from the base Windows target and so need no extra reference pack to cross-compile.
+  -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net10.0-windows'">
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Windows/**" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0-windows'">
+    <Compile Include="Windows/**/*.cs" />
+  </ItemGroup>
+
+</Project>

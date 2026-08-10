@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!--
+      net10.0 exists so the wizard can be run and screenshotted on a Linux or macOS workstation
+      against the dry-run integration. The shipped binary is always published from net10.0-windows,
+      which is the target that carries the registry and shell code.
+    -->
+    <TargetFrameworks>net10.0;net10.0-windows</TargetFrameworks>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>Quill.Installer</RootNamespace>
+    <AssemblyName>QuillSetup</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <ApplicationIcon Condition="Exists('Assets/quill.ico')">Assets/quill.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.1.1" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.1" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.1" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.1" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Quill.Setup.Core/Quill.Setup.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets/**" />
+    <AvaloniaResource Include="Themes/**" />
+    <!-- The real project licence, shown on the licence page rather than a paraphrase of it. -->
+    <EmbeddedResource Include="../../LICENSE" LogicalName="Quill.Installer.LICENSE" />
+  </ItemGroup>
+
+  <!--
+    The application payload. Built by tools/build-installer.sh from the Gradle app image; when it is
+    absent the wizard still builds and runs, and says so on the first page instead of pretending it
+    can install something. That is what keeps this project buildable from a plain checkout.
+  -->
+  <ItemGroup Condition="Exists('Payload/quill-payload.zip')">
+    <EmbeddedResource Include="Payload/quill-payload.zip" LogicalName="Quill.Installer.Payload.zip" />
+  </ItemGroup>
+
+</Project>

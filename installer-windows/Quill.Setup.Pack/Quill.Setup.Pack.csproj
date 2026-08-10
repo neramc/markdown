@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!--
+      A build-time tool, not a shipped artifact: it runs on whatever machine drives the build, so it
+      targets plain net10.0 and is never published single-file.
+    -->
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Quill.Setup.Pack</RootNamespace>
+    <AssemblyName>quill-pack</AssemblyName>
+    <IsPackable>false</IsPackable>
+
+    <PublishSingleFile>false</PublishSingleFile>
+    <SelfContained>false</SelfContained>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Quill.Setup.Core/Quill.Setup.Core.csproj" />
+  </ItemGroup>
+
+</Project>

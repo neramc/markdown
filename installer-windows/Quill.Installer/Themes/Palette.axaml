@@ -1,0 +1,20 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!--
+        Quill's palette, so the installer looks like the product it installs. Kept in its own
+        dictionary rather than inline in App.axaml so the headless UI tests can merge it into their
+        own application and render the real window instead of a stand-in.
+    -->
+    <Color x:Key="QuillAccentColor">#3574F0</Color>
+    <SolidColorBrush x:Key="QuillAccent" Color="{StaticResource QuillAccentColor}" />
+    <SolidColorBrush x:Key="QuillSidebar" Color="#1E1F22" />
+    <SolidColorBrush x:Key="QuillSidebarText" Color="#9DA0A8" />
+    <SolidColorBrush x:Key="QuillSidebarActiveText" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="QuillMutedText" Color="#6C707E" />
+    <SolidColorBrush x:Key="QuillErrorText" Color="#DB5C5C" />
+    <SolidColorBrush x:Key="QuillPageBackground" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="QuillFooterBackground" Color="#F2F3F5" />
+    <SolidColorBrush x:Key="QuillBorder" Color="#DFE1E5" />
+
+</ResourceDictionary>

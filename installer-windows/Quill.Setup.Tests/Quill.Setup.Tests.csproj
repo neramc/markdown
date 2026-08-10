@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!--
+      The plain net10.0 target, deliberately. These tests drive the install and uninstall sequences
+      through the dry-run integration, which is what makes them runnable on the Linux CI machine
+      that builds the Windows installer.
+    -->
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+
+    <!-- Release publishing settings from Directory.Build.props do not apply to a test host. -->
+    <PublishSingleFile>false</PublishSingleFile>
+    <SelfContained>false</SelfContained>
+
+    <!--
+      xUnit1051 wants every cancellable call to take TestContext.Current.CancellationToken so a
+      hung test can be interrupted. These tests zip and unzip a handful of small files in a
+      temporary directory and finish in milliseconds; there is nothing to interrupt, and threading a
+      token through every assertion would bury the thing each test is actually about. The engine
+      APIs themselves do take and honour a CancellationToken — that is tested separately.
+    -->
+    <NoWarn>$(NoWarn);xUnit1051</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- xunit.v3 does not contribute an implicit using of its own namespace. -->
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Quill.Setup.Core/Quill.Setup.Core.csproj" />
+  </ItemGroup>
+
+</Project>
