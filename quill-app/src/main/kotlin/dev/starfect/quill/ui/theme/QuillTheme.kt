@@ -78,6 +78,8 @@ public class EditorPalette(
     public val caretRowBackground: Color,
     /** Fill behind a search match. */
     public val searchMatchBackground: Color,
+    /** The right-margin guide, drawn at the configured column. */
+    public val rightMargin: Color,
     private val tokens: Map<Int, EditorTokenStyle>,
 ) {
     public fun styleFor(styleId: Int): EditorTokenStyle? = tokens[styleId]
@@ -139,6 +141,7 @@ public class EditorPalette(
             gutterCurrentLineForeground = Color(0xFFA1A3AB),
             caretRowBackground = Color(0xFF26282E),
             searchMatchBackground = Color(0xFF32593D),
+            rightMargin = Color(0xFF393B40),
             tokens = DARK_TOKENS,
         )
 
@@ -150,6 +153,7 @@ public class EditorPalette(
             gutterCurrentLineForeground = Color(0xFF5A5D63),
             caretRowBackground = Color(0xFFF2F5F9),
             searchMatchBackground = Color(0xFFC2E5C2),
+            rightMargin = Color(0xFFD3D5DB),
             tokens = LIGHT_TOKENS,
         )
 

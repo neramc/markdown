@@ -2,6 +2,7 @@ package dev.starfect.quill
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -134,6 +135,7 @@ public fun main(arguments: Array<String>) {
                     icon = painterResource("icons/icon.png"),
                     onPreviewKeyEvent = { event -> handleShortcut(event, controller) },
                 ) {
+                    SaveOnFocusLoss(controller, workspace, window)
                     Column(Modifier.fillMaxSize()) {
                         QuillTitleBar(controller, workspace, ::exitApplication)
                         QuillWindowContent(controller, workspace, Modifier.fillMaxSize())
@@ -149,12 +151,51 @@ public fun main(arguments: Array<String>) {
                     icon = painterResource("icons/icon.png"),
                     onPreviewKeyEvent = { event -> handleShortcut(event, controller) },
                 ) {
+                    SaveOnFocusLoss(controller, workspace, window)
                     Column(Modifier.fillMaxSize()) {
                         QuillToolBar(controller, workspace, ::exitApplication)
                         QuillWindowContent(controller, workspace, Modifier.fillMaxSize())
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * Saves every modified document when the window loses focus, if the setting is on.
+ *
+ * An AWT listener rather than a Compose focus modifier: window activation is a property of the
+ * window, and Compose's focus system only knows about focus *within* it — it cannot tell the
+ * difference between the user clicking another application and clicking a tool window.
+ *
+ * Documents with no file are skipped rather than prompting. Losing focus is not a moment to raise a
+ * modal file picker, and doing so from a listener that fires as the window deactivates puts the
+ * dialog behind whatever the user just switched to.
+ */
+@Composable
+private fun SaveOnFocusLoss(controller: QuillController, workspace: WorkspaceState, window: java.awt.Window) {
+    val enabled = workspace.settings.saveOnFocusLoss
+
+    DisposableEffect(window, enabled) {
+        if (!enabled) return@DisposableEffect onDispose {}
+
+        val listener = object : java.awt.event.WindowAdapter() {
+            override fun windowLostFocus(event: java.awt.event.WindowEvent) = save()
+            override fun windowDeactivated(event: java.awt.event.WindowEvent) = save()
+
+            private fun save() {
+                controller.state.value.documents
+                    .filter { it.isModified && it.path != null }
+                    .forEach { document -> controller.save(document.id) { null } }
+            }
+        }
+
+        window.addWindowFocusListener(listener)
+        window.addWindowListener(listener)
+        onDispose {
+            window.removeWindowFocusListener(listener)
+            window.removeWindowListener(listener)
         }
     }
 }

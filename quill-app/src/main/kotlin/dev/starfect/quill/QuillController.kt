@@ -322,17 +322,57 @@ public class QuillController(
             return
         }
 
+        val text = applySaveActions(session.text.text, _state.value.settings)
+
         scope.launch {
-            val text = session.text.text
             withContext(Dispatchers.IO) { runCatching { fileService.write(target, text) } }
                 .onSuccess {
-                    updateDocument(id) { it.copy(path = target, savedText = text) }
+                    // The buffer is rewritten to match what went to disk. Skipping this leaves the
+                    // document permanently "modified" against a file it is identical to except for
+                    // the whitespace the save action just removed.
+                    if (text != session.text.text) {
+                        val caret = session.text.selection.start.coerceIn(0, text.length)
+                        updateDocument(id) { current ->
+                            current.copy(
+                                text = current.text.copy(text = text, selection = TextRange(caret)),
+                                path = target,
+                                savedText = text,
+                            )
+                        }
+                        handles[id]?.let { handle -> runCatching { handle.setText(text) } }
+                        derive(id, immediate = true)
+                    } else {
+                        updateDocument(id) { it.copy(path = target, savedText = text) }
+                    }
                     update { it.copy(notification = "Saved ${target.fileName}") }
                 }
                 .onFailure { failure ->
                     update { it.copy(notification = "Could not save ${target.fileName}: ${failure.message}") }
                 }
         }
+    }
+
+    /**
+     * Applies the save-time settings to the text about to be written.
+     *
+     * Trailing whitespace is stripped everywhere except where Markdown gives it meaning: exactly two
+     * trailing spaces are a hard line break, and removing them silently joins two lines the author
+     * deliberately separated.
+     */
+    internal fun applySaveActions(text: String, settings: QuillSettings): String {
+        var result = text
+
+        if (settings.trimTrailingWhitespaceOnSave) {
+            result = result.lineSequence().joinToString("\n") { line ->
+                if (line.endsWith("  ") && !line.endsWith("   ") && line.isNotBlank()) line else line.trimEnd()
+            }
+        }
+
+        if (settings.ensureNewlineOnSave && result.isNotEmpty()) {
+            result = result.trimEnd('\n') + "\n"
+        }
+
+        return result
     }
 
     /** Exports a document to HTML. */

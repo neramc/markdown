@@ -88,6 +88,22 @@ public fun PreviewPane(
     val highlighter = remember(controller) { EngineCodeHighlighter(controller) }
     val baseSize = workspace.settings.editorFontSize.sp
 
+    // Follow the caret. The section the caret is in is the one the reader wants to see, and keeping
+    // the two panes on the same part of the document is most of what makes a split view useful
+    // rather than merely two views.
+    if (workspace.settings.syncScrolling) {
+        val caretLine = document.caretPosition.line
+        val headingIndex = remember(document.outline, caretLine) {
+            document.outline.indexOfLast { it.line <= caretLine }
+        }
+
+        LaunchedEffect(headingIndex, blocks) {
+            if (headingIndex >= 0 && blocks.isNotEmpty()) {
+                listState.animateScrollToItem(HtmlRenderer.blockForHeading(blocks, headingIndex))
+            }
+        }
+    }
+
     Box(modifier.background(editor.background)) {
         if (blocks.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

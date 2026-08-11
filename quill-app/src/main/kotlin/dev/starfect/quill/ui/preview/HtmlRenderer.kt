@@ -39,6 +39,26 @@ internal object HtmlRenderer {
         return sink.blocks
     }
 
+    /**
+     * The index of the block to scroll to for a source heading position.
+     *
+     * The rendered HTML carries no source positions — comrak's `sourcepos` is off for the preview
+     * because it would put a `data-sourcepos` attribute on every element. Headings are enough: they
+     * are what the outline is built from, they are where a reader navigates to, and matching on them
+     * needs nothing the engine is not already producing.
+     */
+    fun blockForHeading(blocks: List<PreviewBlock>, headingIndex: Int): Int {
+        if (headingIndex < 0) return 0
+        var seen = 0
+        blocks.forEachIndexed { index, block ->
+            if (block is PreviewBlock.Heading) {
+                if (seen == headingIndex) return index
+                seen++
+            }
+        }
+        return blocks.lastIndex.coerceAtLeast(0)
+    }
+
     /** Where a block sits relative to the margin, and what encloses it. */
     private data class Context(
         /** List nesting depth; 0 is top level. */
