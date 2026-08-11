@@ -161,6 +161,14 @@ public fun OutlinePanel(controller: QuillController, workspace: WorkspaceState) 
             return@Column
         }
 
+        // Which heading the caret is under. The IDE keeps the structure view pointed at wherever you
+        // are in the document, so the panel answers "where am I" without being clicked — and it is
+        // what makes Structure share TreeSelection with the project tree rather than only its shape.
+        val caret = document?.caretPosition?.offset ?: 0
+        val current = remember(outline, caret) {
+            outline.indexOfLast { it.offset <= caret }.takeIf { it >= 0 }
+        }
+
         ToolWindowFocusScope(Modifier.fillMaxSize()) {
             VerticallyScrollableContainer(scrollState = listState, modifier = Modifier.fillMaxSize()) {
                 LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
@@ -169,6 +177,7 @@ public fun OutlinePanel(controller: QuillController, workspace: WorkspaceState) 
                         OutlineRow(
                             level = entry.level,
                             title = entry.title,
+                            selected = index == current,
                             onClick = { documentId?.let { controller.moveCaret(it, entry.offset) } },
                         )
                     }
@@ -179,11 +188,11 @@ public fun OutlinePanel(controller: QuillController, workspace: WorkspaceState) 
 }
 
 @Composable
-private fun OutlineRow(level: Int, title: String, onClick: () -> Unit) {
+private fun OutlineRow(level: Int, title: String, selected: Boolean, onClick: () -> Unit) {
     val shell = LocalShellPalette.current
 
     // A heading's level is its depth, so the outline indents exactly as the document nests.
-    TreeRow(depth = (level - 1).coerceAtLeast(0), onClick = onClick) {
+    TreeRow(depth = (level - 1).coerceAtLeast(0), onClick = onClick, selected = selected) {
         // The structure view badges each symbol with its kind; for a document that is the heading
         // level, which is also the only thing distinguishing two identically-named rows.
         Box(Modifier.width(Tokens.IconSize), contentAlignment = Alignment.Center) {
