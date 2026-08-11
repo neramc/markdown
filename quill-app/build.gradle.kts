@@ -79,7 +79,7 @@ val toolchainLauncher = extensions.getByType<JavaToolchainService>().launcherFor
 
 compose.desktop {
     application {
-        mainClass = "com.neramc.quill.MainKt"
+        mainClass = "dev.starfect.quill.MainKt"
         javaHome = toolchainLauncher.get().metadata.installationPath.asFile.absolutePath
 
         jvmArgs += listOf(
@@ -107,8 +107,8 @@ compose.desktop {
             packageName = "Quill"
             packageVersion = quillVersion
             description = "An enterprise Markdown editor with a Rust core"
-            copyright = "Copyright (c) 2026 neramc"
-            vendor = "neramc"
+            copyright = "Copyright (c) 2026 Quill contributors"
+            vendor = "starfect"
 
             // Explicit module list keeps the jlink runtime image small: without it the plugin has to
             // guess, and guessing wrong either bloats the image or breaks at runtime.
@@ -129,10 +129,10 @@ compose.desktop {
                 if (png.exists()) iconFile.set(png)
                 menuGroup = "Development"
                 appCategory = "Development"
-                debMaintainer = "noreply@neramc.dev"
+                debMaintainer = "quill@starfect.dev"
             }
             macOS {
-                bundleID = "com.neramc.quill"
+                bundleID = "dev.starfect.quill"
                 val icns = rootProject.file("assets/icon.icns")
                 if (icns.exists()) iconFile.set(icns)
             }

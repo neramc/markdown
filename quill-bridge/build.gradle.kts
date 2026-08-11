@@ -1,4 +1,4 @@
-import com.neramc.quill.build.CargoBuildTask
+import dev.starfect.quill.build.CargoBuildTask
 import org.gradle.jvm.toolchain.JavaLanguageVersion
 import org.gradle.jvm.toolchain.JvmVendorSpec
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget

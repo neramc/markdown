@@ -7,6 +7,6 @@ plugins {
 val quillVersion: String = providers.gradleProperty("quill.version").get()
 
 allprojects {
-    group = "com.neramc.quill"
+    group = "dev.starfect.quill"
     version = quillVersion
 }

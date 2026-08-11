@@ -6,7 +6,7 @@
 
 # -- Entry point --------------------------------------------------------------------------------
 
--keep public class com.neramc.quill.MainKt {
+-keep public class dev.starfect.quill.MainKt {
     public static void main(java.lang.String[]);
 }
 
@@ -16,8 +16,8 @@
 # FunctionDescriptor by hand. Nothing reaches these members from bytecode ProGuard can see, so the
 # whole bridge is kept: shrinking it away would leave the application starting with no engine.
 
--keep class com.neramc.quill.bridge.internal.** { *; }
--keep class com.neramc.quill.bridge.** { *; }
+-keep class dev.starfect.quill.bridge.internal.** { *; }
+-keep class dev.starfect.quill.bridge.** { *; }
 
 # ProGuard copies non-class jar entries through untouched, so the staged native library and the
 # expui icon replacements need no rule of their own. (R8's -keepresources is not a ProGuard option

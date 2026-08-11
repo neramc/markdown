@@ -10,6 +10,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
   DOTNET_NOLOGO: true
@@ -19,7 +22,7 @@ jobs:
   # The Rust engine on its own. It is the fastest job and the one most changes touch, so failing it
   # early avoids spending the matrix's time on a build that cannot pass.
   engine:
-    name: Rust engine
+    name: Engine
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -42,8 +45,7 @@ jobs:
       - name: Test
         run: cargo test --manifest-path quill-core/Cargo.toml
 
-  # The bridge and the UI, on every platform Quill ships to. The JetBrains Runtime is provisioned by
-  # the Gradle toolchain resolver, so no JDK is set up here beyond the one Gradle itself runs on.
+  # The bridge and the application, on every platform Quill ships to.
   jvm:
     name: JVM (${{ matrix.os }})
     needs: engine
@@ -62,7 +64,9 @@ jobs:
         with:
           workspaces: quill-core
 
-      - name: Set up a JDK for Gradle itself
+      # A JDK for Gradle itself to run on. The compile toolchain is a different JDK, provisioned by
+      # the foojay resolver from the version catalog.
+      - name: Set up a JDK for Gradle
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -70,19 +74,29 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      # jpackage shells out to fakeroot to build a .deb; without it the bundler is skipped and the
-      # packaging task fails.
+      # jpackage shells out to these; without them the bundler is skipped and the packaging task
+      # fails with a message that says nothing about the missing tool.
       - name: Install packaging tools
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y fakeroot
+        run: sudo apt-get update && sudo apt-get install -y fakeroot binutils rpm
 
-      # The UI tests compose offscreen through Skia, so they need no display server. Everything
-      # else is headless already.
+      # The UI tests compose offscreen through Skia and need no display server.
       - name: Build and test
         run: ./gradlew build --stacktrace
 
-      - name: Package for this platform
-        run: ./gradlew packageReleaseDistributionForCurrentOS --stacktrace
+      # createReleaseDistributable is the one packaging task that exists on every platform. The
+      # native installers are per-OS and are built in the steps below, because there is no Windows
+      # target format declared at all -- Windows is served by the separate setup project.
+      - name: Build the release application image
+        run: ./gradlew :quill-app:createReleaseDistributable --stacktrace
+
+      - name: Build the Linux packages
+        if: runner.os == 'Linux'
+        run: ./gradlew :quill-app:packageReleaseDeb :quill-app:packageReleaseRpm --stacktrace
+
+      - name: Build the macOS package
+        if: runner.os == 'macOS'
+        run: ./gradlew :quill-app:packageReleaseDmg --stacktrace
 
       - name: Upload the offscreen UI renders
         if: always()
@@ -90,7 +104,7 @@ jobs:
         with:
           name: ui-renders-${{ matrix.os }}
           path: quill-app/build/test-renders/
-          if-no-files-found: ignore
+          if-no-files-found: warn
 
       - name: Upload the application image
         uses: actions/upload-artifact@v4
@@ -100,6 +114,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload the native packages
+        if: runner.os != 'Windows'
         uses: actions/upload-artifact@v4
         with:
           name: packages-${{ matrix.os }}
@@ -107,12 +122,12 @@ jobs:
             quill-app/build/compose/binaries/main-release/deb/
             quill-app/build/compose/binaries/main-release/rpm/
             quill-app/build/compose/binaries/main-release/dmg/
-          if-no-files-found: ignore
+          if-no-files-found: warn
 
-  # The installer's own tests. These need no Windows and no application image, so they run on Linux
-  # alongside the matrix rather than waiting for it.
+  # The setup project's own tests need neither Windows nor an application image, so they run on
+  # Linux alongside the matrix rather than waiting for it.
   setup-tests:
-    name: Installer tests
+    name: Setup tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -128,15 +143,15 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: installer-ui-renders
+          name: setup-ui-renders
           path: installer-windows/**/bin/**/ui-renders/
-          if-no-files-found: ignore
+          if-no-files-found: warn
 
-  # QuillSetup.exe carries a Windows application image, and jpackage cannot cross-build one — hence
+  # QuillSetup.exe carries a Windows application image, and jpackage cannot cross-build one -- hence
   # the dependency on the Windows leg of the matrix. Publishing itself cross-compiles fine, so this
   # runs on Linux.
-  installer:
-    name: Windows installer
+  setup-package:
+    name: Windows setup
     needs: [jvm, setup-tests]
     runs-on: ubuntu-latest
     steps:
