@@ -627,8 +627,16 @@ public class QuillController(
         // re-derived — otherwise the next highlight comes back in the old scheme's colours.
         if (settings.darkTheme != previous.darkTheme) {
             runCatching { engine.setDarkTheme(settings.darkTheme) }
-            handles.keys.forEach { derive(it, immediate = true) }
-        } else if (settings.inspectionsEnabled != previous.inspectionsEnabled) {
+        }
+
+        // Every setting that feeds derivation has to re-run it. Missing one does not fail
+        // anywhere: the value lands in the state, nothing on screen moves, and the setting reads
+        // as ignored until an unrelated keystroke happens to trigger a parse.
+        val affectsDerivation = settings.darkTheme != previous.darkTheme ||
+            settings.inspectionsEnabled != previous.inspectionsEnabled ||
+            settings.showWeakWarnings != previous.showWeakWarnings
+
+        if (affectsDerivation) {
             handles.keys.forEach { derive(it, immediate = true) }
         }
     }
