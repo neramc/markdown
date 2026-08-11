@@ -76,6 +76,21 @@ public object IdeaMetrics {
     public val FindBarHeight: Dp = 32.dp
 
     /** Left navigation rail on the welcome window. */
+    /** Corner radius of a dialog panel. */
+    public val DialogCorner: Dp = 10.dp
+
+    /** Height of a dialog's own title bar. */
+    public val DialogTitleHeight: Dp = 38.dp
+
+    /** Width of the category list in the Settings and Run/Debug dialogs. */
+    public val DialogListWidth: Dp = 232.dp
+
+    /** Corner radius of the editor and preview panes, and of a preview code block. */
+    public val PaneCorner: Dp = 8.dp
+
+    /** Height of the bottom dock when it is open. */
+    public val BottomDockHeight: Dp = 190.dp
+
     public val WelcomeRailWidth: Dp = 250.dp
 
     /** One entry in the welcome window's recent-projects list. */

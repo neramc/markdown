@@ -8,6 +8,9 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.use
 import dev.starfect.quill.QuillController
 import dev.starfect.quill.bridge.QuillEngine
+import dev.starfect.quill.model.Dialog
+import dev.starfect.quill.model.RunTask
+import dev.starfect.quill.model.ToolWindow
 import dev.starfect.quill.model.ViewMode
 import dev.starfect.quill.ui.shell.QuillToolBar
 import dev.starfect.quill.ui.theme.QuillTheme
@@ -93,6 +96,24 @@ class ShellRenderTest {
 
             Mixed scripts: 한국어 텍스트와 이모지 🎉 를 포함합니다.
         """.trimIndent()
+
+        /**
+         * A document carrying one problem of each severity.
+         *
+         * An error (the fence is never closed), a warning (the heading level jumps past 2) and a
+         * weak warning (the trailing spaces on the paragraph). Three severities is what makes the
+         * inspection widget draw all three counts instead of collapsing to one.
+         */
+        val FLAWED = """
+            # Title
+
+            ### Skipped a level
+
+            A paragraph with trailing space.${' '}${' '}${' '}
+
+            ```
+            an unclosed fence
+        """.trimIndent()
     }
 
     private lateinit var scope: CoroutineScope
@@ -166,6 +187,82 @@ class ShellRenderTest {
     }
 
     @Test
+    fun `the Settings dialog renders over the shell`() {
+        val plain = renderShell("split-plain.png", dark = true, viewMode = ViewMode.SPLIT)
+        val dialog = renderShell("settings-dialog.png", dark = true, viewMode = ViewMode.SPLIT) {
+            controller.showDialog(Dialog.SETTINGS)
+        }
+
+        assertTrue(distinctColours(dialog) > 64, "the Settings dialog rendered blank")
+        assertTrue(
+            differingPixelRatio(plain, dialog) > 0.2,
+            "the dialog and its scrim should cover a large part of the window",
+        )
+    }
+
+    @Test
+    fun `the Run-Debug Configurations dialog renders with a configuration selected`() {
+        val dialog = renderShell("run-configurations-dialog.png", dark = true, viewMode = ViewMode.SPLIT) {
+            controller.addRunConfiguration(RunTask.EXPORT_HTML)
+            controller.addRunConfiguration(RunTask.INSPECT)
+            controller.showDialog(Dialog.RUN_CONFIGURATIONS)
+        }
+
+        assertTrue(distinctColours(dialog) > 64, "the Run/Debug dialog rendered blank")
+    }
+
+    @Test
+    fun `the Problems tool window renders the findings of a document with problems`() {
+        val clean = renderShell("problems-clean.png", dark = true, viewMode = ViewMode.SPLIT) {
+            controller.openProblems()
+        }
+
+        // A second document, this one deliberately broken, so the panel has rows to draw.
+        val flawed = renderShell(
+            "problems-panel.png",
+            dark = true,
+            viewMode = ViewMode.SPLIT,
+            source = FLAWED,
+        ) {
+            controller.openProblems()
+        }
+
+        val document = assertNotNull(controller.state.value.activeDocument, "no document was opened")
+        assertTrue(document.findings.isNotEmpty(), "the engine reported no problems in a broken document")
+        assertEquals(
+            ToolWindow.PROBLEMS,
+            controller.state.value.bottomToolWindow,
+            "the Problems panel was not open when the frame was drawn",
+        )
+        assertTrue(
+            differingPixelRatio(clean, flawed) > 0.02,
+            "the problems panel drew the same thing for a clean and a broken document",
+        )
+    }
+
+    /** Opens the Problems panel regardless of what is already on the bottom dock. */
+    private fun QuillController.openProblems() {
+        if (state.value.bottomToolWindow != ToolWindow.PROBLEMS) {
+            setBottomToolWindow(ToolWindow.PROBLEMS)
+        }
+    }
+
+    @Test
+    fun `the inspection widget reflects what the engine found`() {
+        renderShell("inspection-widget.png", dark = true, viewMode = ViewMode.EDITOR, source = FLAWED)
+
+        val document = assertNotNull(controller.state.value.activeDocument, "no document was opened")
+        val summary = document.inspectionSummary
+
+        // The fixture carries one of each severity, which is what makes the widget draw all three
+        // counts rather than collapsing to one.
+        assertTrue(summary.errors > 0, "expected an error from the unclosed fence")
+        assertTrue(summary.warnings > 0, "expected a warning from the heading jump")
+        assertTrue(summary.weak > 0, "expected a weak warning from the trailing whitespace")
+        assertEquals(summary.total, document.findings.size)
+    }
+
+    @Test
     fun `the engine produced the derived views the shell is drawing`() {
         // Guards against the render assertions passing on an empty document: had derivation failed
         // silently, every pane would still draw its chrome and the colour checks would hold.
@@ -193,16 +290,17 @@ class ShellRenderTest {
         fileName: String,
         dark: Boolean,
         viewMode: ViewMode,
+        source: String = SAMPLE,
         afterOpen: () -> Unit = {},
     ): BufferedImage {
-        val source = Files.createTempDirectory("quill-render").resolve("sample.md")
-        source.writeText(SAMPLE)
+        val file = Files.createTempDirectory("quill-render").resolve("sample.md")
+        file.writeText(source)
 
-        controller.openProject(source.parent)
-        controller.openFile(source)
+        controller.openProject(file.parent)
+        controller.openFile(file)
         controller.updateSettings { it.copy(darkTheme = dark, viewMode = viewMode) }
 
-        awaitDerivedDocument(source)
+        awaitDerivedDocument(file)
         afterOpen()
 
         val encoded = ImageComposeScene(width = WIDTH, height = HEIGHT, density = Density(1f)).use { scene ->

@@ -4,7 +4,9 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.text.input.TextFieldValue
 import dev.starfect.quill.bridge.MarkdownFlavour
 import dev.starfect.quill.bridge.wire.DocumentStats
+import dev.starfect.quill.bridge.wire.Finding
 import dev.starfect.quill.bridge.wire.HtmlNode
+import dev.starfect.quill.bridge.wire.InspectionSummary
 import dev.starfect.quill.bridge.wire.MarkdownBlockIr
 import dev.starfect.quill.bridge.wire.OutlineEntry
 import dev.starfect.quill.bridge.wire.SearchMatch
@@ -23,8 +25,29 @@ public enum class ViewMode {
     PREVIEW,
 }
 
-/** A tool window in the left or right dock. */
-public enum class ToolWindow { PROJECT, STRUCTURE }
+/**
+ * A tool window in one of the three docks.
+ *
+ * Each is pinned to the edge the IDE puts it on: navigation on the left, the document's own outline
+ * on the right, and everything transient along the bottom.
+ */
+public enum class ToolWindow(public val dock: Dock, public val label: String) {
+    PROJECT(Dock.LEFT, "Project"),
+    STRUCTURE(Dock.RIGHT, "Structure"),
+    PROBLEMS(Dock.BOTTOM, "Problems"),
+    NOTIFICATIONS(Dock.RIGHT, "Notifications"),
+    DATABASE(Dock.RIGHT, "Database"),
+    TERMINAL(Dock.BOTTOM, "Terminal"),
+    ;
+
+    public companion object {
+        /** The tool windows on [dock], in stripe order. */
+        public fun on(dock: Dock): List<ToolWindow> = entries.filter { it.dock == dock }
+    }
+}
+
+/** Which edge a tool window docks to. */
+public enum class Dock { LEFT, RIGHT, BOTTOM }
 
 /** Zero-based caret line, column and absolute offset, all in UTF-16 units. */
 @Immutable
@@ -53,6 +76,7 @@ public data class DocumentSession(
     val blocks: List<MarkdownBlockIr> = emptyList(),
     val html: List<HtmlNode> = emptyList(),
     val outline: List<OutlineEntry> = emptyList(),
+    val findings: List<Finding> = emptyList(),
     val stats: DocumentStats = DocumentStats.EMPTY,
     val spans: List<StyleSpan> = emptyList(),
     val matches: List<SearchMatch> = emptyList(),
@@ -62,6 +86,10 @@ public data class DocumentSession(
     /** File name, or a placeholder for a document that has never been saved. */
     val displayName: String
         get() = path?.fileName?.toString() ?: "Untitled"
+
+    /** Finding counts by severity, which is what the editor's inspection widget shows. */
+    val inspectionSummary: InspectionSummary
+        get() = InspectionSummary.of(findings)
 
     /** Whether the buffer differs from what is on disk. */
     val isModified: Boolean
@@ -113,7 +141,57 @@ public data class QuillSettings(
     val showLineNumbers: Boolean = true,
     val editorFontSize: Int = 14,
     val wordWrap: Boolean = true,
+    /** Highlight the line the caret is on. */
+    val highlightCaretRow: Boolean = true,
+    /** Show the whitespace and trailing-space inspections, which are noisy on imported documents. */
+    val showWeakWarnings: Boolean = true,
+    /** Run inspections at all. */
+    val inspectionsEnabled: Boolean = true,
+    /** Preview scrolling follows the caret. */
+    val syncScrolling: Boolean = true,
+    /** Save a modified document when the window loses focus. */
+    val saveOnFocusLoss: Boolean = false,
+    /** Strip trailing whitespace when saving. */
+    val trimTrailingWhitespaceOnSave: Boolean = false,
+    /** Ensure the file ends with exactly one newline when saving. */
+    val ensureNewlineOnSave: Boolean = true,
+    /** Soft-wrap column guide, or 0 to hide it. */
+    val visualGuideColumn: Int = 0,
+    /** Tab width in spaces. */
+    val tabWidth: Int = 4,
 )
+
+/**
+ * One entry in the Run/Debug configurations dialog.
+ *
+ * Quill's "run" is a document task — exporting, linting, opening the rendered file — so a
+ * configuration names one of those and the arguments it takes. The shape mirrors the IDE's dialog
+ * because that is where the user expects to find it, not because Quill runs processes.
+ */
+@Immutable
+public data class RunConfiguration(
+    val id: Long,
+    val name: String,
+    val task: RunTask,
+    /** Document to run against, or null for whichever is focused. */
+    val targetPath: Path? = null,
+    val outputPath: Path? = null,
+    val standalone: Boolean = true,
+    val darkTheme: Boolean = true,
+    val allowRawHtml: Boolean = false,
+    val openAfterRun: Boolean = false,
+    val storeAsProjectFile: Boolean = false,
+)
+
+/** What a [RunConfiguration] does. */
+public enum class RunTask(public val label: String, public val description: String) {
+    EXPORT_HTML("Export HTML", "Render the document to a standalone HTML file"),
+    INSPECT("Inspect", "Run every inspection and report the findings"),
+    WORD_COUNT("Word count", "Report the document's statistics"),
+}
+
+/** The modal dialog on screen, if any. */
+public enum class Dialog { SETTINGS, RUN_CONFIGURATIONS, ABOUT }
 
 /** The whole application state. */
 @Immutable
@@ -127,8 +205,38 @@ public data class WorkspaceState(
     val commandPaletteVisible: Boolean = false,
     val leftToolWindow: ToolWindow? = ToolWindow.PROJECT,
     val rightToolWindow: ToolWindow? = ToolWindow.STRUCTURE,
+    val bottomToolWindow: ToolWindow? = null,
+    val dialog: Dialog? = null,
+    val runConfigurations: List<RunConfiguration> = emptyList(),
+    val selectedRunConfigurationId: Long? = null,
+    val notifications: List<Notification> = emptyList(),
     val notification: String? = null,
 ) {
     val activeDocument: DocumentSession?
         get() = documents.firstOrNull { it.id == activeDocumentId }
+
+    /** The tool window shown on [dock], or null when that dock is collapsed. */
+    public fun toolWindow(dock: Dock): ToolWindow? = when (dock) {
+        Dock.LEFT -> leftToolWindow
+        Dock.RIGHT -> rightToolWindow
+        Dock.BOTTOM -> bottomToolWindow
+    }
+
+    /** The configuration the run button uses, which is the selected one or the first defined. */
+    val activeRunConfiguration: RunConfiguration?
+        get() = runConfigurations.firstOrNull { it.id == selectedRunConfigurationId }
+            ?: runConfigurations.firstOrNull()
 }
+
+/** One entry in the Notifications tool window. */
+@Immutable
+public data class Notification(
+    val id: Long,
+    val title: String,
+    val body: String,
+    val severity: NotificationSeverity = NotificationSeverity.INFO,
+    val timestamp: Long = System.currentTimeMillis(),
+)
+
+/** How prominently a [Notification] is drawn. */
+public enum class NotificationSeverity { INFO, SUCCESS, WARNING, ERROR }

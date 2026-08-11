@@ -81,6 +81,8 @@ public final class QuillBindings {
             handle("quill_doc_spans", FunctionDescriptor.of(C_INT, PTR, C_INT, C_INT, PTR));
     private static final MethodHandle DOC_OUTLINE =
             handle("quill_doc_outline", FunctionDescriptor.of(C_INT, PTR, PTR));
+    private static final MethodHandle DOC_INSPECTIONS =
+            handle("quill_doc_inspections", FunctionDescriptor.of(C_INT, PTR, PTR));
     private static final MethodHandle DOC_STATS = handle("quill_doc_stats", FunctionDescriptor.of(C_INT, PTR, PTR));
     private static final MethodHandle DOC_SEARCH =
             handle("quill_doc_search", FunctionDescriptor.of(C_INT, PTR, PTR, C_SIZE_T, C_INT, PTR));
@@ -321,6 +323,16 @@ public final class QuillBindings {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment buffer = arena.allocate(QUILL_BUF);
             int status = (int) DOC_OUTLINE.invokeExact(doc, buffer);
+            return new Payload(status, status == STATUS_OK ? consume(buffer) : new byte[0]);
+        } catch (Throwable failure) {
+            throw rethrow(failure);
+        }
+    }
+
+    public static Payload docInspections(MemorySegment doc) {
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment buffer = arena.allocate(QUILL_BUF);
+            int status = (int) DOC_INSPECTIONS.invokeExact(doc, buffer);
             return new Payload(status, status == STATUS_OK ? consume(buffer) : new byte[0]);
         } catch (Throwable failure) {
             throw rethrow(failure);

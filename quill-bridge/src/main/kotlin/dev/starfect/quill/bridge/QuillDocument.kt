@@ -2,6 +2,7 @@ package dev.starfect.quill.bridge
 
 import dev.starfect.quill.bridge.internal.QuillBindings
 import dev.starfect.quill.bridge.wire.DocumentStats
+import dev.starfect.quill.bridge.wire.Finding
 import dev.starfect.quill.bridge.wire.HtmlNode
 import dev.starfect.quill.bridge.wire.MarkdownBlockIr
 import dev.starfect.quill.bridge.wire.OutlineEntry
@@ -9,6 +10,7 @@ import dev.starfect.quill.bridge.wire.SearchMatch
 import dev.starfect.quill.bridge.wire.StyleSpan
 import dev.starfect.quill.bridge.wire.decodeBlocks
 import dev.starfect.quill.bridge.wire.decodeHtmlDom
+import dev.starfect.quill.bridge.wire.decodeInspections
 import dev.starfect.quill.bridge.wire.decodeOutline
 import dev.starfect.quill.bridge.wire.decodeSearch
 import dev.starfect.quill.bridge.wire.decodeSpans
@@ -149,6 +151,15 @@ public class QuillDocument internal constructor(
     /** The heading outline. */
     public fun outline(): List<OutlineEntry> =
         decodeOutline(QuillBindings.docOutline(requireOpen()).require("outline"))
+
+    /**
+     * Problems found in the document, in source order.
+     *
+     * Ordered by position rather than by severity: the list is read alongside the document, and
+     * jumping around it in severity order makes it useless for working through.
+     */
+    public fun inspections(): List<Finding> =
+        decodeInspections(QuillBindings.docInspections(requireOpen()).require("inspections"))
 
     /** Word, character and reading-time statistics. */
     public fun stats(): DocumentStats = decodeStats(QuillBindings.docStats(requireOpen()).require("stats"))

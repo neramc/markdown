@@ -3,11 +3,14 @@ package dev.starfect.quill
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isAltPressed
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
+import dev.starfect.quill.model.Dialog
+import dev.starfect.quill.model.ToolWindow
 import dev.starfect.quill.model.ViewMode
 
 /**
@@ -21,9 +24,14 @@ internal fun handleShortcut(event: KeyEvent, controller: QuillController): Boole
     // Cmd on macOS, Ctrl elsewhere.
     val primary = event.isCtrlPressed || event.isMetaPressed
     if (!primary) {
-        if (event.key == Key.Escape) {
-            val workspace = controller.state.value
-            return when {
+        val workspace = controller.state.value
+        return when {
+            event.key == Key.Escape -> when {
+                // Innermost first: a dialog over a palette over a find bar, closed in that order.
+                workspace.dialog != null -> {
+                    controller.dismissDialog()
+                    true
+                }
                 workspace.commandPaletteVisible -> {
                     controller.setCommandPaletteVisible(false)
                     true
@@ -34,8 +42,29 @@ internal fun handleShortcut(event: KeyEvent, controller: QuillController): Boole
                 }
                 else -> false
             }
+
+            // Shift+F10 runs, as it does in the IDE.
+            event.key == Key.F10 && event.isShiftPressed -> {
+                workspace.activeRunConfiguration
+                    ?.let(controller::run)
+                    ?: controller.showDialog(Dialog.RUN_CONFIGURATIONS)
+                true
+            }
+
+            // F2 and Shift+F2 step through the inspection findings.
+            event.key == Key.F2 -> {
+                workspace.activeDocument?.let { controller.goToFinding(it, forward = !event.isShiftPressed) }
+                true
+            }
+
+            else -> false
         }
-        return false
+    }
+
+    // Ctrl+Alt+S opens Settings, which is the IDE's binding and not one to reassign.
+    if (event.isAltPressed && event.key == Key.S) {
+        controller.showDialog(Dialog.SETTINGS)
+        return true
     }
 
     val activeId = controller.state.value.activeDocumentId
@@ -83,6 +112,10 @@ internal fun handleShortcut(event: KeyEvent, controller: QuillController): Boole
         }
         event.key == Key.T && event.isShiftPressed -> {
             controller.toggleTheme()
+            true
+        }
+        event.key == Key.Six && event.isShiftPressed -> {
+            controller.setBottomToolWindow(ToolWindow.PROBLEMS)
             true
         }
         else -> false

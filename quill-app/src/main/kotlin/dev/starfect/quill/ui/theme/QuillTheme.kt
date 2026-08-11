@@ -202,6 +202,10 @@ public class ShellPalette(
     public val popupBorder: Color,
     /** Error text and invalid-input outlines. */
     public val error: Color,
+    /** Warning severity, in inspections and the problems list. */
+    public val warning: Color,
+    /** The all-clear tick, and anything reporting a completed action. */
+    public val success: Color,
     /** Modified-file marker in tabs and the project tree. */
     public val modified: Color,
     /** Ordinary directory icons in the project view. */
@@ -232,6 +236,8 @@ public class ShellPalette(
             popupBackground = Color(0xFF2B2D30),
             popupBorder = Color(0xFF43454A),
             error = Color(0xFFDB5C5C),
+            warning = Color(0xFFE0A22B),
+            success = Color(0xFF5FAD65),
             modified = Color(0xFF548AF7),
             folderIcon = Color(0xFF9AA7B0),
             sourceFolderIcon = Color(0xFF5FA8F5),
@@ -257,6 +263,8 @@ public class ShellPalette(
             popupBackground = Color(0xFFFFFFFF),
             popupBorder = Color(0xFFC9CCD6),
             error = Color(0xFFC94F4F),
+            warning = Color(0xFFC28A18),
+            success = Color(0xFF3D8B45),
             modified = Color(0xFF3574F0),
             folderIcon = Color(0xFF7A8494),
             sourceFolderIcon = Color(0xFF3574F0),

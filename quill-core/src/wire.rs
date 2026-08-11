@@ -33,6 +33,7 @@ pub enum PayloadKind {
     CodeHighlight = 6,
     Text = 7,
     HtmlDom = 8,
+    Inspections = 9,
 }
 
 /// Append-only binary encoder.
@@ -169,6 +170,7 @@ impl<'a> Decoder<'a> {
             6 => PayloadKind::CodeHighlight,
             7 => PayloadKind::Text,
             8 => PayloadKind::HtmlDom,
+            9 => PayloadKind::Inspections,
             other => return Err(DecodeError::UnknownKind(other)),
         };
         Ok((decoder, kind))

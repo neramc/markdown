@@ -347,6 +347,143 @@ public object IdeIcons {
         }
     }
 
+    /** The Problems tool window's stripe icon: a triangle with a bang. */
+    @Composable
+    public fun ProblemsStripe(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.StripeIconSize) {
+        IdeIcon(size, modifier) { unit ->
+            polyline(listOf(8f to 2.5f, 14f to 13f, 2f to 13f, 8f to 2.5f), tint, unit)
+            line(8f, 6.5f, 8f, 9.5f, tint, unit)
+            drawCircle(tint, 0.75f * unit, Offset(8f * unit, 11.3f * unit))
+        }
+    }
+
+    /** The Notifications tool window's stripe icon: a bell. */
+    @Composable
+    public fun NotificationsStripe(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.StripeIconSize) {
+        IdeIcon(size, modifier) { unit ->
+            polyline(
+                listOf(
+                    3.5f to 11f,
+                    4.6f to 9.6f,
+                    4.6f to 7f,
+                    8f to 3.2f,
+                    11.4f to 7f,
+                    11.4f to 9.6f,
+                    12.5f to 11f,
+                    3.5f to 11f,
+                ),
+                tint,
+                unit,
+            )
+            polyline(listOf(6.6f to 12.4f, 8f to 13.6f, 9.4f to 12.4f), tint, unit)
+        }
+    }
+
+    /** The Database tool window's stripe icon: the stacked-cylinder glyph. */
+    @Composable
+    public fun DatabaseStripe(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.StripeIconSize) {
+        IdeIcon(size, modifier) { unit ->
+            // Three ellipses stacked, with the sides joining the top and bottom ones.
+            ellipse(8f, 4f, 5f, 2f, tint, unit)
+            polyline(listOf(3f to 4f, 3f to 12f), tint, unit)
+            polyline(listOf(13f to 4f, 13f to 12f), tint, unit)
+            arcDown(8f, 8f, 5f, 2f, tint, unit)
+            arcDown(8f, 12f, 5f, 2f, tint, unit)
+        }
+    }
+
+    /** The Terminal tool window's stripe icon: a prompt caret. */
+    @Composable
+    public fun TerminalStripe(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.StripeIconSize) {
+        IdeIcon(size, modifier) { unit ->
+            rect(2f, 3f, 14f, 13f, tint, unit)
+            polyline(listOf(4.5f to 6.5f, 7f to 8.5f, 4.5f to 10.5f), tint, unit)
+            line(8.5f, 10.5f, 11.5f, 10.5f, tint, unit)
+        }
+    }
+
+    // ---------------------------------------------------------------- severity
+
+    /** A filled severity dot, used in the inspection widget and the problems list. */
+    @Composable
+    public fun SeverityError(tint: Color, modifier: Modifier = Modifier, size: Dp = 14.dp) {
+        IdeIcon(size, modifier) { unit ->
+            drawCircle(tint, 6f * unit, Offset(8f * unit, 8f * unit))
+            line(8f, 4.6f, 8f, 8.6f, Color.White, unit)
+            drawCircle(Color.White, 0.85f * unit, Offset(8f * unit, 11f * unit))
+        }
+    }
+
+    /** The warning triangle, which is the glyph the editor's inspection widget shows. */
+    @Composable
+    public fun SeverityWarning(tint: Color, modifier: Modifier = Modifier, size: Dp = 14.dp) {
+        IdeIcon(size, modifier) { unit ->
+            val path = Path().apply {
+                moveTo(8f * unit, 1.8f * unit)
+                lineTo(15f * unit, 14f * unit)
+                lineTo(1f * unit, 14f * unit)
+                close()
+            }
+            drawPath(path, tint)
+            line(8f, 6f, 8f, 9.8f, Color.Black.copy(alpha = 0.75f), unit)
+            drawCircle(Color.Black.copy(alpha = 0.75f), 0.8f * unit, Offset(8f * unit, 11.9f * unit))
+        }
+    }
+
+    /** The weak-warning glyph: the same triangle, outlined rather than filled. */
+    @Composable
+    public fun SeverityWeak(tint: Color, modifier: Modifier = Modifier, size: Dp = 14.dp) {
+        IdeIcon(size, modifier) { unit ->
+            polyline(listOf(8f to 2.5f, 14f to 13f, 2f to 13f, 8f to 2.5f), tint, unit)
+        }
+    }
+
+    /** The all-clear mark the widget shows on a document with no findings. */
+    @Composable
+    public fun SeverityClean(tint: Color, modifier: Modifier = Modifier, size: Dp = 14.dp) {
+        IdeIcon(size, modifier) { unit ->
+            polyline(listOf(3.5f to 8.5f, 6.5f to 11.5f, 12.5f to 4.5f), tint, unit)
+        }
+    }
+
+    /** Duplicate: two offset sheets. */
+    @Composable
+    public fun Copy(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.IconSize) {
+        IdeIcon(size, modifier) { unit ->
+            rect(5.5f, 2.5f, 13.5f, 10.5f, tint, unit)
+            polyline(listOf(10.5f to 13.5f, 2.5f to 13.5f, 2.5f to 5.5f), tint, unit)
+        }
+    }
+
+    // ---------------------------------------------------------------- run and debug
+
+    /** The green run triangle. */
+    @Composable
+    public fun Run(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.IconSize) {
+        IdeIcon(size, modifier) { unit ->
+            val path = Path().apply {
+                moveTo(4.5f * unit, 3f * unit)
+                lineTo(13f * unit, 8f * unit)
+                lineTo(4.5f * unit, 13f * unit)
+                close()
+            }
+            drawPath(path, tint)
+        }
+    }
+
+    /** The debug bug. */
+    @Composable
+    public fun Debug(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.IconSize) {
+        IdeIcon(size, modifier) { unit ->
+            circle(8f, 8.5f, 3.6f, tint, unit)
+            line(3f, 6f, 4.6f, 6.8f, tint, unit)
+            line(3f, 11f, 4.6f, 10.2f, tint, unit)
+            line(13f, 6f, 11.4f, 6.8f, tint, unit)
+            line(13f, 11f, 11.4f, 10.2f, tint, unit)
+            line(8f, 3f, 8f, 4.9f, tint, unit)
+        }
+    }
+
     // ---------------------------------------------------------------- editor toolbar
 
     /** Show the source only: a pane filled on the left. */
@@ -457,5 +594,52 @@ public object IdeIcons {
 
     private fun DrawScope.circle(x: Float, y: Float, radius: Float, tint: Color, unit: Float) {
         drawCircle(tint, radius * unit, Offset(x * unit, y * unit), style = stroke(unit))
+    }
+
+    /** A full ellipse, for the database cylinder's top face. */
+    private fun DrawScope.ellipse(
+        x: Float,
+        y: Float,
+        radiusX: Float,
+        radiusY: Float,
+        tint: Color,
+        unit: Float,
+    ) {
+        val path = Path().apply {
+            addOval(
+                Rect(
+                    (x - radiusX) * unit,
+                    (y - radiusY) * unit,
+                    (x + radiusX) * unit,
+                    (y + radiusY) * unit,
+                )
+            )
+        }
+        drawPath(path, tint, style = stroke(unit))
+    }
+
+    /**
+     * The lower half of an ellipse.
+     *
+     * The cylinder's middle and bottom faces show only their front edge — drawing the full ellipse
+     * would put a line through the body where the hidden back edge is.
+     */
+    private fun DrawScope.arcDown(
+        x: Float,
+        y: Float,
+        radiusX: Float,
+        radiusY: Float,
+        tint: Color,
+        unit: Float,
+    ) {
+        drawArc(
+            color = tint,
+            startAngle = 0f,
+            sweepAngle = 180f,
+            useCenter = false,
+            topLeft = Offset((x - radiusX) * unit, (y - radiusY) * unit),
+            size = Size(2 * radiusX * unit, 2 * radiusY * unit),
+            style = stroke(unit),
+        )
     }
 }

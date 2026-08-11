@@ -14,6 +14,7 @@ public enum class PayloadKind(internal val id: Int) {
     CODE_HIGHLIGHT(6),
     TEXT(7),
     HTML_DOM(8),
+    INSPECTIONS(9),
     ;
 
     internal companion object {

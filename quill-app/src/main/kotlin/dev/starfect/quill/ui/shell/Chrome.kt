@@ -44,36 +44,57 @@ public fun ToolWindowStripe(
     active: ToolWindow?,
     onSelect: (ToolWindow) -> Unit,
     modifier: Modifier = Modifier,
+    bottomTools: List<ToolWindow> = emptyList(),
+    bottomActive: ToolWindow? = null,
+    onSelectBottom: (ToolWindow) -> Unit = {},
 ) {
     val shell = LocalShellPalette.current
     Column(
         modifier = modifier.width(IdeaMetrics.StripeWidth).fillMaxHeight()
             .background(shell.toolWindowBackground)
-            .padding(top = 5.dp),
+            .padding(vertical = 5.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         tools.forEach { tool ->
-            IdeActionButton(
-                onClick = { onSelect(tool) },
-                tooltip = tool.label,
-                selected = tool == active,
-                size = IdeaMetrics.StripeButtonSize,
-            ) { tint ->
-                when (tool) {
-                    ToolWindow.PROJECT -> IdeIcons.ProjectStripe(tint)
-                    ToolWindow.STRUCTURE -> IdeIcons.StructureStripe(tint)
-                }
-            }
+            StripeButton(tool, selected = tool == active) { onSelect(tool) }
+        }
+
+        if (bottomTools.isEmpty()) return@Column
+
+        // The New UI puts the bottom-docked tool windows at the foot of the left rail rather than
+        // giving them a rail of their own, which is what keeps the window's edges to three stripes.
+        Spacer(Modifier.weight(1f))
+        bottomTools.forEach { tool ->
+            StripeButton(tool, selected = tool == bottomActive) { onSelectBottom(tool) }
         }
     }
 }
 
-internal val ToolWindow.label: String
-    get() = when (this) {
-        ToolWindow.PROJECT -> "Project"
-        ToolWindow.STRUCTURE -> "Structure"
+@Composable
+private fun StripeButton(tool: ToolWindow, selected: Boolean, onClick: () -> Unit) {
+    IdeActionButton(
+        onClick = onClick,
+        tooltip = tool.label,
+        selected = selected,
+        size = IdeaMetrics.StripeButtonSize,
+    ) { tint ->
+        ToolWindowIcon(tool, tint)
     }
+}
+
+/** The stripe glyph for a tool window. */
+@Composable
+public fun ToolWindowIcon(tool: ToolWindow, tint: Color) {
+    when (tool) {
+        ToolWindow.PROJECT -> IdeIcons.ProjectStripe(tint)
+        ToolWindow.STRUCTURE -> IdeIcons.StructureStripe(tint)
+        ToolWindow.PROBLEMS -> IdeIcons.ProblemsStripe(tint)
+        ToolWindow.NOTIFICATIONS -> IdeIcons.NotificationsStripe(tint)
+        ToolWindow.DATABASE -> IdeIcons.DatabaseStripe(tint)
+        ToolWindow.TERMINAL -> IdeIcons.TerminalStripe(tint)
+    }
+}
 
 /**
  * The header above a docked tool window.

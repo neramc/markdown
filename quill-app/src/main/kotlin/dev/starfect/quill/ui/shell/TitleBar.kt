@@ -32,6 +32,7 @@ import dev.starfect.quill.QuillController
 import dev.starfect.quill.bridge.QuillNativeLibraryException
 import dev.starfect.quill.io.FileService
 import dev.starfect.quill.io.GitStatus
+import dev.starfect.quill.model.Dialog
 import dev.starfect.quill.model.ToolWindow
 import dev.starfect.quill.model.ViewMode
 import dev.starfect.quill.model.WorkspaceState
@@ -137,9 +138,21 @@ private fun TitleBarActions(controller: QuillController, workspace: WorkspaceSta
         selected = workspace.commandPaletteVisible,
     ) { tint -> IdeIcons.Search(tint) }
 
+    val active = workspace.activeRunConfiguration
     IdeActionButton(
-        onClick = controller::toggleTheme,
-        tooltip = if (workspace.settings.darkTheme) "Switch to Light theme" else "Switch to Dark theme",
+        onClick = { active?.let(controller::run) ?: controller.showDialog(Dialog.RUN_CONFIGURATIONS) },
+        tooltip = active?.let { "Run '${it.name}'  Shift+F10" } ?: "Add a run configuration",
+        enabled = workspace.activeDocument != null,
+    ) { tint ->
+        // The run triangle is green when there is something to run and takes the ordinary icon
+        // tint when there is not, which is how the IDE distinguishes an armed action from an empty one.
+        IdeIcons.Run(if (active != null) LocalShellPalette.current.success else tint)
+    }
+
+    IdeActionButton(
+        onClick = { controller.showDialog(Dialog.SETTINGS) },
+        tooltip = "Settings  Ctrl+Alt+S",
+        selected = workspace.dialog == Dialog.SETTINGS,
     ) { tint -> IdeIcons.Gear(tint) }
 }
 
@@ -352,21 +365,17 @@ private fun MenuScope.mainMenu(
 
         passiveItem { MenuSeparator() }
 
-        selectableItem(
-            selected = workspace.leftToolWindow != null,
-            onClick = {
-                dismiss()
-                controller.setLeftToolWindow(ToolWindow.PROJECT)
-            },
-        ) { Text("Project") }
-
-        selectableItem(
-            selected = workspace.rightToolWindow != null,
-            onClick = {
-                dismiss()
-                controller.setRightToolWindow(ToolWindow.STRUCTURE)
-            },
-        ) { Text("Structure") }
+        // Every tool window, each reporting whether it is the one open on its dock. Listing them
+        // from the enum keeps this menu and the stripes from drifting apart.
+        ToolWindow.entries.forEach { tool ->
+            selectableItem(
+                selected = workspace.toolWindow(tool.dock) == tool,
+                onClick = {
+                    dismiss()
+                    controller.toggleToolWindow(tool)
+                },
+            ) { Text(tool.label) }
+        }
 
         passiveItem { MenuSeparator() }
 
@@ -408,6 +417,48 @@ private fun MenuScope.mainMenu(
             },
         ) { Text("Reload Project") }
     }) { Text("Tools") }
+
+    submenu(submenu = {
+        val active = workspace.activeRunConfiguration
+        selectableItem(
+            selected = false,
+            enabled = active != null,
+            keybinding = setOf("Shift", "F10"),
+            onClick = {
+                dismiss()
+                active?.let(controller::run)
+            },
+        ) { Text(active?.let { "Run '${it.name}'" } ?: "Run") }
+
+        selectableItem(
+            selected = false,
+            onClick = {
+                dismiss()
+                controller.showDialog(Dialog.RUN_CONFIGURATIONS)
+            },
+        ) { Text("Edit Configurations…") }
+    }) { Text("Run") }
+
+    submenu(submenu = {
+        selectableItem(
+            selected = false,
+            keybinding = setOf("Ctrl", "Alt", "S"),
+            onClick = {
+                dismiss()
+                controller.showDialog(Dialog.SETTINGS)
+            },
+        ) { Text("Settings…") }
+
+        passiveItem { MenuSeparator() }
+
+        selectableItem(
+            selected = false,
+            onClick = {
+                dismiss()
+                controller.showDialog(Dialog.ABOUT)
+            },
+        ) { Text("About Quill") }
+    }) { Text("Help") }
 }
 
 /** Display name for a view mode, shared by the menu and the editor toolbar's tooltips. */

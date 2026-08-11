@@ -12,15 +12,24 @@ import dev.starfect.quill.bridge.QuillEngineException
 import dev.starfect.quill.bridge.SearchFlags
 import dev.starfect.quill.bridge.wire.ColorSpan
 import dev.starfect.quill.bridge.wire.DocumentStats
+import dev.starfect.quill.bridge.wire.Finding
 import dev.starfect.quill.bridge.wire.HtmlNode
+import dev.starfect.quill.bridge.wire.InspectionSummary
 import dev.starfect.quill.bridge.wire.MarkdownBlockIr
 import dev.starfect.quill.bridge.wire.OutlineEntry
+import dev.starfect.quill.bridge.wire.Severity
 import dev.starfect.quill.bridge.wire.StyleSpan
 import dev.starfect.quill.io.FileService
+import dev.starfect.quill.model.Dialog
+import dev.starfect.quill.model.Dock
 import dev.starfect.quill.model.DocumentSession
 import dev.starfect.quill.model.FileNode
 import dev.starfect.quill.model.FindState
+import dev.starfect.quill.model.Notification
+import dev.starfect.quill.model.NotificationSeverity
 import dev.starfect.quill.model.QuillSettings
+import dev.starfect.quill.model.RunConfiguration
+import dev.starfect.quill.model.RunTask
 import dev.starfect.quill.model.ToolWindow
 import dev.starfect.quill.model.ViewMode
 import dev.starfect.quill.model.WorkspaceState
@@ -73,6 +82,9 @@ public class QuillController(
 
         /** How many lines to highlight; beyond this the viewport would need tracking anyway. */
         const val HIGHLIGHT_LINE_BUDGET = 5_000
+
+        /** How many notifications to keep. Older ones are noise nobody scrolls back to. */
+        const val MAX_NOTIFICATIONS = 50
     }
 
     /**
@@ -231,6 +243,7 @@ public class QuillController(
         val blocks: List<MarkdownBlockIr>,
         val html: List<HtmlNode>,
         val outline: List<OutlineEntry>,
+        val findings: List<Finding>,
         val stats: DocumentStats,
         val spans: List<StyleSpan>,
     )
@@ -246,6 +259,8 @@ public class QuillController(
             if (!immediate) delay(DERIVE_DEBOUNCE_MILLIS)
             val handle = handles[id] ?: return@launch
 
+            val settings = _state.value.settings
+
             withContext(Dispatchers.Default) {
                 runCatching {
                     val version = handle.version
@@ -255,6 +270,7 @@ public class QuillController(
                         blocks = handle.blocks(),
                         html = handle.htmlDom(),
                         outline = handle.outline(),
+                        findings = inspect(handle, settings),
                         stats = handle.stats(),
                         spans = handle.spans(0, lineCount.coerceAtMost(HIGHLIGHT_LINE_BUDGET)),
                     )
@@ -271,6 +287,7 @@ public class QuillController(
                                 blocks = result.blocks,
                                 html = result.html,
                                 outline = result.outline,
+                                findings = result.findings,
                                 stats = result.stats,
                                 spans = result.spans,
                                 loadError = null,
@@ -280,6 +297,19 @@ public class QuillController(
                 }
                 .onFailure { failure -> updateDocument(id) { it.copy(loadError = failure.message) } }
         }
+    }
+
+    /**
+     * Runs the inspections, honouring the two settings that suppress them.
+     *
+     * Weak warnings are filtered here rather than in the engine so the setting takes effect on the
+     * next repaint instead of requiring a re-parse, and so the counts the widget shows and the rows
+     * the problems list holds can never disagree.
+     */
+    private fun inspect(handle: QuillDocument, settings: QuillSettings): List<Finding> {
+        if (!settings.inspectionsEnabled) return emptyList()
+        val findings = handle.inspections()
+        return if (settings.showWeakWarnings) findings else findings.filter { it.severity != Severity.WEAK }
     }
 
     // ---------------------------------------------------------------- files
@@ -463,6 +493,35 @@ public class QuillController(
         }
     }
 
+    /** Selects a finding's range, so the problem is visible and not merely scrolled to. */
+    public fun goToFinding(id: Long, finding: Finding) {
+        updateDocument(id) { session ->
+            val length = session.text.text.length
+            val start = finding.start.coerceIn(0, length)
+            val end = finding.end.coerceIn(start, length)
+            session.copy(text = session.text.copy(selection = TextRange(start, end)))
+        }
+    }
+
+    /**
+     * Steps to the next or previous finding, wrapping at the ends.
+     *
+     * Wrapping matters more than it looks: the widget's arrows are how a document gets worked
+     * through, and stopping dead at the last problem means noticing that and scrolling back up.
+     */
+    public fun goToFinding(session: DocumentSession, forward: Boolean) {
+        val ordered = session.findings.sortedBy { it.start }
+        if (ordered.isEmpty()) return
+
+        val caret = session.text.selection.start
+        val target = if (forward) {
+            ordered.firstOrNull { it.start > caret } ?: ordered.first()
+        } else {
+            ordered.lastOrNull { it.start < caret } ?: ordered.last()
+        }
+        goToFinding(session.id, target)
+    }
+
     // ---------------------------------------------------------------- settings & chrome
 
     public fun updateSettings(transform: (QuillSettings) -> QuillSettings) {
@@ -492,8 +551,216 @@ public class QuillController(
         update { it.copy(rightToolWindow = if (it.rightToolWindow == tool) null else tool) }
     }
 
+    public fun setBottomToolWindow(tool: ToolWindow?) {
+        update { it.copy(bottomToolWindow = if (it.bottomToolWindow == tool) null else tool) }
+    }
+
+    /** Toggles a tool window on whichever dock it belongs to. */
+    public fun toggleToolWindow(tool: ToolWindow) {
+        when (tool.dock) {
+            Dock.LEFT -> setLeftToolWindow(tool)
+            Dock.RIGHT -> setRightToolWindow(tool)
+            Dock.BOTTOM -> setBottomToolWindow(tool)
+        }
+    }
+
     public fun setCommandPaletteVisible(visible: Boolean) {
         update { it.copy(commandPaletteVisible = visible) }
+    }
+
+    // ---------------------------------------------------------------- dialogs
+
+    public fun showDialog(dialog: Dialog) {
+        update { it.copy(dialog = dialog) }
+    }
+
+    public fun dismissDialog() {
+        update { it.copy(dialog = null) }
+    }
+
+    /** Replaces the settings wholesale, which is how the Settings dialog applies its edits. */
+    public fun applySettings(settings: QuillSettings) {
+        val previous = _state.value.settings
+        update { it.copy(settings = settings) }
+
+        // The engine holds the palette, so a theme change has to reach it before anything is
+        // re-derived — otherwise the next highlight comes back in the old scheme's colours.
+        if (settings.darkTheme != previous.darkTheme) {
+            runCatching { engine.setDarkTheme(settings.darkTheme) }
+            handles.keys.forEach { derive(it, immediate = true) }
+        } else if (settings.inspectionsEnabled != previous.inspectionsEnabled) {
+            handles.keys.forEach { derive(it, immediate = true) }
+        }
+    }
+
+    // ---------------------------------------------------------------- run configurations
+
+    /** Adds a configuration and selects it. */
+    public fun addRunConfiguration(task: RunTask): RunConfiguration {
+        val configuration = RunConfiguration(
+            id = nextId.getAndIncrement(),
+            name = uniqueConfigurationName(task.label),
+            task = task,
+        )
+        update {
+            it.copy(
+                runConfigurations = it.runConfigurations + configuration,
+                selectedRunConfigurationId = configuration.id,
+            )
+        }
+        return configuration
+    }
+
+    /** Appends a numeric suffix until the name is free, the way the IDE's dialog does. */
+    private fun uniqueConfigurationName(base: String): String {
+        val taken = _state.value.runConfigurations.map { it.name }.toSet()
+        if (base !in taken) return base
+        var index = 2
+        while ("$base ($index)" in taken) index++
+        return "$base ($index)"
+    }
+
+    public fun updateRunConfiguration(configuration: RunConfiguration) {
+        update { workspace ->
+            workspace.copy(
+                runConfigurations = workspace.runConfigurations.map {
+                    if (it.id == configuration.id) configuration else it
+                }
+            )
+        }
+    }
+
+    public fun removeRunConfiguration(id: Long) {
+        update { workspace ->
+            val remaining = workspace.runConfigurations.filterNot { it.id == id }
+            workspace.copy(
+                runConfigurations = remaining,
+                selectedRunConfigurationId = workspace.selectedRunConfigurationId
+                    ?.takeIf { it != id }
+                    ?: remaining.firstOrNull()?.id,
+            )
+        }
+    }
+
+    public fun selectRunConfiguration(id: Long) {
+        update { it.copy(selectedRunConfigurationId = id) }
+    }
+
+    /**
+     * Replaces the whole set, which is how the Run/Debug dialog applies its edits.
+     *
+     * The dialog builds its list locally so Cancel can discard it, and marks entries the user added
+     * with a non-positive id because it has no id source of its own. Those are assigned real ids
+     * here; anything absent from [configurations] was removed in the dialog and stays removed.
+     *
+     * @return the configurations as stored, with real ids.
+     */
+    public fun setRunConfigurations(
+        configurations: List<RunConfiguration>,
+        selectedId: Long?,
+    ): List<RunConfiguration> {
+        val remapped = mutableMapOf<Long, Long>()
+        val stored = configurations.map { configuration ->
+            if (configuration.id > 0) {
+                configuration
+            } else {
+                val id = nextId.getAndIncrement()
+                remapped[configuration.id] = id
+                configuration.copy(id = id)
+            }
+        }
+
+        val selection = selectedId
+            ?.let { remapped[it] ?: it }
+            ?.takeIf { candidate -> stored.any { it.id == candidate } }
+            ?: stored.firstOrNull()?.id
+
+        update { it.copy(runConfigurations = stored, selectedRunConfigurationId = selection) }
+        return stored
+    }
+
+    /**
+     * Runs a configuration against the document it names, or the focused one.
+     *
+     * Results land in the Notifications tool window rather than in a status message, because a run
+     * produces something worth going back to — a path, a count, a finding total — and a status
+     * message that clears on the next action loses it.
+     */
+    public fun run(configuration: RunConfiguration) {
+        val session = configuration.targetPath
+            ?.let { path -> _state.value.documents.firstOrNull { it.path == path } }
+            ?: _state.value.activeDocument
+            ?: run {
+                notify("Nothing to run", "Open a document first.", NotificationSeverity.WARNING)
+                return
+            }
+
+        val handle = handles[session.id] ?: return
+        val name = configuration.name
+
+        scope.launch {
+            val outcome = withContext(Dispatchers.Default) {
+                runCatching {
+                    when (configuration.task) {
+                        RunTask.EXPORT_HTML -> {
+                            var options = ExportOptions.NONE
+                            if (configuration.standalone) options = options or ExportOptions.STANDALONE
+                            if (configuration.darkTheme) options = options or ExportOptions.DARK
+                            if (configuration.allowRawHtml) options = options or ExportOptions.ALLOW_RAW_HTML
+
+                            val html = handle.exportHtml(session.displayName, options)
+                            val target = configuration.outputPath
+                                ?: session.path?.resolveSibling(
+                                    session.displayName.substringBeforeLast('.') + ".html"
+                                )
+                                ?: error("this document has no file yet, so there is nowhere to export to")
+
+                            withContext(Dispatchers.IO) { fileService.write(target, html) }
+                            "Wrote ${html.length} characters to $target"
+                        }
+
+                        RunTask.INSPECT -> {
+                            val summary = InspectionSummary.of(handle.inspections())
+                            if (summary.total == 0) {
+                                "No problems found"
+                            } else {
+                                "${summary.errors} errors, ${summary.warnings} warnings, " +
+                                    "${summary.weak} weak warnings"
+                            }
+                        }
+
+                        RunTask.WORD_COUNT -> {
+                            val stats = handle.stats()
+                            "${stats.words} words, ${stats.characters} characters, ${stats.lines} lines"
+                        }
+                    }
+                }
+            }
+
+            outcome
+                .onSuccess { message -> notify(name, message, NotificationSeverity.SUCCESS) }
+                .onFailure { failure ->
+                    notify(name, failure.message ?: failure.toString(), NotificationSeverity.ERROR)
+                }
+        }
+    }
+
+    // ---------------------------------------------------------------- notifications
+
+    /** Records a notification and opens the tool window that holds them if it is not already up. */
+    public fun notify(title: String, body: String, severity: NotificationSeverity = NotificationSeverity.INFO) {
+        val entry = Notification(id = nextId.getAndIncrement(), title = title, body = body, severity = severity)
+        update { workspace ->
+            workspace.copy(
+                // Newest first: the list is read from the top and only the recent entries matter.
+                notifications = (listOf(entry) + workspace.notifications).take(MAX_NOTIFICATIONS),
+                rightToolWindow = ToolWindow.NOTIFICATIONS,
+            )
+        }
+    }
+
+    public fun clearNotifications() {
+        update { it.copy(notifications = emptyList()) }
     }
 
     public fun dismissNotification() {

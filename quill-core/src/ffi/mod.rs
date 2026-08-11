@@ -416,6 +416,25 @@ pub extern "C" fn quill_doc_outline(doc: *mut QuillDoc, out: *mut QuillBuf) -> i
     })
 }
 
+/// Writes the inspection findings into `out`.
+#[unsafe(no_mangle)]
+pub extern "C" fn quill_doc_inspections(doc: *mut QuillDoc, out: *mut QuillBuf) -> i32 {
+    guard(|| {
+        // SAFETY: handle and output validity are the caller's contract.
+        let (Some(mut document), Some(slot)) =
+            (unsafe { lock_document(doc) }, unsafe { out_slot(out) })
+        else {
+            return null_pointer("document or output");
+        };
+        if let Some(cached) = document.cached(PayloadKind::Inspections) {
+            return write_out(slot, cached.to_vec());
+        }
+        let bytes = crate::inspect::encode(&mut document);
+        document.cache(PayloadKind::Inspections, bytes.clone());
+        write_out(slot, bytes)
+    })
+}
+
 /// Writes document statistics into `out`.
 #[unsafe(no_mangle)]
 pub extern "C" fn quill_doc_stats(doc: *mut QuillDoc, out: *mut QuillBuf) -> i32 {

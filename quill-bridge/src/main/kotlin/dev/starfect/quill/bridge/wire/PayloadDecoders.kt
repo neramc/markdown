@@ -259,6 +259,21 @@ public fun decodeColorSpans(segment: MemorySegment): List<ColorSpan> {
 public fun decodeText(segment: MemorySegment): String =
     WireReader.of(segment).expect(PayloadKind.TEXT).string()
 
+/** Decodes a [PayloadKind.INSPECTIONS] payload. */
+public fun decodeInspections(segment: MemorySegment): List<Finding> {
+    val reader = WireReader.of(segment).expect(PayloadKind.INSPECTIONS)
+    return List(reader.count()) {
+        Finding(
+            inspection = Inspection.fromId(reader.byte()),
+            severity = Severity.fromId(reader.byte()),
+            line = reader.int(),
+            start = reader.int(),
+            end = reader.int(),
+            message = reader.string(),
+        )
+    }
+}
+
 /** Node tags in an [PayloadKind.HTML_DOM] payload, mirroring `html.rs`. */
 private const val NODE_TEXT = 0
 private const val NODE_ELEMENT = 1
