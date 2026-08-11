@@ -46,6 +46,11 @@ impl ResultCache {
             .map(|(_, _, bytes)| bytes.as_slice())
     }
 
+    /// Drops everything, for a change that invalidates results without touching the text.
+    fn clear(&mut self) {
+        self.entries.clear();
+    }
+
     fn put(&mut self, kind: PayloadKind, version: i64, bytes: Vec<u8>) {
         self.entries
             .retain(|(cached_kind, _, _)| *cached_kind != kind);
@@ -62,6 +67,7 @@ pub struct Document {
     /// every operation parses, so this is rebuilt at most once per edit.
     flat: Option<String>,
     cache: ResultCache,
+    flavour: crate::flavour::Flavour,
 }
 
 impl Document {
@@ -71,6 +77,25 @@ impl Document {
             version: 1,
             flat: Some(text.to_owned()),
             cache: ResultCache::default(),
+            flavour: crate::flavour::Flavour::default(),
+        }
+    }
+
+    /// The dialect this document is parsed as.
+    pub fn flavour(&self) -> crate::flavour::Flavour {
+        self.flavour
+    }
+
+    /// Changes the dialect, discarding every derived result.
+    ///
+    /// The cache is keyed by document version, and a flavour change alters every derived view
+    /// without touching the text — so the version is bumped too, or the UI would keep showing
+    /// results parsed under the previous dialect.
+    pub fn set_flavour(&mut self, flavour: crate::flavour::Flavour) {
+        if self.flavour != flavour {
+            self.flavour = flavour;
+            self.version += 1;
+            self.cache.clear();
         }
     }
 

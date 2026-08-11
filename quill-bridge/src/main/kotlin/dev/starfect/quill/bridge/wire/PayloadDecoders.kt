@@ -258,3 +258,37 @@ public fun decodeColorSpans(segment: MemorySegment): List<ColorSpan> {
 /** Decodes a [PayloadKind.TEXT] payload. */
 public fun decodeText(segment: MemorySegment): String =
     WireReader.of(segment).expect(PayloadKind.TEXT).string()
+
+/** Node tags in an [PayloadKind.HTML_DOM] payload, mirroring `html.rs`. */
+private const val NODE_TEXT = 0
+private const val NODE_ELEMENT = 1
+
+/**
+ * Nesting depth this decoder will descend to.
+ *
+ * The engine caps its own parser at 256, so a payload deeper than this cannot come from a matching
+ * native library. Refusing it keeps a corrupt or mismatched payload from overflowing the JVM stack.
+ */
+private const val MAX_HTML_DEPTH = 512
+
+/** Decodes a [PayloadKind.HTML_DOM] payload into the rendered document tree. */
+public fun decodeHtmlDom(segment: MemorySegment): List<HtmlNode> {
+    val reader = WireReader.of(segment).expect(PayloadKind.HTML_DOM)
+    return readHtmlNodes(reader, depth = 0)
+}
+
+private fun readHtmlNodes(reader: WireReader, depth: Int): List<HtmlNode> =
+    List(reader.count()) { readHtmlNode(reader, depth) }
+
+private fun readHtmlNode(reader: WireReader, depth: Int): HtmlNode = when (val tag = reader.byte()) {
+    NODE_TEXT -> HtmlNode.Text(reader.string())
+    NODE_ELEMENT -> {
+        if (depth >= MAX_HTML_DEPTH) {
+            throw QuillWireException("HTML payload nests deeper than $MAX_HTML_DEPTH levels")
+        }
+        val name = reader.string()
+        val attributes = List(reader.count()) { HtmlAttribute(reader.string(), reader.string()) }
+        HtmlNode.Element(name, attributes, readHtmlNodes(reader, depth + 1))
+    }
+    else -> throw QuillWireException("unknown HTML node tag $tag")
+}

@@ -364,7 +364,40 @@ fn encode_inline<'a>(node: &'a AstNode<'a>, encoder: &mut Encoder) -> bool {
     true
 }
 
-/// Renders the document to HTML using the same extension set as the preview.
+/// Converts a document to HTML using the dialect's own rules.
+///
+/// This is the single conversion the preview and the export both go through, which is what keeps
+/// what you see on screen and what you publish from drifting apart.
+pub fn to_html_for(text: &str, flavour: crate::flavour::Flavour) -> String {
+    let prepared = crate::flavour::prepare(text, flavour);
+
+    let mut render_options = options();
+    if !flavour.uses_gfm_extensions() {
+        render_options.extension.strikethrough = false;
+        render_options.extension.table = false;
+        render_options.extension.autolink = false;
+        render_options.extension.tasklist = false;
+        render_options.extension.footnotes = false;
+        render_options.extension.alerts = false;
+    }
+    // MDX and Markdoc both reach the parser as HTML wrappers around Markdown, so their output has
+    // to survive rather than be escaped.
+    render_options.render.r#unsafe =
+        flavour.allows_raw_html() || flavour == crate::flavour::Flavour::Markdoc;
+    render_options.render.sourcepos = false;
+
+    let arena = Arena::new();
+    let root = parse_document(&arena, &prepared.text, &render_options);
+    let mut html = String::new();
+    // format_html writes through std::fmt::Write and only fails if the sink fails, which writing
+    // into a String cannot.
+    if comrak::format_html(root, &render_options, &mut html).is_err() {
+        return String::new();
+    }
+    html
+}
+
+/// Renders the document to HTML with the default dialect's extension set.
 pub fn to_html(text: &str, allow_raw_html: bool) -> String {
     let mut render_options = options();
     render_options.render.r#unsafe = allow_raw_html;

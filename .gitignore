@@ -115,7 +115,16 @@ dist
 # ---- Quill build outputs ----
 # Gradle
 .gradle/
-build/
+#
+# Anchored deliberately. A bare "build/" matches a directory of that name at any depth, which
+# silently swallowed buildSrc/src/main/kotlin/dev/starfect/quill/build/ -- the package holding
+# CargoBuildTask. The result was a repository that built locally and could not build anywhere else,
+# with `git status` reporting nothing wrong because ignored files are not untracked files.
+#
+# Every Gradle project here is the root or one level below it, and a single "*" does not cross a
+# slash, so these two patterns cover the real build directories and nothing deeper.
+/build/
+*/build/
 !gradle/wrapper/gradle-wrapper.jar
 
 # Kotlin compiler session data

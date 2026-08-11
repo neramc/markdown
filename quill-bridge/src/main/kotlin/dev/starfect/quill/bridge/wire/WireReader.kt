@@ -13,6 +13,7 @@ public enum class PayloadKind(internal val id: Int) {
     SPANS(5),
     CODE_HIGHLIGHT(6),
     TEXT(7),
+    HTML_DOM(8),
     ;
 
     internal companion object {

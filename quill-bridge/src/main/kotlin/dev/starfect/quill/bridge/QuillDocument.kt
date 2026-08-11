@@ -2,11 +2,13 @@ package dev.starfect.quill.bridge
 
 import dev.starfect.quill.bridge.internal.QuillBindings
 import dev.starfect.quill.bridge.wire.DocumentStats
+import dev.starfect.quill.bridge.wire.HtmlNode
 import dev.starfect.quill.bridge.wire.MarkdownBlockIr
 import dev.starfect.quill.bridge.wire.OutlineEntry
 import dev.starfect.quill.bridge.wire.SearchMatch
 import dev.starfect.quill.bridge.wire.StyleSpan
 import dev.starfect.quill.bridge.wire.decodeBlocks
+import dev.starfect.quill.bridge.wire.decodeHtmlDom
 import dev.starfect.quill.bridge.wire.decodeOutline
 import dev.starfect.quill.bridge.wire.decodeSearch
 import dev.starfect.quill.bridge.wire.decodeSpans
@@ -100,9 +102,35 @@ public class QuillDocument internal constructor(
         checkStatus(QuillBindings.docSetText(requireOpen(), text), "setText")
     }
 
-    /** Parses the document into the block IR that drives the preview. */
+    /**
+     * The dialect this document is parsed as.
+     *
+     * Assigning re-derives everything: the cached parse, outline, statistics and preview are
+     * discarded, and the version counter advances so a consumer watching it re-reads.
+     */
+    public var flavour: MarkdownFlavour
+        get() {
+            val value = QuillBindings.docFlavour(requireOpen())
+            if (value < 0) throw QuillEngineException(value, "flavour", lastEngineError())
+            return MarkdownFlavour.fromId(value)
+        }
+        set(value) {
+            checkStatus(QuillBindings.docSetFlavour(requireOpen(), value.id), "setFlavour")
+        }
+
+    /** Parses the document into the block IR that drives the outline and the editor. */
     public fun blocks(): List<MarkdownBlockIr> =
         decodeBlocks(QuillBindings.docBlocks(requireOpen()).require("blocks"))
+
+    /**
+     * Renders the document to HTML and returns the parsed result.
+     *
+     * This is what the preview draws. Rendering through HTML rather than straight from the Markdown
+     * AST is what keeps the preview and the exported file identical, and it is the only path on
+     * which raw HTML in the source and the flavour extensions render as markup instead of as text.
+     */
+    public fun htmlDom(): List<HtmlNode> =
+        decodeHtmlDom(QuillBindings.docHtmlDom(requireOpen()).require("htmlDom"))
 
     /**
      * Syntax spans for the Markdown source, limited to lines `[firstLine, lastLine]` (zero-based,

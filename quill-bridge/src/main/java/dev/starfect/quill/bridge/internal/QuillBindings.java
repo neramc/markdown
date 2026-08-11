@@ -74,6 +74,9 @@ public final class QuillBindings {
             handle("quill_doc_len_utf16", FunctionDescriptor.of(C_LONG, PTR));
     private static final MethodHandle DOC_TEXT = handle("quill_doc_text", FunctionDescriptor.of(C_INT, PTR, PTR));
     private static final MethodHandle DOC_BLOCKS = handle("quill_doc_blocks", FunctionDescriptor.of(C_INT, PTR, PTR));
+    private static final MethodHandle DOC_HTML_DOM = handle("quill_doc_html_dom", FunctionDescriptor.of(C_INT, PTR, PTR));
+    private static final MethodHandle DOC_SET_FLAVOUR = handle("quill_doc_set_flavour", FunctionDescriptor.of(C_INT, PTR, ValueLayout.JAVA_BYTE));
+    private static final MethodHandle DOC_FLAVOUR = handle("quill_doc_flavour", FunctionDescriptor.of(C_INT, PTR));
     private static final MethodHandle DOC_SPANS =
             handle("quill_doc_spans", FunctionDescriptor.of(C_INT, PTR, C_INT, C_INT, PTR));
     private static final MethodHandle DOC_OUTLINE =
@@ -273,6 +276,32 @@ public final class QuillBindings {
             MemorySegment buffer = arena.allocate(QUILL_BUF);
             int status = (int) DOC_BLOCKS.invokeExact(doc, buffer);
             return new Payload(status, status == STATUS_OK ? consume(buffer) : new byte[0]);
+        } catch (Throwable failure) {
+            throw rethrow(failure);
+        }
+    }
+
+    public static Payload docHtmlDom(MemorySegment doc) {
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment buffer = arena.allocate(QUILL_BUF);
+            int status = (int) DOC_HTML_DOM.invokeExact(doc, buffer);
+            return new Payload(status, status == STATUS_OK ? consume(buffer) : new byte[0]);
+        } catch (Throwable failure) {
+            throw rethrow(failure);
+        }
+    }
+
+    public static int docSetFlavour(MemorySegment doc, byte flavour) {
+        try {
+            return (int) DOC_SET_FLAVOUR.invokeExact(doc, flavour);
+        } catch (Throwable failure) {
+            throw rethrow(failure);
+        }
+    }
+
+    public static int docFlavour(MemorySegment doc) {
+        try {
+            return (int) DOC_FLAVOUR.invokeExact(doc);
         } catch (Throwable failure) {
             throw rethrow(failure);
         }

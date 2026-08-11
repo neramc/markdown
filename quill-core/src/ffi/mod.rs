@@ -310,6 +310,61 @@ pub extern "C" fn quill_doc_blocks(doc: *mut QuillDoc, out: *mut QuillBuf) -> i3
     })
 }
 
+/// Sets the Markdown dialect the document is parsed as.
+///
+/// Every derived view depends on the dialect, so changing it bumps the document version and drops
+/// the cache; the UI sees a new version and re-derives exactly as it would after an edit.
+#[unsafe(no_mangle)]
+pub extern "C" fn quill_doc_set_flavour(doc: *mut QuillDoc, flavour: u8) -> i32 {
+    guard(|| {
+        // SAFETY: handle validity is the caller's contract.
+        let Some(mut document) = (unsafe { lock_document(doc) }) else {
+            return null_pointer("document");
+        };
+        document.set_flavour(crate::flavour::Flavour::from_u8(flavour));
+        status::OK
+    })
+}
+
+/// Returns the document's current dialect as its wire value, or a negative status on failure.
+#[unsafe(no_mangle)]
+pub extern "C" fn quill_doc_flavour(doc: *mut QuillDoc) -> i32 {
+    guard(|| {
+        // SAFETY: handle validity is the caller's contract.
+        let Some(document) = (unsafe { lock_document(doc) }) else {
+            return null_pointer("document");
+        };
+        document.flavour() as i32
+    })
+}
+
+/// Writes the rendered document as an HTML node tree into `out`.
+///
+/// This is the preview's source of truth. The Markdown is converted to HTML with the dialect's own
+/// rules and that HTML is parsed into a DOM, so raw HTML written in the source renders as markup
+/// instead of arriving in the preview as literal text — and the preview and the exported file are
+/// produced by the same conversion.
+#[unsafe(no_mangle)]
+pub extern "C" fn quill_doc_html_dom(doc: *mut QuillDoc, out: *mut QuillBuf) -> i32 {
+    guard(|| {
+        // SAFETY: handle and output validity are the caller's contract.
+        let (Some(mut document), Some(slot)) =
+            (unsafe { lock_document(doc) }, unsafe { out_slot(out) })
+        else {
+            return null_pointer("document or output");
+        };
+        if let Some(cached) = document.cached(PayloadKind::HtmlDom) {
+            return write_out(slot, cached.to_vec());
+        }
+
+        let flavour = document.flavour();
+        let html = crate::parser::to_html_for(document.text(), flavour);
+        let bytes = crate::html::encode(&crate::html::parse(&html));
+        document.cache(PayloadKind::HtmlDom, bytes.clone());
+        write_out(slot, bytes)
+    })
+}
+
 /// Writes editor syntax spans for lines `first_line..=last_line` into `out`.
 #[unsafe(no_mangle)]
 pub extern "C" fn quill_doc_spans(
