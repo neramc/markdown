@@ -1,0 +1,46 @@
+name: Feature request
+description: Suggest something Quill should do
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do
+      description: >
+        Describe the situation rather than the feature. Knowing what you are working around tells us
+        whether the thing you asked for is the best answer to it.
+      placeholder: |
+        I keep a glossary as a link reference file and include it in several documents. Quill reports
+        every reference in those documents as undefined, so the widget is permanently red.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you have in mind
+      description: If you have a specific design, describe it. If not, leave this empty.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Editor
+        - Preview and rendering
+        - Markdown dialects
+        - Inspections
+        - Tool windows and dialogs
+        - Export
+        - Windows installer
+        - Build and packaging
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I have searched the existing issues
+          required: true

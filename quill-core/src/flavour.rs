@@ -30,12 +30,19 @@ pub enum Flavour {
 
 impl Flavour {
     /// Maps a wire value back to a flavour, defaulting to GFM for anything unrecognised.
-    pub fn from_u8(value: u8) -> Self {
+    /// The dialect with this discriminant, or `None` if it is not one this build knows.
+    ///
+    /// Deliberately not a fallback to [`Flavour::Gfm`]. A value this build does not recognise means
+    /// the bridge was built against a newer engine than the library it loaded, and quietly serving
+    /// GFM would render the document in the wrong dialect with nothing anywhere reporting why.
+    /// Failing the call surfaces the mismatch where it happens.
+    pub fn from_u8(value: u8) -> Option<Self> {
         match value {
-            0 => Self::CommonMark,
-            2 => Self::Mdx,
-            3 => Self::Markdoc,
-            _ => Self::Gfm,
+            0 => Some(Self::CommonMark),
+            1 => Some(Self::Gfm),
+            2 => Some(Self::Mdx),
+            3 => Some(Self::Markdoc),
+            _ => None,
         }
     }
 
@@ -337,11 +344,14 @@ mod tests {
             Flavour::Mdx,
             Flavour::Markdoc,
         ] {
-            assert_eq!(Flavour::from_u8(flavour as u8), flavour);
+            assert_eq!(Flavour::from_u8(flavour as u8), Some(flavour));
         }
-        // An out-of-range value falls back rather than panicking, because it arrives over an FFI
-        // boundary where the caller could be anything.
-        assert_eq!(Flavour::from_u8(200), Flavour::Gfm);
+
+        // An out-of-range value is rejected rather than falling back. It arrives over an FFI
+        // boundary, so it means the bridge and the library disagree about what dialects exist, and
+        // quietly serving GFM would render the document wrongly with nothing reporting why.
+        assert_eq!(Flavour::from_u8(4), None);
+        assert_eq!(Flavour::from_u8(200), None);
     }
 
     #[test]

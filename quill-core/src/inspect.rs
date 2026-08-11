@@ -301,17 +301,16 @@ fn inspect_ast(text: &str, lines: &LineIndex, findings: &mut Vec<Finding>) {
                 continue;
             }
 
-            NodeValue::CodeBlock(code) => {
-                if code.fenced && code.info.trim().is_empty() {
-                    findings.push(Finding {
-                        inspection: Inspection::UnlabelledCodeFence,
-                        line: line_number,
-                        start: start as u32,
-                        end: end as u32,
-                        message: "Fenced block has no language, so it is not highlighted"
-                            .to_owned(),
-                    });
-                }
+            // An indented block has no info string to carry a language, so only a fenced one can
+            // be missing it.
+            NodeValue::CodeBlock(code) if code.fenced && code.info.trim().is_empty() => {
+                findings.push(Finding {
+                    inspection: Inspection::UnlabelledCodeFence,
+                    line: line_number,
+                    start: start as u32,
+                    end: end as u32,
+                    message: "Fenced block has no language, so it is not highlighted".to_owned(),
+                });
             }
 
             _ => {}

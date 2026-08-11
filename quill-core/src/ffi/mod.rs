@@ -321,7 +321,13 @@ pub extern "C" fn quill_doc_set_flavour(doc: *mut QuillDoc, flavour: u8) -> i32 
         let Some(mut document) = (unsafe { lock_document(doc) }) else {
             return null_pointer("document");
         };
-        document.set_flavour(crate::flavour::Flavour::from_u8(flavour));
+        let Some(parsed) = crate::flavour::Flavour::from_u8(flavour) else {
+            set_last_error(format!(
+                "unknown Markdown flavour {flavour}; this library knows 0..=3"
+            ));
+            return status::INVALID_ARGUMENT;
+        };
+        document.set_flavour(parsed);
         status::OK
     })
 }
@@ -643,6 +649,42 @@ mod tests {
     #[test]
     fn reports_the_abi_version() {
         assert_eq!(quill_abi_version(), ABI_VERSION);
+    }
+
+    #[test]
+    fn every_known_flavour_round_trips_across_the_boundary() {
+        let (engine, doc) = open("# Title\n");
+
+        for value in 0u8..=3 {
+            assert_eq!(quill_doc_set_flavour(doc, value), status::OK);
+            assert_eq!(quill_doc_flavour(doc), i32::from(value));
+        }
+
+        quill_doc_free(doc);
+        quill_engine_free(engine);
+    }
+
+    #[test]
+    fn an_unknown_flavour_is_rejected_rather_than_falling_back() {
+        let (engine, doc) = open("~~struck~~\n");
+
+        assert_eq!(quill_doc_set_flavour(doc, 0), status::OK);
+        let before = quill_doc_flavour(doc);
+
+        // A value this build does not know means the bridge and the library disagree. Serving GFM
+        // instead would render the document in the wrong dialect with nothing reporting why.
+        assert_eq!(quill_doc_set_flavour(doc, 200), status::INVALID_ARGUMENT);
+        assert_eq!(
+            quill_doc_flavour(doc),
+            before,
+            "a rejected call must not change the document"
+        );
+
+        let message = String::from_utf8(capture(|out| quill_last_error(out))).expect("utf-8");
+        assert!(message.contains("200"), "unhelpful error: {message}");
+
+        quill_doc_free(doc);
+        quill_engine_free(engine);
     }
 
     #[test]

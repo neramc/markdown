@@ -9,9 +9,11 @@ each layer owns and why the boundaries are where they are.
 ┌──────────────────── quill-app (Kotlin, Compose Multiplatform + Jewel) ─────────────┐
 │  Main · QuillController · WorkspaceState                                            │
 │  ui/shell     DecoratedWindow, TitleBar, tool window stripes, status bar            │
-│  ui/editor    SourceEditor (TextArea + VisualTransformation), EditorTabs            │
-│  ui/preview   IrToJewel, PreviewPane, EngineCodeHighlighter                         │
-│  ui/tools     ProjectTree, OutlinePanel, FindReplaceBar                             │
+│  ui/editor    SourceEditor (TextArea + VisualTransformation), EditorTabs,           │
+│               InspectionWidget                                                      │
+│  ui/preview   HtmlRenderer, PreviewPane, EngineCodeHighlighter                      │
+│  ui/tools     ProjectTree, OutlinePanel, ProblemsPanel, FindReplaceBar              │
+│  ui/dialog    IdeDialog, SettingsDialog, RunConfigurationsDialog                    │
 │  ui/palette   CommandPalette                                                        │
 └───────────────────────────────────┬─────────────────────────────────────────────────┘
                                     │ QuillEngine / QuillDocument (Kotlin, AutoCloseable)
@@ -23,9 +25,12 @@ each layer owns and why the boundaries are where they are.
 └───────────────────────────────────┬─────────────────────────────────────────────────┘
                                     │ java.lang.foreign, C ABI, UTF-16 offsets
 ┌──────────────────── quill-core (Rust cdylib) ───────────────────────────────────────┐
-│  ffi/            20 extern "C" entry points, catch_unwind, QuillBuf ownership        │
+│  ffi/            extern "C" entry points, catch_unwind, QuillBuf ownership           │
 │  document.rs     ropey rope, version counter, per-version result cache               │
-│  parser/         comrak GFM AST → block IR carrying source line ranges               │
+│  flavour.rs      CommonMark / GFM / MDX / Markdoc source preparation                 │
+│  parser/         comrak AST → block IR carrying source line ranges                   │
+│  html.rs         rendered HTML → the DOM the preview draws                           │
+│  inspect.rs      fourteen inspections, AST and source-line                           │
 │  highlight/      editor.rs (line lexer), code.rs (syntect + two-face)                │
 │  outline.rs · stats.rs · search.rs · export.rs · theme.rs · wire.rs                  │
 └──────────────────────────────────────────────────────────────────────────────────────┘
@@ -75,19 +80,54 @@ landed.
 
 ## Rendering the preview
 
-The engine's IR is deliberately shaped like Jewel's own `MarkdownBlock` / `InlineMarkdown`
-hierarchy, so `IrToJewel` is a flat rename with no restructuring. Jewel then renders it with the
-IntelliJ Platform's own Markdown styling — and never parses any Markdown itself. Jewel's bundled
-commonmark processor is dead code in this application.
+The preview does not draw the Markdown block model. The engine renders the document to HTML, parses
+that back into a small DOM, and the preview draws the DOM. The extra step buys three things:
 
-Two exceptions:
+- **Raw HTML in the source renders as markup.** A `<kbd>` or a hand-written table used to reach the
+  preview as literal text.
+- **The preview and the export are the same document.** Export already produced HTML, so two
+  renderers existed with two sets of quirks, and a heading that looked one way on screen and another
+  in the exported file was a bug nobody could see until they published.
+- **The dialect extensions render for free.** A Markdoc tag and an MDX component both become ordinary
+  elements in `flavour.rs`, and the renderer draws them without knowing which dialect produced them.
 
-- **Tables.** Jewel renders tables through an extension whose node type is not publicly
-  constructible, so Quill draws them itself in `PreviewPane.MarkdownTable` using the shell palette.
-- **Fenced code.** Jewel exposes a `CodeHighlighter` seam; `EngineCodeHighlighter` implements it by
-  calling back into the engine, where syntect resolves colours against the active IntelliJ scheme.
-  It emits the unstyled text first so a block appears immediately, then replaces it — Jewel's
-  contract explicitly supports that progressive pattern.
+`HtmlRenderer` flattens the DOM into a list of blocks rather than composing it recursively. A tree
+composed as a tree needs one composable per element and cannot be scrolled lazily; the flat list
+draws every entry at constant depth, with indentation and quote depth carried as fields rather than
+as nesting. Inline content collapses in the same pass, which is what lets a paragraph wrap as a
+paragraph instead of as a row of boxes, and what makes nested emphasis one span carrying both styles
+rather than two fighting over a range.
+
+Two details worth knowing:
+
+- **Links survive as offset ranges,** not as nested nodes. A click has to be hit-tested against the
+  text as laid out, because the same offset sits on a different line at a different pane width.
+- **Fenced code goes through `EngineCodeHighlighter`,** which calls back into the engine where
+  syntect resolves colours against the active scheme. It emits the unstyled text first so a block
+  appears immediately, then replaces it.
+
+The parser in `html.rs` is deliberately tolerant and never fails — an unclosed tag closes at its
+parent's end rather than aborting the render, because a preview that disappears while you are
+mid-sentence is worse than one that is briefly wrong. It caps its descent at 256 levels: the parser,
+the encoder and the tree's own drop all recurse per level, and MDX passes raw HTML straight through
+on every keystroke.
+
+## Inspections
+
+`inspect.rs` runs fourteen checks and reports findings as UTF-16 ranges, so the UI can select the
+offending span without converting anything. Findings are sorted by position rather than by severity,
+because the problems list is read alongside the document.
+
+Most run on the comrak AST. Three cannot, and run on source lines instead:
+
+- **Ragged table rows.** comrak truncates the extra cells and pads the missing ones, so by the time
+  the table is parsed the mistake is gone. Only what the author typed shows it.
+- **Unused footnote definitions.** comrak drops an unreferenced definition from the tree entirely.
+- **Unclosed fences.** This is precisely the case where the parse disagrees with what is on screen.
+
+The line scan skips fence interiors and front matter. A tab inside a Makefile snippet and a trailing
+space inside a YAML block are the author's business, and flagging them makes the widget useless for
+any document containing either.
 
 ## Highlighting the source is a lexer, not a parse
 

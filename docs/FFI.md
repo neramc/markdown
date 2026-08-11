@@ -34,9 +34,14 @@ int32_t quill_doc_set_text(QuillDoc*, const uint8_t* utf8, size_t len);
 int64_t quill_doc_version(QuillDoc*);
 int64_t quill_doc_len_utf16(QuillDoc*);
 
+int32_t quill_doc_set_flavour(QuillDoc*, uint8_t flavour);
+int32_t quill_doc_flavour(QuillDoc*);
+
 int32_t quill_doc_text(QuillDoc*, QuillBuf* out);
 int32_t quill_doc_blocks(QuillDoc*, QuillBuf* out);
+int32_t quill_doc_html_dom(QuillDoc*, QuillBuf* out);
 int32_t quill_doc_outline(QuillDoc*, QuillBuf* out);
+int32_t quill_doc_inspections(QuillDoc*, QuillBuf* out);
 int32_t quill_doc_stats(QuillDoc*, QuillBuf* out);
 int32_t quill_doc_spans(QuillDoc*, uint32_t first_line, uint32_t last_line, QuillBuf* out);
 
@@ -63,6 +68,25 @@ typedef struct { uint8_t* ptr; size_t len; size_t cap; } QuillBuf;
 
 `cap` is present because Rust's allocator needs the original capacity to free a `Vec` correctly.
 Callers must not modify it.
+
+## Flavours
+
+`quill_doc_set_flavour` takes one of:
+
+| Value | Dialect |
+|---|---|
+| 0 | CommonMark |
+| 1 | GitHub Flavored Markdown (the default) |
+| 2 | MDX |
+| 3 | Markdoc |
+
+An unrecognised value is rejected with a non-zero status rather than falling back, so a bridge built
+against a newer engine cannot silently get GFM when it asked for something else. `quill_doc_flavour`
+returns the current value, or a negative status on failure.
+
+Setting a flavour bumps the document's version **and** clears its result cache. The version bump
+alone would not be enough: every cached derivation is keyed on the version, so without the clear the
+first read after a switch could still return the previous dialect's parse.
 
 ## UTF-16 offsets
 
@@ -122,7 +146,9 @@ consume than text.
 |---|---|---|
 | magic | `u32` LE | `0x31525751` (`"QWR1"`) |
 | version | `u16` LE | `1` |
-| kind | `u16` LE | payload kind, see below |
+| kind | `u8` | payload kind, see below |
+
+Seven bytes in total. `WireReader` rejects a payload shorter than that before reading anything.
 
 **Kinds**
 
@@ -131,10 +157,15 @@ consume than text.
 | Blocks | 1 | Depth-first block IR node stream |
 | Outline | 2 | Heading entries |
 | Stats | 3 | Word, character, line counts and reading time |
-| Spans | 4 | Editor style spans |
-| Search | 5 | Match ranges |
-| Colors | 6 | Resolved ARGB spans for a code block |
+| Search | 4 | Match ranges |
+| Spans | 5 | Editor style spans |
+| CodeHighlight | 6 | Resolved ARGB spans for a code block |
 | Text | 7 | A single UTF-8 string |
+| HtmlDom | 8 | Depth-first node stream of the rendered HTML |
+| Inspections | 9 | Findings: inspection, severity, line, range, message |
+
+Values are append-only. Renumbering one silently changes what an older bridge decodes a payload as,
+which the magic and version cannot catch because both still match.
 
 **Primitives**
 

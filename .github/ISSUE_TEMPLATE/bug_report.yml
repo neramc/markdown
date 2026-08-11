@@ -1,0 +1,74 @@
+name: Bug report
+description: Something does not work the way it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. If this is a security issue, please use
+        [private reporting](https://github.com/neramc/quill/security) instead.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you got instead.
+      placeholder: |
+        I opened a .mdx file containing a JSX component and the preview showed the tag as literal text.
+    validations:
+      required: true
+
+  - type: textarea
+    id: document
+    attributes:
+      label: The document that triggers it
+      description: >
+        For anything involving parsing, rendering or inspections, paste the document itself rather
+        than describing it. Reduce it as far as you can — the smallest input that still fails is
+        worth more than a large one.
+      render: markdown
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where
+      options:
+        - Editor
+        - Preview
+        - Inspections / Problems
+        - Search or find and replace
+        - Tool windows or dialogs
+        - Export
+        - Windows installer
+        - Build
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Quill version
+      placeholder: "1.0.0, or a commit hash if you built it yourself"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Linux
+        - macOS
+        - Windows
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Stack trace or output
+      description: >
+        Anything the terminal printed. Release builds keep line numbers, so a trace from a packaged
+        Quill still points at real source lines.
+      render: shell
