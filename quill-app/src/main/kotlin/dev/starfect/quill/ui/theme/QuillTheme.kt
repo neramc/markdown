@@ -183,19 +183,25 @@ public class EditorPalette(
 /**
  * The IDE shell's palette.
  *
- * Two things make this read as a tool rather than as a dark web app, and neither is the hue.
+ * The dark values are sampled out of a real IntelliJ window rather than chosen: panels `#2B2D30`,
+ * editor and tab strip `#1E1F22`, hover `#35373B`, focused selection `#2E436E`, unfocused selection
+ * `#43454A`. Reading them off a screenshot settled two things guessing had got wrong.
  *
- * **The tones are very close together.** Root, panel, hover and selection sit within a few points of
- * each other. Regions are separated by a barely-perceptible tone change rather than by a block of
- * contrasting colour, which is why the window reads as one continuous work surface.
+ * **The panels and the editor are twelve points apart, and nothing is drawn between them.** An
+ * earlier pass had them one point apart with a `#2B2D30` line down every boundary, which inverts how
+ * the IDE works: there the tone step *is* the separator, and a scan across the real window goes
+ * straight from panel to editor with no border pixel at all. A shell that needs a line between every
+ * region is a shell whose regions do not differ enough to be seen. Lines are kept only where two
+ * areas share a tone — a tool window's header against its content, the editor's split handle — and
+ * `border` is the `#393B40` those use.
+ *
+ * **A focused selection is blue and an unfocused one is grey.** Both are low-contrast, but they are
+ * not the same colour: the blue is how the window says where typing will go, and painting every
+ * selection grey throws that away. See [SurfaceState].
  *
  * **Text is layered rather than uniformly bright.** Primary, secondary and muted are three distinct
  * steps. Painting every label the same white is the single fastest way to make a dense UI unreadable:
  * with nothing receding, everything competes.
- *
- * Selection in particular is a low-contrast fill, not a saturated blue. Accent is reserved for
- * saying *what is active* — the selected tab's underline, focus, links — and loses that job the
- * moment it is used for decoration.
  */
 @Immutable
 public class ShellPalette(
@@ -204,18 +210,27 @@ public class ShellPalette(
     /**
      * A panel nested inside another, such as a dialog's category list.
      *
-     * One step away from [toolWindowBackground], not a contrasting colour.
+     * Takes the editor's tone, so a list inside a dialog sits in a well the same way the editor sits
+     * inside the shell — the same relationship, one level down.
      */
     public val panelSecondary: Color,
     /** Status bar; separate because it can be themed apart from the panels. */
     public val statusBarBackground: Color,
     /**
-     * The separators between regions.
+     * The separator between two regions that share a tone.
      *
-     * Deliberately close to the panel it sits on. A shell whose first impression is "there are a lot
-     * of lines" has borders doing work that a tone change should be doing.
+     * Darker than the panels it divides, not lighter — the IDE separates its rail from its tool
+     * window, and its panels from its status bar, with a line in the *editor's* colour. Where two
+     * regions already differ in tone, nothing is drawn at all.
      */
     public val border: Color,
+    /**
+     * The editor's split handle.
+     *
+     * The one separator that has to be found with the pointer, so it is the one separator allowed to
+     * be visible against the surface it sits on.
+     */
+    public val splitter: Color,
     /** Primary text: file names, tool window titles, active elements. */
     public val text: Color,
     /** Secondary text: descriptions, supporting information. */
@@ -265,25 +280,26 @@ public class ShellPalette(
 ) {
     public companion object {
         public val Dark: ShellPalette = ShellPalette(
-            toolWindowBackground = Color(0xFF1F2023),
-            panelSecondary = Color(0xFF25262A),
-            statusBarBackground = Color(0xFF1F2023),
-            border = Color(0xFF2B2D30),
+            toolWindowBackground = Color(0xFF2B2D30),
+            panelSecondary = Color(0xFF1E1F22),
+            statusBarBackground = Color(0xFF2B2D30),
+            border = Color(0xFF1E1F22),
+            splitter = Color(0xFF393B40),
             text = Color(0xFFD7D9DC),
             secondaryText = Color(0xFFA6A8AD),
             mutedText = Color(0xFF777A80),
             icon = Color(0xFFA6A8AD),
             mutedIcon = Color(0xFF777A80),
-            hoverBackground = Color(0xFF2B2D30),
-            pressedBackground = Color(0xFF3A3D42),
-            selectionBackground = Color(0xFF34373B),
-            inactiveSelectionBackground = Color(0xFF2B2D30),
+            hoverBackground = Color(0xFF35373B),
+            pressedBackground = Color(0xFF43454A),
+            selectionBackground = Color(0xFF2E436E),
+            inactiveSelectionBackground = Color(0xFF43454A),
             accent = Color(0xFF4D8DFF),
-            tabBarBackground = Color(0xFF1F2023),
+            tabBarBackground = Color(0xFF1E1F22),
             tabSelectedBackground = Color(0xFF1E1F22),
             tabUnderline = Color(0xFF4D8DFF),
-            popupBackground = Color(0xFF25262A),
-            popupBorder = Color(0xFF34373B),
+            popupBackground = Color(0xFF2B2D30),
+            popupBorder = Color(0xFF393B40),
             error = Color(0xFFDB5C5C),
             warning = Color(0xFFE0A22B),
             success = Color(0xFF5FAD65),
@@ -298,24 +314,25 @@ public class ShellPalette(
         // that is a soft grey rather than a saturated blue.
         public val Light: ShellPalette = ShellPalette(
             toolWindowBackground = Color(0xFFF7F8FA),
-            panelSecondary = Color(0xFFF0F1F4),
+            panelSecondary = Color(0xFFFFFFFF),
             statusBarBackground = Color(0xFFF7F8FA),
-            border = Color(0xFFE4E6EB),
+            border = Color(0xFFEBECF0),
+            splitter = Color(0xFFD3D5DB),
             text = Color(0xFF25272B),
             secondaryText = Color(0xFF5A5D63),
             mutedText = Color(0xFF8C8F96),
             icon = Color(0xFF5A5D63),
             mutedIcon = Color(0xFF8C8F96),
             hoverBackground = Color(0xFFEBECF0),
-            pressedBackground = Color(0xFFDCDEE3),
-            selectionBackground = Color(0xFFE0E2E7),
-            inactiveSelectionBackground = Color(0xFFEBECF0),
+            pressedBackground = Color(0xFFD3D5DB),
+            selectionBackground = Color(0xFFD4E2FF),
+            inactiveSelectionBackground = Color(0xFFD3D5DB),
             accent = Color(0xFF3574F0),
-            tabBarBackground = Color(0xFFF7F8FA),
+            tabBarBackground = Color(0xFFFFFFFF),
             tabSelectedBackground = Color(0xFFFFFFFF),
             tabUnderline = Color(0xFF3574F0),
-            popupBackground = Color(0xFFFFFFFF),
-            popupBorder = Color(0xFFD6D9E0),
+            popupBackground = Color(0xFFF7F8FA),
+            popupBorder = Color(0xFFD3D5DB),
             error = Color(0xFFC94F4F),
             warning = Color(0xFFC28A18),
             success = Color(0xFF3D8B45),

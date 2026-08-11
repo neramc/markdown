@@ -21,7 +21,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 import dev.starfect.quill.QuillController
 import dev.starfect.quill.model.DocumentSession
 import dev.starfect.quill.model.WorkspaceState
@@ -29,9 +28,7 @@ import dev.starfect.quill.ui.icons.IdeIcons
 import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.shell.IdeActionButton
 import dev.starfect.quill.ui.theme.LocalShellPalette
-import dev.starfect.quill.ui.theme.ShellDivider
 import dev.starfect.quill.ui.theme.interactiveSurface
-import org.jetbrains.jewel.ui.Orientation
 import org.jetbrains.jewel.ui.component.Text
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -53,11 +50,6 @@ public fun EditorTabs(controller: QuillController, workspace: WorkspaceState) {
     val shell = LocalShellPalette.current
 
     Box(Modifier.fillMaxWidth().height(Tokens.TabHeight).background(shell.tabBarBackground)) {
-        // Drawn before the tabs, so the selected tab's accent line paints over it. In the IDE the
-        // accent *replaces* the strip's bottom border for the width of the active tab; painting the
-        // divider last instead clipped the 2px line to 1px on screen.
-        ShellDivider(Orientation.Horizontal, Modifier.align(Alignment.BottomStart))
-
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             LazyRow(
                 modifier = Modifier.weight(1f),

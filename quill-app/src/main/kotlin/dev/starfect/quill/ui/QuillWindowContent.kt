@@ -17,7 +17,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.starfect.quill.QuillController
 import dev.starfect.quill.model.Dialog
 import dev.starfect.quill.model.Dock
@@ -77,10 +76,12 @@ public fun QuillWindowContent(
                 ShellDivider(Orientation.Vertical)
 
                 if (workspace.leftToolWindow == ToolWindow.PROJECT) {
+                    // No separator: the panel and the editor are twelve points apart, and in the
+                    // real window that tone step is the whole boundary. A line here would be the
+                    // first thing anyone saw.
                     Box(Modifier.width(260.dp).fillMaxHeight().background(shell.toolWindowBackground)) {
                         ProjectTree(controller, workspace)
                     }
-                    ShellDivider(Orientation.Vertical)
                 }
 
                 Column(Modifier.weight(1f).fillMaxHeight()) {
@@ -128,7 +129,6 @@ private fun RightDock(controller: QuillController, workspace: WorkspaceState) {
     val tool = workspace.rightToolWindow ?: return
     val shell = LocalShellPalette.current
 
-    ShellDivider(Orientation.Vertical)
     Box(Modifier.width(280.dp).fillMaxHeight().background(shell.toolWindowBackground)) {
         when (tool) {
             ToolWindow.STRUCTURE -> OutlinePanel(controller, workspace)
@@ -215,7 +215,7 @@ private fun EditorArea(controller: QuillController, workspace: WorkspaceState, m
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                     // The splitter is the only thing dividing the two halves, so it takes the same
                     // near-invisible border as every other separator in the shell.
-                    dividerStyle = DividerStyle(shell.border, DividerMetrics.defaults()),
+                    dividerStyle = DividerStyle(shell.splitter, DividerMetrics.defaults()),
                     state = splitState,
                     firstPaneMinWidth = 220.dp,
                     secondPaneMinWidth = 220.dp,
