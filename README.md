@@ -24,7 +24,7 @@ Nothing on screen is computed twice: the syntax colours in the editor, the outli
 the problems list and the rendered page all come from the same engine, from the same parse.
 
 <div align="center">
-<img src="docs/images/editor-dark.png" width="900" alt="Quill's split view: project tree on the left, source editor with syntax highlighting in the centre, rendered page on the right, document outline on the right edge">
+<img src="docs/images/live-split.png" width="900" alt="Quill's split view: project tree on the left, source editor with syntax highlighting in the centre, rendered page on the right, document outline on the right edge">
 </div>
 
 ## What it does
@@ -62,7 +62,7 @@ the Problems tool window. Clicking a row selects the offending range; `F2` and `
 through them.
 
 <div align="center">
-<img src="docs/images/problems.png" width="900" alt="The Problems tool window listing four findings with severity icons, inspection names and line numbers">
+<img src="docs/images/live-problems.png" width="900" alt="The Problems tool window listing two findings with severity icons, inspection names and line numbers">
 </div>
 
 They are the mistakes that survive proofreading — a link whose destination is empty still renders as
@@ -84,7 +84,7 @@ lines instead.
 
 <table>
 <tr>
-<td width="50%"><img src="docs/images/settings.png" alt="The Settings dialog, with categories on the left and the Appearance page on the right"></td>
+<td width="50%"><img src="docs/images/live-settings.png" alt="The Settings dialog, with categories on the left and the Inspections page on the right"></td>
 <td width="50%"><img src="docs/images/run-configurations.png" alt="The Run/Debug Configurations dialog, with a list of configurations on the left and the selected one's form on the right"></td>
 </tr>
 </table>
@@ -176,7 +176,13 @@ dotnet test installer-windows/Quill.Setup.sln      # the installer engine and wi
 The bridge suite is the one that proves the ABI: it drives the real shared library through the FFM
 API and checks the offset convention, the wire format and buffer ownership across the boundary. The
 UI suite composes the whole shell into a Skia raster surface with no display server, writing every
-frame to `quill-app/build/test-renders/` — the screenshots in this README are those files.
+frame to `quill-app/build/test-renders/`.
+
+The screenshots in this README are not those frames. They are the packaged release binary — the one
+that has been through ProGuard — running on a virtual display and driven by real pointer events, with
+the X server's own framebuffer decoded to PNG. That distinction has already earned its keep: a
+setting that applied correctly in every offscreen test did nothing when clicked, because the value
+reached the state and nothing re-derived from it.
 
 ## Repository layout
 
