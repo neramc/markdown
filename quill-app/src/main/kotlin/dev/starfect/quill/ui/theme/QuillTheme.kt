@@ -34,6 +34,7 @@ import org.jetbrains.jewel.intui.standalone.styling.light
 import org.jetbrains.jewel.ui.component.styling.LocalMenuStyle
 import org.jetbrains.jewel.ui.component.styling.LocalScrollbarStyle
 import org.jetbrains.jewel.ui.component.styling.MenuColors
+import org.jetbrains.jewel.ui.component.styling.MenuItemMetrics
 import org.jetbrains.jewel.ui.component.styling.MenuMetrics
 import org.jetbrains.jewel.ui.component.styling.MenuStyle
 import org.jetbrains.jewel.ui.component.styling.ScrollbarMetrics
@@ -454,7 +455,19 @@ private fun shellMenuStyle(dark: Boolean, shell: ShellPalette): MenuStyle {
             offset = base.metrics.offset,
             shadowSize = base.metrics.shadowSize,
             borderWidth = 1.dp,
-            itemMetrics = base.metrics.itemMetrics,
+            // Jewel's default row is 24dp, which puts the menu at a different density from the tree
+            // rows and toolbar beside it. The shell's own row height applies here too.
+            itemMetrics = MenuItemMetrics(
+                selectionCornerSize = CornerSize(Tokens.Radius.Row),
+                outerPadding = base.metrics.itemMetrics.outerPadding,
+                contentPadding = PaddingValues(horizontal = Tokens.Spacing.Medium),
+                separatorPadding = base.metrics.itemMetrics.separatorPadding,
+                keybindingsPadding = base.metrics.itemMetrics.keybindingsPadding,
+                separatorThickness = base.metrics.itemMetrics.separatorThickness,
+                separatorHeight = base.metrics.itemMetrics.separatorHeight,
+                iconSize = Tokens.IconSize,
+                minHeight = Tokens.MenuRowHeight,
+            ),
             submenuMetrics = base.metrics.submenuMetrics,
         ),
         icons = base.icons,
