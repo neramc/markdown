@@ -19,6 +19,9 @@ import org.jetbrains.jewel.intui.window.decoratedWindow
 import org.jetbrains.jewel.intui.window.styling.dark
 import org.jetbrains.jewel.intui.window.styling.light
 import org.jetbrains.jewel.ui.ComponentStyling
+import org.jetbrains.jewel.intui.window.styling.dark
+import org.jetbrains.jewel.intui.window.styling.light
+import org.jetbrains.jewel.window.styling.TitleBarColors
 import org.jetbrains.jewel.window.styling.TitleBarStyle
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.shape.CornerSize
@@ -380,7 +383,7 @@ public fun QuillTheme(dark: Boolean, content: @Composable () -> Unit) {
     IntUiTheme(
         theme = themeDefinition,
         styling = ComponentStyling.default()
-            .decoratedWindow(titleBarStyle = if (dark) TitleBarStyle.dark() else TitleBarStyle.light())
+            .decoratedWindow(titleBarStyle = shellTitleBarStyle(dark, shell))
             .provide {
                 arrayOf(
                     LocalScrollbarStyle provides quietScrollbarStyle(dark),
@@ -439,4 +442,30 @@ private fun shellMenuStyle(dark: Boolean, shell: ShellPalette): MenuStyle {
         ),
         icons = base.icons,
     )
+}
+
+/**
+ * The window's own title bar, painted from the shell's palette.
+ *
+ * Jewel's default title bar sits about twelve points lighter than the tool windows below it, which
+ * puts a visible band across the top of a shell whose whole character is that its regions differ by
+ * two or three points. Only the background and the border need overriding; everything else the
+ * default supplies is already right.
+ */
+@Composable
+private fun shellTitleBarStyle(dark: Boolean, shell: ShellPalette): TitleBarStyle {
+    val colors = if (dark) {
+        TitleBarColors.dark(
+            backgroundColor = shell.toolWindowBackground,
+            inactiveBackground = shell.toolWindowBackground,
+            borderColor = shell.border,
+        )
+    } else {
+        TitleBarColors.light(
+            backgroundColor = shell.toolWindowBackground,
+            inactiveBackground = shell.toolWindowBackground,
+            borderColor = shell.border,
+        )
+    }
+    return if (dark) TitleBarStyle.dark(colors = colors) else TitleBarStyle.light(colors = colors)
 }
