@@ -131,6 +131,12 @@ inspection.
 ## Known environment limitations
 
 The container this project was developed in has no GL context, so Skiko falls back to software
-rendering — harmless, and the reason `Cannot create Linux GL context` appears in launch logs. It
-also has no screen-capture tooling; the screenshots in `docs/images/` come from the offscreen render
-tests rather than from a window manager.
+rendering — harmless, and the reason `Cannot create Linux GL context` appears in launch logs.
+
+There is no window manager either, which is worth knowing if you drive the app on a virtual display:
+nothing routes keyboard input to the window and nothing honours a position request, so both have to
+be done by hand through the X server. Pointer events are unaffected, which is enough to click
+through the whole UI. The screenshots in `docs/images/` are framebuffer captures of the packaged
+release binary running that way — `Xvfb -fbdir` writes the screen to an XWD file, which decodes to a
+PNG. `quill-app`'s render tests produce equivalent images offscreen through `ImageComposeScene`, and
+those are what CI can check; the captures are what shows the real window.

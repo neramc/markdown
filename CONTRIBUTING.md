@@ -108,8 +108,9 @@ away, add a `-keep` rule to `quill-app/proguard-rules.pro` with a comment saying
 - **Branches** off `main`. Rebase rather than merge to bring in changes.
 - **British spelling** in comments and documentation, since that is what the codebase uses.
 - **`.editorconfig`** carries the formatting rules; most editors apply it automatically.
-- **Screenshots** in `docs/images/` come from `quill-app/build/test-renders/`. Regenerate them
-  rather than cropping a real window, so they stay reproducible.
+- **Screenshots** in `docs/images/` are captures of the packaged release binary. `quill-app`'s
+  render tests write equivalent images to `quill-app/build/test-renders/` on every run, so a UI
+  change that breaks rendering fails the build rather than waiting to be noticed in a screenshot.
 
 ## Reporting bugs
 
