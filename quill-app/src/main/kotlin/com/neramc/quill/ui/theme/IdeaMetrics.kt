@@ -28,13 +28,19 @@ public object IdeaMetrics {
     public val ToolWindowHeaderHeight: Dp = 32.dp
 
     /** Editor tab height, and the height of the strip that holds them. */
-    public val TabHeight: Dp = 32.dp
+    public val TabHeight: Dp = 34.dp
 
     /** Thickness of the accent bar under the selected editor tab. */
     public val TabUnderlineThickness: Dp = 2.dp
 
-    /** Status bar along the bottom of the window. */
+    /** Status bar along the bottom of the window, which also carries the breadcrumbs. */
     public val StatusBarHeight: Dp = 26.dp
+
+    /** The coloured square in the project widget that carries the project's initial. */
+    public val ProjectBadgeSize: Dp = 20.dp
+
+    /** Corner radius on that badge. */
+    public val ProjectBadgeCorner: Dp = 5.dp
 
     /** One row in the project or structure tree. */
     public val TreeRowHeight: Dp = 24.dp
@@ -68,6 +74,15 @@ public object IdeaMetrics {
 
     /** The find bar docked at the top of the editor. */
     public val FindBarHeight: Dp = 32.dp
+
+    /** Left navigation rail on the welcome window. */
+    public val WelcomeRailWidth: Dp = 250.dp
+
+    /** One entry in the welcome window's recent-projects list. */
+    public val WelcomeRecentRowHeight: Dp = 56.dp
+
+    /** The large square actions the welcome window shows when there are no recent projects. */
+    public val WelcomeActionSize: Dp = 108.dp
 
     /** Body text in trees, tabs and toolbars. */
     public val UiFontSize: TextUnit = 13.sp

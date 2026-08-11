@@ -120,13 +120,26 @@ The details that carry the resemblance, and what each replaced:
 | View mode switch | An icon toggle group at the editor's top-right | A segmented control in the title bar |
 | Find bar | Docked at the *top*, one row, `Aa` / `W` / `.*` glyph chips, counter inside the field | Docked at the bottom with labelled checkboxes |
 | Search Everywhere | 700pt floating surface, scope tabs, grouped results, borderless field | A narrow palette with a boxed input |
-| Trees | File-type icons, indent guides, full-width selection | Indented text |
+| Trees | Project root row with its location, filled folder icons tinted by role, file-type glyphs, indent guides, full-width selection | Indented text |
+| Main toolbar widgets | A coloured avatar carrying the project's initial, then the Git branch | A bare project name |
+| Status bar | Breadcrumbs on the left; caret, encoding, separator, file type and the writable padlock on the right | A row of statistics |
+| Editor gutter | Numbers placed from the text field's own layout, so a wrapped line shows one number; the caret's line brighter, its row highlighted | One number per logical line, drifting out of step at the first wrap |
+| Welcome window | A rail with product identity and navigation; large actions when empty, a searchable recent list when not | No welcome window at all |
 
 Icons are drawn as Compose vectors in `ui/icons/IdeIcons.kt` rather than loaded as resources.
 IntelliJ's own `expui` artwork is not published to Maven Central — Jewel ships without most of it —
 so the alternatives were bundling artwork Quill has no licence to, or a window full of
 missing-resource boxes. Drawing them on the same 16-unit grid the IDE designs on also means every
 icon takes the theme tint, exactly as the IDE's SVGs do.
+
+### The gutter is drawn from the editor's own layout
+
+Line numbers come from the `TextLayoutResult` the text field hands back, not from counting newlines.
+That distinction is the difference between a gutter and a decoration: with soft wrap on, a logical
+line can occupy three visual rows, and a gutter that prints `1..n` down the side drifts out of step
+with the text at the first wrapped line and stays wrong for the rest of the document. Taking the
+layout means each number lands on its line's first visual row and the rows below it stay blank,
+which is what the IDE does — and the caret-row highlight lands on the right row for the same reason.
 
 **On fidelity:** this matches the New UI's documented palette, metrics and arrangement, and the
 offscreen render tests show the result. It is not, and cannot be verified as, pixel-identical to a

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -18,6 +19,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -28,12 +31,14 @@ import androidx.compose.ui.window.rememberWindowState
 import com.neramc.quill.QuillController
 import com.neramc.quill.bridge.QuillNativeLibraryException
 import com.neramc.quill.io.FileService
+import com.neramc.quill.io.GitStatus
 import com.neramc.quill.model.ToolWindow
 import com.neramc.quill.model.ViewMode
 import com.neramc.quill.model.WorkspaceState
 import com.neramc.quill.ui.icons.IdeIcons
 import com.neramc.quill.ui.theme.IdeaMetrics
 import com.neramc.quill.ui.theme.LocalShellPalette
+import com.neramc.quill.ui.theme.ShellPalette
 import com.neramc.quill.ui.theme.QuillTheme
 import java.nio.file.Path
 import org.jetbrains.jewel.ui.Orientation
@@ -78,9 +83,8 @@ public fun DecoratedWindowScope.QuillTitleBar(
             )
             MainMenuButton(controller, workspace, onExit)
             ProjectWidget(workspace)
+            BranchWidget(workspace)
         }
-
-        CurrentFileLabel(workspace)
 
         Row(
             Modifier.align(Alignment.End).padding(end = 8.dp),
@@ -115,10 +119,9 @@ public fun QuillToolBar(controller: QuillController, workspace: WorkspaceState, 
         )
         MainMenuButton(controller, workspace, onExit)
         ProjectWidget(workspace)
+        BranchWidget(workspace)
 
-        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-            CurrentFileLabel(workspace)
-        }
+        Box(Modifier.weight(1f))
 
         TitleBarActions(controller, workspace)
     }
@@ -140,18 +143,40 @@ private fun TitleBarActions(controller: QuillController, workspace: WorkspaceSta
     ) { tint -> IdeIcons.Gear(tint) }
 }
 
-/** The project widget: the open directory's name, as a pill that opens nothing but reads as one. */
+/**
+ * The project widget: a coloured avatar carrying the project's initial, its name, and a chevron.
+ *
+ * The badge is the detail that makes this widget recognisable at a glance — IntelliJ gives every
+ * project a deterministic colour so the toolbar tells you which window you are in before you have
+ * read anything.
+ */
 @Composable
 private fun ProjectWidget(workspace: WorkspaceState) {
     val shell = LocalShellPalette.current
     val project = workspace.projectRoot?.fileName?.toString() ?: "quill"
 
     IdeWidgetButton(onClick = {}) {
+        Box(
+            modifier = Modifier.size(IdeaMetrics.ProjectBadgeSize)
+                .clip(RoundedCornerShape(IdeaMetrics.ProjectBadgeCorner))
+                .background(ShellPalette.badgeColor(project)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = project.firstOrNull()?.uppercase() ?: "Q",
+                fontSize = IdeaMetrics.TinyFontSize,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White,
+                maxLines = 1,
+            )
+        }
+
         Text(
             text = project,
             fontSize = IdeaMetrics.UiFontSize,
             color = shell.text,
             maxLines = 1,
+            modifier = Modifier.padding(start = 6.dp),
         )
         // The chevron is what marks this as a widget rather than a caption; the IDE draws one on
         // every toolbar widget that can be opened.
@@ -159,22 +184,29 @@ private fun ProjectWidget(workspace: WorkspaceState) {
     }
 }
 
-/** The active file, centred, with the IDE's asterisk for unsaved changes. */
+/**
+ * The VCS widget, showing the checked-out branch.
+ *
+ * It appears only when the project really is a Git working tree, so the widget is either accurate or
+ * absent — a decorative "master" next to a directory under no version control would be worse than
+ * the gap it fills.
+ */
 @Composable
-private fun CurrentFileLabel(workspace: WorkspaceState) {
+private fun BranchWidget(workspace: WorkspaceState) {
     val shell = LocalShellPalette.current
-    val document = workspace.activeDocument ?: return
+    val root = workspace.projectRoot
+    val branch = remember(root) { GitStatus.currentBranch(root) } ?: return
 
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    IdeWidgetButton(onClick = {}) {
+        IdeIcons.Branch(shell.icon, size = 14.dp)
         Text(
-            text = document.displayName,
-            fontSize = IdeaMetrics.SmallFontSize,
-            color = shell.mutedText,
+            text = branch,
+            fontSize = IdeaMetrics.UiFontSize,
+            color = shell.text,
             maxLines = 1,
+            modifier = Modifier.padding(start = 5.dp),
         )
-        if (document.isModified) {
-            Text(" *", fontSize = IdeaMetrics.SmallFontSize, color = shell.modified)
-        }
+        Box(Modifier.padding(start = 4.dp)) { IdeIcons.WidgetChevron(shell.mutedText) }
     }
 }
 

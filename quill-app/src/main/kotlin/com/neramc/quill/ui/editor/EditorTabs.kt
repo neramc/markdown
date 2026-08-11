@@ -27,6 +27,7 @@ import com.neramc.quill.model.DocumentSession
 import com.neramc.quill.model.WorkspaceState
 import com.neramc.quill.ui.icons.IdeIcons
 import com.neramc.quill.ui.theme.IdeaMetrics
+import com.neramc.quill.ui.shell.IdeActionButton
 import com.neramc.quill.ui.theme.LocalShellPalette
 import org.jetbrains.jewel.ui.Orientation
 import org.jetbrains.jewel.ui.component.Divider
@@ -48,20 +49,32 @@ public fun EditorTabs(controller: QuillController, workspace: WorkspaceState) {
     val shell = LocalShellPalette.current
 
     Box(Modifier.fillMaxWidth().height(IdeaMetrics.TabHeight).background(shell.tabBarBackground)) {
-        LazyRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Start,
-        ) {
-            items(workspace.documents.size, key = { workspace.documents[it].id }) { index ->
-                val session = workspace.documents[index]
-                EditorTab(
-                    session = session,
-                    selected = session.id == workspace.activeDocumentId,
-                    onSelect = { controller.selectDocument(session.id) },
-                    onClose = { controller.closeDocument(session.id) },
-                )
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            LazyRow(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.Start,
+            ) {
+                items(workspace.documents.size, key = { workspace.documents[it].id }) { index ->
+                    val session = workspace.documents[index]
+                    EditorTab(
+                        session = session,
+                        selected = session.id == workspace.activeDocumentId,
+                        onSelect = { controller.selectDocument(session.id) },
+                        onClose = { controller.closeDocument(session.id) },
+                    )
+                }
             }
+
+            // The IDE parks a tab-actions menu at the right end of the strip; without it the strip
+            // ends in nothing and the row reads as unfinished next to a real editor window.
+            IdeActionButton(
+                onClick = {},
+                tooltip = "Tab Actions",
+                size = 24.dp,
+                modifier = Modifier.padding(end = 6.dp),
+            ) { tint -> IdeIcons.MoreVertical(tint, size = 14.dp) }
         }
+
         Divider(
             orientation = Orientation.Horizontal,
             color = shell.border,

@@ -204,6 +204,14 @@ public class ShellPalette(
     public val error: Color,
     /** Modified-file marker in tabs and the project tree. */
     public val modified: Color,
+    /** Ordinary directory icons in the project view. */
+    public val folderIcon: Color,
+    /** Directories the IDE treats as sources, which it tints. */
+    public val sourceFolderIcon: Color,
+    /** Build output and other excluded directories, which the IDE tints orange. */
+    public val excludedIcon: Color,
+    /** Surface behind the welcome window's content pane. */
+    public val welcomeBackground: Color,
 ) {
     public companion object {
         public val Dark: ShellPalette = ShellPalette(
@@ -225,6 +233,10 @@ public class ShellPalette(
             popupBorder = Color(0xFF43454A),
             error = Color(0xFFDB5C5C),
             modified = Color(0xFF548AF7),
+            folderIcon = Color(0xFF9AA7B0),
+            sourceFolderIcon = Color(0xFF5FA8F5),
+            excludedIcon = Color(0xFFCC7832),
+            welcomeBackground = Color(0xFF1E1F22),
         )
 
         public val Light: ShellPalette = ShellPalette(
@@ -246,9 +258,43 @@ public class ShellPalette(
             popupBorder = Color(0xFFC9CCD6),
             error = Color(0xFFC94F4F),
             modified = Color(0xFF3574F0),
+            folderIcon = Color(0xFF7A8494),
+            sourceFolderIcon = Color(0xFF3574F0),
+            excludedIcon = Color(0xFFA1651E),
+            welcomeBackground = Color(0xFFFFFFFF),
         )
 
         public fun of(dark: Boolean): ShellPalette = if (dark) Dark else Light
+
+        /**
+         * The colours IntelliJ tints a project's avatar badge with.
+         *
+         * The IDE assigns one deterministically from the project name so the same project always
+         * carries the same colour across sessions and machines — the badge is a recognition aid, and
+         * a badge that changed colour on every launch would be worse than none.
+         */
+        private val BadgeColors: List<Color> = listOf(
+            Color(0xFF8B5CF6),
+            Color(0xFF3574F0),
+            Color(0xFF16A394),
+            Color(0xFF5FAD65),
+            Color(0xFFE08855),
+            Color(0xFFDB5C5C),
+            Color(0xFFD96BA8),
+            Color(0xFF6B7FD7),
+        )
+
+        /** Picks the badge colour for a project name. */
+        public fun badgeColor(name: String): Color {
+            if (name.isEmpty()) return BadgeColors[0]
+            // A stable, order-independent hash: String.hashCode would work too, but folding the
+            // characters keeps the choice from clustering for names sharing a prefix.
+            var hash = 0
+            for (character in name) {
+                hash = (hash * 31 + character.code) and 0x7FFFFFFF
+            }
+            return BadgeColors[hash % BadgeColors.size]
+        }
     }
 }
 

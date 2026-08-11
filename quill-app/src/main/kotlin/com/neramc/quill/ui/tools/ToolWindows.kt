@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.neramc.quill.QuillController
 import com.neramc.quill.model.FileNode
@@ -35,6 +36,7 @@ import com.neramc.quill.ui.icons.IdeIcons
 import com.neramc.quill.ui.shell.ToolWindowHeader
 import com.neramc.quill.ui.theme.IdeaMetrics
 import com.neramc.quill.ui.theme.LocalShellPalette
+import java.nio.file.Path
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.VerticallyScrollableContainer
 
@@ -64,6 +66,13 @@ public fun ProjectTree(controller: QuillController, workspace: WorkspaceState) {
 
         VerticallyScrollableContainer(scrollState = listState, modifier = Modifier.fillMaxSize()) {
             LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+                // The project root sits at the top of the tree with its location beside it, exactly
+                // as the IDE shows it. It scrolls with the rest rather than being pinned, which is
+                // also what the IDE does.
+                workspace.projectRoot?.let { root ->
+                    item(key = "\u0000root") { ProjectRootRow(root) }
+                }
+
                 items(rows.size, key = { rows[it].path.toString() }) { index ->
                     val node = rows[index]
                     val isOpen = workspace.documents.any { it.path == node.path }
@@ -79,6 +88,45 @@ public fun ProjectTree(controller: QuillController, workspace: WorkspaceState) {
                 }
             }
         }
+    }
+}
+
+/** The project root: an expanded module icon, the project name, and its abbreviated location. */
+@Composable
+private fun ProjectRootRow(root: Path) {
+    val shell = LocalShellPalette.current
+    val home = remember { System.getProperty("user.home").orEmpty() }
+    val location = remember(root, home) {
+        val absolute = root.toString()
+        if (home.isNotEmpty() && absolute.startsWith(home)) "~" + absolute.removePrefix(home) else absolute
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth().height(IdeaMetrics.TreeRowHeight).padding(start = 6.dp, end = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Box(Modifier.size(14.dp), contentAlignment = Alignment.Center) {
+            IdeIcons.ChevronDown(shell.icon, size = 12.dp)
+        }
+        IdeIcons.Module(shell.sourceFolderIcon, size = IdeaMetrics.IconSize)
+        Text(
+            text = root.fileName?.toString() ?: root.toString(),
+            fontSize = IdeaMetrics.UiFontSize,
+            color = shell.text,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        // The location is the IDE's own secondary text: dimmer, smaller, and clipped from the right
+        // so the project name never gets pushed out by a deep path.
+        Text(
+            text = location,
+            fontSize = IdeaMetrics.TinyFontSize,
+            color = shell.mutedText,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 
@@ -115,10 +163,20 @@ private fun TreeRow(node: FileNode, selected: Boolean, open: Boolean, onClick: (
             }
         }
 
-        if (node.isDirectory) {
-            IdeIcons.Folder(shell.icon, size = IdeaMetrics.IconSize)
-        } else {
-            IdeIcons.MarkdownFile(shell.icon, shell.accent, size = IdeaMetrics.IconSize)
+        // The icon says what the row is. IntelliJ fills folder icons and tints them by role, and
+        // gives every file type its own glyph; a tree where every row carries the same mark is the
+        // single biggest reason a copy reads as a list rather than as a project view.
+        when {
+            node.isDirectory -> IdeIcons.Folder(
+                tint = shell.folderIcon,
+                size = IdeaMetrics.IconSize,
+                open = node.isExpanded,
+            )
+
+            node.name.substringAfterLast('.', "").lowercase() in MARKDOWN_EXTENSIONS ->
+                IdeIcons.MarkdownFile(shell.icon, shell.accent, size = IdeaMetrics.IconSize)
+
+            else -> IdeIcons.PlainFile(shell.icon, size = IdeaMetrics.IconSize)
         }
 
         Text(
@@ -126,9 +184,13 @@ private fun TreeRow(node: FileNode, selected: Boolean, open: Boolean, onClick: (
             fontSize = IdeaMetrics.UiFontSize,
             color = if (open) shell.accent else shell.text,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
+
+/** Extensions the project view marks with the Markdown glyph rather than a plain page. */
+private val MARKDOWN_EXTENSIONS = setOf("md", "markdown", "mdx")
 
 /**
  * Draws the vertical guide lines that connect a nested row back to its ancestors.

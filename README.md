@@ -33,6 +33,8 @@ a separate C# / Avalonia application rather than a generated MSI.
 | **Search Everywhere** | `Ctrl+Shift+P`, with scope tabs, grouped results and subsequence matching over every command. |
 | **Outline** | Live document structure, click to jump. |
 | **HTML export** | Standalone themed HTML, light or dark. |
+| **Welcome window** | Shown when Quill starts with no path: recent projects with their coloured avatars, or large New / Open actions when the list is empty. |
+| **Breadcrumbs** | Project, folders, file and the heading the caret sits under, along the status bar. |
 | **Themes** | IntelliJ Darcula and Light, switched at runtime. |
 
 ## Architecture

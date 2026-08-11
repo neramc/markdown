@@ -12,15 +12,20 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.neramc.quill.QuillController
+import com.neramc.quill.model.DocumentSession
 import com.neramc.quill.model.ToolWindow
 import com.neramc.quill.model.WorkspaceState
 import com.neramc.quill.ui.icons.IdeIcons
 import com.neramc.quill.ui.theme.IdeaMetrics
 import com.neramc.quill.ui.theme.LocalShellPalette
+import java.nio.file.Path
 import org.jetbrains.jewel.ui.Orientation
 import org.jetbrains.jewel.ui.component.Divider
 import org.jetbrains.jewel.ui.component.Text
@@ -44,7 +49,7 @@ public fun ToolWindowStripe(
     Column(
         modifier = modifier.width(IdeaMetrics.StripeWidth).fillMaxHeight()
             .background(shell.toolWindowBackground)
-            .padding(top = 6.dp),
+            .padding(top = 5.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
@@ -73,8 +78,10 @@ internal val ToolWindow.label: String
 /**
  * The header above a docked tool window.
  *
- * Mixed case, not upper case: the New UI stopped shouting its panel titles, and an all-caps header
- * is one of the clearest tells of a UI copied from the old look.
+ * The title carries a chevron, because in the IDE it opens the view switcher, and it is set in mixed
+ * case — the New UI stopped shouting its panel titles, and an all-caps header is one of the clearest
+ * tells of a UI copied from the old look. The right end holds the overflow menu and the fold-away
+ * button, in that order, as every IDE tool window does.
  */
 @Composable
 public fun ToolWindowHeader(
@@ -87,18 +94,24 @@ public fun ToolWindowHeader(
     Column {
         Row(
             modifier = Modifier.fillMaxWidth().height(IdeaMetrics.ToolWindowHeaderHeight)
-                .padding(start = 12.dp, end = 4.dp),
+                .padding(start = 12.dp, end = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = title,
-                fontSize = IdeaMetrics.SmallFontSize,
-                color = shell.text,
-                maxLines = 1,
-                modifier = Modifier.weight(1f),
-            )
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = title,
+                    fontSize = IdeaMetrics.SmallFontSize,
+                    color = shell.text,
+                    maxLines = 1,
+                )
+                Box(Modifier.padding(start = 4.dp)) { IdeIcons.WidgetChevron(shell.mutedText, size = 9.dp) }
+            }
 
             actions()
+
+            IdeActionButton(onClick = {}, tooltip = "Options", size = 22.dp) { tint ->
+                IdeIcons.MoreVertical(tint, size = 14.dp)
+            }
 
             if (onHide != null) {
                 IdeActionButton(onClick = onHide, tooltip = "Hide", size = 22.dp) { tint ->
@@ -113,9 +126,11 @@ public fun ToolWindowHeader(
 /**
  * The status bar.
  *
- * The New UI keeps a message on the left and a right-aligned run of widgets — caret position, line
- * separator, encoding — each of which is a hover target. The theme switch stands in for the IDE's
- * own settings widget at the far right.
+ * Its left half is the navigation breadcrumb — project, folders, file, enclosing heading — which is
+ * where IntelliJ puts it, not floating above the editor. The right half is the run of widgets the
+ * IDE keeps there: caret position, then document facts, then the line separator, encoding and
+ * read-only state. Every one of them is a hover target with a tooltip, because in the IDE every one
+ * of them is clickable.
  */
 @Composable
 public fun StatusBar(controller: QuillController, workspace: WorkspaceState) {
@@ -127,61 +142,136 @@ public fun StatusBar(controller: QuillController, workspace: WorkspaceState) {
         Row(
             modifier = Modifier.fillMaxWidth().height(IdeaMetrics.StatusBarHeight)
                 .background(shell.statusBarBackground)
-                .padding(horizontal = 8.dp),
+                .padding(start = 6.dp, end = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            val notification = workspace.notification
-            val error = document?.loadError
+            Box(Modifier.weight(1f)) {
+                val notification = workspace.notification
+                val error = document?.loadError
 
-            StatusItem(
-                label = notification ?: error ?: "",
-                tooltip = "Last message",
-                modifier = Modifier.weight(1f),
-                color = when {
-                    error != null -> shell.error
-                    notification != null -> shell.text
-                    else -> shell.mutedText
-                },
-                onClick = controller::dismissNotification,
-            )
+                when {
+                    // A message displaces the breadcrumbs while it is showing, the same way the
+                    // IDE's status text does, and clicking it dismisses it.
+                    error != null -> StatusMessage(error, shell.error, controller::dismissNotification)
+                    notification != null -> StatusMessage(notification, shell.text, controller::dismissNotification)
+                    else -> Breadcrumbs(controller, workspace)
+                }
+            }
 
             if (document != null) {
                 val caret = document.caretPosition
                 val stats = document.stats
+
                 StatusItem("${caret.line + 1}:${caret.column + 1}", "Go to line and column")
                 StatusItem("${stats.words} words", "Words in prose, excluding code and front matter")
                 StatusItem(readingTime(stats.readingTimeSeconds), "Estimated reading time at 200 wpm")
                 StatusItem("LF", "Line separator")
                 StatusItem("UTF-8", "File encoding")
+                StatusItem("Markdown", "File type")
+
+                Spacer(Modifier.width(2.dp))
+                IdeActionButton(onClick = {}, tooltip = "The file is writable", size = 22.dp) { tint ->
+                    IdeIcons.Lock(tint, locked = false)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The breadcrumb trail along the bottom of the window.
+ *
+ * The last crumb is the heading the caret currently sits under, which is the Markdown equivalent of
+ * the enclosing class and method the IDE shows for code. It is the one part of the trail that
+ * changes as you move around a file, and the reason the bar is worth having at all.
+ */
+@Composable
+private fun Breadcrumbs(controller: QuillController, workspace: WorkspaceState) {
+    val shell = LocalShellPalette.current
+    val document = workspace.activeDocument ?: return
+    val crumbs = remember(workspace.projectRoot, document.path, document.outline, document.caretPosition) {
+        buildCrumbs(workspace.projectRoot, document)
+    }
+
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        crumbs.forEachIndexed { index, crumb ->
+            if (index > 0) {
+                Box(Modifier.padding(horizontal = 1.dp)) {
+                    IdeIcons.ChevronRight(shell.mutedText, size = 10.dp)
+                }
             }
 
-            Spacer(Modifier.width(2.dp))
-            IdeActionButton(
-                onClick = controller::toggleTheme,
-                tooltip = if (workspace.settings.darkTheme) "Switch to Light theme" else "Switch to Dark theme",
-                size = 22.dp,
-            ) { tint -> IdeIcons.Gear(tint, size = 14.dp) }
+            IdeWidgetButton(onClick = { crumb.onClick(controller) }) {
+                when (crumb.kind) {
+                    CrumbKind.PROJECT -> IdeIcons.Module(shell.icon, size = 13.dp)
+                    CrumbKind.FOLDER -> IdeIcons.Folder(shell.folderIcon, size = 13.dp)
+                    CrumbKind.FILE -> IdeIcons.MarkdownFile(shell.icon, shell.accent, size = 13.dp)
+                    CrumbKind.HEADING -> Unit
+                }
+                Text(
+                    text = crumb.label,
+                    fontSize = IdeaMetrics.TinyFontSize,
+                    color = shell.mutedText,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(start = if (crumb.kind == CrumbKind.HEADING) 0.dp else 4.dp),
+                )
+            }
         }
+    }
+}
+
+private enum class CrumbKind { PROJECT, FOLDER, FILE, HEADING }
+
+private class Crumb(val label: String, val kind: CrumbKind, val onClick: (QuillController) -> Unit = {})
+
+/** Builds the trail: project, the folders between it and the file, the file, then the heading. */
+private fun buildCrumbs(projectRoot: Path?, document: DocumentSession): List<Crumb> = buildList {
+    val path = document.path
+
+    if (projectRoot != null) {
+        add(Crumb(projectRoot.fileName?.toString() ?: projectRoot.toString(), CrumbKind.PROJECT))
+    }
+
+    if (path != null) {
+        val relative = runCatching { projectRoot?.relativize(path) }.getOrNull()
+        val parts = (relative ?: path.fileName)?.toList().orEmpty()
+        // Everything except the last element is a directory on the way to the file.
+        parts.dropLast(1).forEach { part -> add(Crumb(part.toString(), CrumbKind.FOLDER)) }
+    }
+
+    add(Crumb(document.displayName, CrumbKind.FILE))
+
+    // The heading the caret is inside: the last one that begins at or before the caret.
+    val caretOffset = document.caretPosition.offset
+    document.outline.lastOrNull { it.offset <= caretOffset }?.let { entry ->
+        add(
+            Crumb(entry.title, CrumbKind.HEADING) { controller ->
+                controller.moveCaret(document.id, entry.offset)
+            }
+        )
+    }
+}
+
+/** A transient message, shown in place of the breadcrumbs. */
+@Composable
+private fun StatusMessage(message: String, color: Color, onDismiss: () -> Unit) {
+    IdeWidgetButton(onClick = onDismiss) {
+        Text(message, fontSize = IdeaMetrics.TinyFontSize, color = color, maxLines = 1)
     }
 }
 
 /** One status bar widget: a label with a hover fill and a tooltip, as every IDE widget is. */
 @Composable
-private fun StatusItem(
-    label: String,
-    tooltip: String,
-    modifier: Modifier = Modifier,
-    color: androidx.compose.ui.graphics.Color = LocalShellPalette.current.mutedText,
-    onClick: () -> Unit = {},
-) {
-    if (label.isEmpty()) {
-        Box(modifier)
-        return
-    }
-
+private fun StatusItem(label: String, tooltip: String, modifier: Modifier = Modifier) {
     Tooltip(tooltip = { Text(tooltip) }) {
-        IdeWidgetButton(onClick = onClick, modifier = modifier) {
-            Text(label, fontSize = IdeaMetrics.TinyFontSize, color = color, maxLines = 1)
+        IdeWidgetButton(onClick = {}, modifier = modifier) {
+            Text(
+                label,
+                fontSize = IdeaMetrics.TinyFontSize,
+                color = LocalShellPalette.current.mutedText,
+                maxLines = 1,
+            )
         }
     }
 }

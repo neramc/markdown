@@ -128,6 +128,44 @@ public object IdeIcons {
         }
     }
 
+    /** The VCS widget's branch glyph: two nodes joined by a fork. */
+    @Composable
+    public fun Branch(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.IconSize) {
+        IdeIcon(size, modifier) { unit ->
+            circle(4.5f, 3.6f, 1.7f, tint, unit)
+            circle(4.5f, 12.4f, 1.7f, tint, unit)
+            circle(11.5f, 5.6f, 1.7f, tint, unit)
+            line(4.5f, 5.3f, 4.5f, 10.7f, tint, unit)
+            // The fork: the branch tip curves back onto the trunk, which is what makes this read as
+            // a branch rather than as three unrelated dots.
+            polyline(listOf(11.5f to 7.3f, 11.5f to 9f, 4.5f to 9f), tint, unit)
+        }
+    }
+
+    /** The overflow menu the IDE puts at the end of a toolbar or tab strip. */
+    @Composable
+    public fun MoreVertical(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.IconSize) {
+        IdeIcon(size, modifier) { unit ->
+            for (y in intArrayOf(4, 8, 12)) {
+                drawCircle(tint, 0.85f * unit, Offset(8f * unit, y * unit))
+            }
+        }
+    }
+
+    /** The read-only padlock the IDE keeps at the right end of the status bar. */
+    @Composable
+    public fun Lock(tint: Color, locked: Boolean, modifier: Modifier = Modifier, size: Dp = 14.dp) {
+        IdeIcon(size, modifier) { unit ->
+            rect(4f, 7.5f, 12f, 13.5f, tint, unit)
+            if (locked) {
+                polyline(listOf(6f to 7.5f, 6f to 5f, 10f to 5f, 10f to 7.5f), tint, unit)
+            } else {
+                // Unlocked: the shackle swings clear of the body on one side.
+                polyline(listOf(6f to 7.5f, 6f to 5f, 10f to 5f, 10f to 6.2f), tint, unit)
+            }
+        }
+    }
+
     // ---------------------------------------------------------------- trees
 
     /** Collapsed disclosure triangle. */
@@ -146,20 +184,118 @@ public object IdeIcons {
         }
     }
 
-    /** A directory in the project view. */
+    /**
+     * A directory in the project view.
+     *
+     * IntelliJ fills its folder icons rather than outlining them, and tints the fill by role —
+     * plain grey-blue for an ordinary directory, blue for a source root, orange for something
+     * excluded from the project. The tint carries real information in the IDE, so it is worth
+     * keeping rather than drawing every folder identically.
+     */
     @Composable
-    public fun Folder(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.IconSize) {
+    public fun Folder(
+        tint: Color,
+        modifier: Modifier = Modifier,
+        size: Dp = IdeaMetrics.IconSize,
+        open: Boolean = false,
+    ) {
         IdeIcon(size, modifier) { unit ->
-            val path = Path().apply {
-                moveTo(2f * unit, 12.5f * unit)
-                lineTo(2f * unit, 4f * unit)
-                lineTo(6.2f * unit, 4f * unit)
-                lineTo(7.6f * unit, 5.6f * unit)
-                lineTo(14f * unit, 5.6f * unit)
-                lineTo(14f * unit, 12.5f * unit)
+            val body = Path().apply {
+                moveTo(1.8f * unit, 12.8f * unit)
+                lineTo(1.8f * unit, 3.6f * unit)
+                lineTo(6.4f * unit, 3.6f * unit)
+                lineTo(7.9f * unit, 5.4f * unit)
+                lineTo(14.2f * unit, 5.4f * unit)
+                lineTo(14.2f * unit, 12.8f * unit)
                 close()
             }
-            drawPath(path, tint, style = stroke(unit))
+            drawPath(body, tint.copy(alpha = 0.9f))
+
+            if (open) {
+                // The open folder's front flap is skewed, which is how the IDE shows an expanded
+                // directory without changing the icon's footprint.
+                val flap = Path().apply {
+                    moveTo(1.8f * unit, 12.8f * unit)
+                    lineTo(4.2f * unit, 7.6f * unit)
+                    lineTo(15.2f * unit, 7.6f * unit)
+                    lineTo(12.8f * unit, 12.8f * unit)
+                    close()
+                }
+                drawPath(flap, tint)
+            }
+        }
+    }
+
+    /** A package: a folder with the dot the IDE marks a package root with. */
+    @Composable
+    public fun PackageFolder(
+        tint: Color,
+        accent: Color,
+        modifier: Modifier = Modifier,
+        size: Dp = IdeaMetrics.IconSize,
+    ) {
+        IdeIcon(size, modifier) { unit ->
+            val body = Path().apply {
+                moveTo(1.8f * unit, 12.8f * unit)
+                lineTo(1.8f * unit, 3.6f * unit)
+                lineTo(6.4f * unit, 3.6f * unit)
+                lineTo(7.9f * unit, 5.4f * unit)
+                lineTo(14.2f * unit, 5.4f * unit)
+                lineTo(14.2f * unit, 12.8f * unit)
+                close()
+            }
+            drawPath(body, tint.copy(alpha = 0.9f))
+            drawCircle(accent, 1.9f * unit, Offset(11.4f * unit, 10.4f * unit))
+        }
+    }
+
+    /** The module root: the square the IDE puts at the top of the project tree. */
+    @Composable
+    public fun Module(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.IconSize) {
+        IdeIcon(size, modifier) { unit ->
+            rect(2.5f, 2.5f, 13.5f, 13.5f, tint, unit)
+            line(2.5f, 6.2f, 13.5f, 6.2f, tint, unit)
+        }
+    }
+
+    /** A file with no type of its own. */
+    @Composable
+    public fun PlainFile(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.IconSize) {
+        IdeIcon(size, modifier) { unit ->
+            val page = Path().apply {
+                moveTo(3.5f * unit, 1.8f * unit)
+                lineTo(9.4f * unit, 1.8f * unit)
+                lineTo(12.5f * unit, 4.9f * unit)
+                lineTo(12.5f * unit, 14.2f * unit)
+                lineTo(3.5f * unit, 14.2f * unit)
+                close()
+            }
+            drawPath(page, tint, style = stroke(unit))
+            polyline(listOf(9.4f to 1.8f, 9.4f to 4.9f, 12.5f to 4.9f), tint, unit)
+        }
+    }
+
+    // ---------------------------------------------------------------- welcome window
+
+    /** New. */
+    @Composable
+    public fun Plus(tint: Color, modifier: Modifier = Modifier, size: Dp = 28.dp) {
+        IdeIcon(size, modifier) { unit ->
+            line(8f, 3f, 8f, 13f, tint, unit)
+            line(3f, 8f, 13f, 8f, tint, unit)
+        }
+    }
+
+    /** Open an existing folder. */
+    @Composable
+    public fun OpenFolder(tint: Color, modifier: Modifier = Modifier, size: Dp = 28.dp) {
+        IdeIcon(size, modifier) { unit ->
+            polyline(
+                listOf(2f to 12.8f, 2f to 3.8f, 6.4f to 3.8f, 7.9f to 5.6f, 13.4f to 5.6f, 13.4f to 7.4f),
+                tint,
+                unit,
+            )
+            polyline(listOf(2f to 12.8f, 4.4f to 7.4f, 15.2f to 7.4f, 12.8f to 12.8f, 2f to 12.8f), tint, unit)
         }
     }
 
