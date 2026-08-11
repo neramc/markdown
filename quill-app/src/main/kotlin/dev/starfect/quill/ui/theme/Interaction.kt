@@ -43,6 +43,9 @@ public enum class SurfaceState {
 
     /** Selected, but the container holding it does not have focus. */
     SELECTED_INACTIVE,
+
+    /** A toggle that is on: a stripe button for an open tool window, a view-mode switch, a chip. */
+    TOGGLED,
     DISABLED,
     ;
 
@@ -52,7 +55,7 @@ public enum class SurfaceState {
         HOVERED -> palette.hoverBackground
         PRESSED -> palette.pressedBackground
         SELECTED -> palette.selectionBackground
-        SELECTED_INACTIVE -> palette.inactiveSelectionBackground
+        SELECTED_INACTIVE, TOGGLED -> palette.inactiveSelectionBackground
     }
 
     /** The content colour for this state. */
@@ -68,7 +71,14 @@ public enum class SurfaceState {
     }
 
     public companion object {
-        /** Resolves the state from the flags a component actually knows about. */
+        /**
+         * The state of a row in a list or a tree, where selection means "this is the current item".
+         *
+         * Such a selection is blue while its container has focus and grey once focus moves on. That
+         * pair is not decoration: it is the only thing in the window saying where typing will go, and
+         * a screenshot of the IDE shows both at once — a blue row in the focused Problems list and a
+         * grey one in the unfocused project tree.
+         */
         public fun of(
             hovered: Boolean = false,
             pressed: Boolean = false,
@@ -80,6 +90,27 @@ public enum class SurfaceState {
             pressed -> PRESSED
             selected && focused -> SELECTED
             selected -> SELECTED_INACTIVE
+            hovered -> HOVERED
+            else -> NORMAL
+        }
+
+        /**
+         * The state of a control that is switched on or off, rather than selected.
+         *
+         * A stripe button for an open tool window, the view-mode switch, the find bar's Aa/W/.*
+         * chips. These are never "where typing will go", so they take the grey and leave the blue to
+         * mean what it means — which is what stops accent leaking onto every toggled thing in the
+         * window.
+         */
+        public fun ofToggle(
+            hovered: Boolean = false,
+            pressed: Boolean = false,
+            on: Boolean = false,
+            enabled: Boolean = true,
+        ): SurfaceState = when {
+            !enabled -> DISABLED
+            pressed -> PRESSED
+            on -> TOGGLED
             hovered -> HOVERED
             else -> NORMAL
         }
@@ -100,18 +131,24 @@ public fun Modifier.interactiveSurface(
     selected: Boolean = false,
     enabled: Boolean = true,
     focused: Boolean = true,
+    /** True when [selected] means "switched on" rather than "this is the current item". */
+    toggle: Boolean = false,
     cornerRadius: Dp = Tokens.Radius.Row,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
 ): Modifier {
     val hovered by interactionSource.collectIsHoveredAsState()
     val pressed by interactionSource.collectIsPressedAsState()
-    val state = SurfaceState.of(
-        hovered = hovered,
-        pressed = pressed,
-        selected = selected,
-        focused = focused,
-        enabled = enabled,
-    )
+    val state = if (toggle) {
+        SurfaceState.ofToggle(hovered = hovered, pressed = pressed, on = selected, enabled = enabled)
+    } else {
+        SurfaceState.of(
+            hovered = hovered,
+            pressed = pressed,
+            selected = selected,
+            focused = focused,
+            enabled = enabled,
+        )
+    }
 
     return this
         .clip(RoundedCornerShape(cornerRadius))

@@ -188,10 +188,13 @@ private fun ScopeTabs(selected: SearchScope, onSelect: (SearchScope) -> Unit) {
 
             Box(
                 modifier = Modifier.height(Tokens.SearchScopeHeight)
+                    // A scope chip switches the search's filter; it is not the row the caret is on,
+                    // so it takes the toggled grey and leaves the blue to the result list.
                     .interactiveSurface(
                         onClick = { onSelect(scope) },
                         palette = shell,
                         selected = isSelected,
+                        toggle = true,
                         cornerRadius = Tokens.Radius.Control,
                     )
                     .padding(horizontal = Tokens.Spacing.Small),

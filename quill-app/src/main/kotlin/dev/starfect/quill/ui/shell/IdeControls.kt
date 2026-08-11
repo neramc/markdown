@@ -49,10 +49,12 @@ public fun IdeActionButton(
     val hovered by interaction.collectIsHoveredAsState()
     val pressed by interaction.collectIsPressedAsState()
 
-    val state = SurfaceState.of(
+    // A toolbar button is a switch, not a cursor: `selected` here means "this tool window is open"
+    // or "this view mode is on", so it takes the toggled grey rather than the selection blue.
+    val state = SurfaceState.ofToggle(
         hovered = hovered,
         pressed = pressed,
-        selected = selected,
+        on = selected,
         enabled = enabled,
     )
 
@@ -95,7 +97,7 @@ public fun IdeWidgetButton(
     val hovered by interaction.collectIsHoveredAsState()
     val pressed by interaction.collectIsPressedAsState()
 
-    val state = SurfaceState.of(hovered = hovered, pressed = pressed, selected = selected)
+    val state = SurfaceState.ofToggle(hovered = hovered, pressed = pressed, on = selected)
 
     Row(
         modifier = modifier.height(Tokens.ControlSize)
