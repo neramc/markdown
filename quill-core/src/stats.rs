@@ -70,10 +70,17 @@ pub fn compute(text: &str) -> Stats {
     // Characters are counted on the raw source, because that is what the caret positions in the
     // editor refer to. UTF-16 keeps it consistent with every other offset crossing the bridge.
     stats.characters = text.chars().map(char::len_utf16).sum::<usize>() as u32;
-    stats.characters_without_spaces =
-        text.chars().filter(|c| !c.is_whitespace()).map(|c| c.len_utf16()).sum::<usize>() as u32;
+    stats.characters_without_spaces = text
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .map(|c| c.len_utf16())
+        .sum::<usize>() as u32;
 
-    stats.lines = if text.is_empty() { 0 } else { text.lines().count() as u32 };
+    stats.lines = if text.is_empty() {
+        0
+    } else {
+        text.lines().count() as u32
+    };
 
     // Round up, so any non-empty document reads as at least one second rather than zero.
     stats.reading_time_seconds = if stats.words == 0 {
@@ -128,7 +135,10 @@ mod tests {
 
     #[test]
     fn excludes_front_matter_from_prose() {
-        assert_eq!(compute("---\ntitle: Something Long\n---\n\nBody text.\n").words, 2);
+        assert_eq!(
+            compute("---\ntitle: Something Long\n---\n\nBody text.\n").words,
+            2
+        );
     }
 
     #[test]

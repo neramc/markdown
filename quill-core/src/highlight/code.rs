@@ -73,7 +73,11 @@ pub fn highlight(code: &str, language: &str, dark: bool) -> Vec<ColorSpan> {
         // remaining lines simply fall back to the default colour.
         let Ok(ranges) = highlighter.highlight_line(line, &SYNTAXES) else {
             if total > offset {
-                spans.push(ColorSpan { start: offset, end: total, argb: fallback });
+                spans.push(ColorSpan {
+                    start: offset,
+                    end: total,
+                    argb: fallback,
+                });
             }
             break;
         };
@@ -88,17 +92,33 @@ pub fn highlight(code: &str, language: &str, dark: bool) -> Vec<ColorSpan> {
             // the JVM allocates one AnnotatedString range per span.
             match spans.last_mut() {
                 Some(last) if last.end == offset && last.argb == argb => last.end += width,
-                _ => spans.push(ColorSpan { start: offset, end: offset + width, argb }),
+                _ => spans.push(ColorSpan {
+                    start: offset,
+                    end: offset + width,
+                    argb,
+                }),
             }
             offset += width;
         }
     }
 
-    if spans.is_empty() { single_run(total, fallback) } else { spans }
+    if spans.is_empty() {
+        single_run(total, fallback)
+    } else {
+        spans
+    }
 }
 
 fn single_run(total: usize, argb: u32) -> Vec<ColorSpan> {
-    if total == 0 { Vec::new() } else { vec![ColorSpan { start: 0, end: total, argb }] }
+    if total == 0 {
+        Vec::new()
+    } else {
+        vec![ColorSpan {
+            start: 0,
+            end: total,
+            argb,
+        }]
+    }
 }
 
 #[cfg(test)]
@@ -123,8 +143,12 @@ mod tests {
     fn highlights_rust_into_multiple_colours() {
         let spans = highlight("fn main() {\n    let x = 1;\n}\n", "rust", true);
         assert!(spans.len() > 1, "expected more than one coloured run");
-        let distinct: std::collections::BTreeSet<u32> = spans.iter().map(|span| span.argb).collect();
-        assert!(distinct.len() > 1, "keywords and identifiers should differ in colour");
+        let distinct: std::collections::BTreeSet<u32> =
+            spans.iter().map(|span| span.argb).collect();
+        assert!(
+            distinct.len() > 1,
+            "keywords and identifiers should differ in colour"
+        );
     }
 
     #[test]
@@ -136,7 +160,10 @@ mod tests {
         assert_eq!(spans.first().unwrap().start, 0);
         assert_eq!(spans.last().unwrap().end, expected);
         for pair in spans.windows(2) {
-            assert_eq!(pair[0].end, pair[1].start, "spans must not overlap or leave gaps");
+            assert_eq!(
+                pair[0].end, pair[1].start,
+                "spans must not overlap or leave gaps"
+            );
         }
     }
 

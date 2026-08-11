@@ -136,7 +136,11 @@ fn encode_block<'a>(node: &'a AstNode<'a>, list_level: u32, encoder: &mut Encode
                     });
                 }
                 ListType::Bullet => {
-                    let bullet = char::from(if list.bullet_char == 0 { b'-' } else { list.bullet_char });
+                    let bullet = char::from(if list.bullet_char == 0 {
+                        b'-'
+                    } else {
+                        list.bullet_char
+                    });
                     encoder.put_str(&bullet.to_string());
                 }
             }
@@ -165,11 +169,24 @@ fn encode_block<'a>(node: &'a AstNode<'a>, list_level: u32, encoder: &mut Encode
                 write_header(encoder, ir::block::FENCED_CODE_BLOCK, line_start, line_end);
                 // The info string may carry more than a language ("rust,no_run"); Jewel wants the
                 // bare language token.
-                let language = code_block.info.split(|c: char| c == ',' || c.is_whitespace()).next().unwrap_or("");
-                encoder.put_opt_str(if language.is_empty() { None } else { Some(language) });
+                let language = code_block
+                    .info
+                    .split(|c: char| c == ',' || c.is_whitespace())
+                    .next()
+                    .unwrap_or("");
+                encoder.put_opt_str(if language.is_empty() {
+                    None
+                } else {
+                    Some(language)
+                });
                 encoder.put_str(&code_block.literal);
             } else {
-                write_header(encoder, ir::block::INDENTED_CODE_BLOCK, line_start, line_end);
+                write_header(
+                    encoder,
+                    ir::block::INDENTED_CODE_BLOCK,
+                    line_start,
+                    line_end,
+                );
                 encoder.put_str(&code_block.literal);
             }
             encoder.put_u32(0);
@@ -207,7 +224,12 @@ fn encode_block<'a>(node: &'a AstNode<'a>, list_level: u32, encoder: &mut Encode
             encode_inline_children(node, encoder);
         }
         NodeValue::FootnoteDefinition(definition) => {
-            write_header(encoder, ir::block::FOOTNOTE_DEFINITION, line_start, line_end);
+            write_header(
+                encoder,
+                ir::block::FOOTNOTE_DEFINITION,
+                line_start,
+                line_end,
+            );
             encoder.put_str(&definition.name);
             encode_block_children(node, list_level, encoder);
         }
@@ -292,14 +314,22 @@ fn encode_inline<'a>(node: &'a AstNode<'a>, encoder: &mut Encoder) -> bool {
         NodeValue::Link(link) => {
             encoder.put_u8(ir::inline::LINK);
             encoder.put_str(&link.url);
-            encoder.put_opt_str(if link.title.is_empty() { None } else { Some(&link.title) });
+            encoder.put_opt_str(if link.title.is_empty() {
+                None
+            } else {
+                Some(&link.title)
+            });
             encode_inline_children(node, encoder);
         }
         NodeValue::Image(link) => {
             encoder.put_u8(ir::inline::IMAGE);
             encoder.put_str(&link.url);
             encoder.put_str(&plain_text(node));
-            encoder.put_opt_str(if link.title.is_empty() { None } else { Some(&link.title) });
+            encoder.put_opt_str(if link.title.is_empty() {
+                None
+            } else {
+                Some(&link.title)
+            });
             encode_inline_children(node, encoder);
         }
         NodeValue::HtmlInline(html) => {
@@ -358,7 +388,11 @@ mod tests {
 
     /// Reads a block header and returns `(tag, line_start, line_end)`.
     fn read_header(decoder: &mut Decoder<'_>) -> (u8, u32, u32) {
-        (decoder.u8().unwrap(), decoder.u32().unwrap(), decoder.u32().unwrap())
+        (
+            decoder.u8().unwrap(),
+            decoder.u32().unwrap(),
+            decoder.u32().unwrap(),
+        )
     }
 
     #[test]
@@ -476,7 +510,10 @@ mod tests {
     fn renders_html_and_escapes_raw_html_by_default() {
         let html = to_html("# Hi\n\n<script>alert(1)</script>\n", false);
         assert!(html.contains("<h1>Hi</h1>"));
-        assert!(!html.contains("<script>"), "raw HTML must be escaped unless explicitly allowed");
+        assert!(
+            !html.contains("<script>"),
+            "raw HTML must be escaped unless explicitly allowed"
+        );
 
         assert!(to_html("<script>x</script>\n", true).contains("<script>"));
     }

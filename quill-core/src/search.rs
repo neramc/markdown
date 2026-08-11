@@ -40,8 +40,16 @@ pub struct Match {
 const MAX_MATCHES: usize = 10_000;
 
 fn build_regex(query: &str, flags: u32) -> Result<Regex, SearchError> {
-    let pattern = if flags & flags::REGEX != 0 { query.to_owned() } else { regex::escape(query) };
-    let pattern = if flags & flags::WHOLE_WORD != 0 { format!(r"\b(?:{pattern})\b") } else { pattern };
+    let pattern = if flags & flags::REGEX != 0 {
+        query.to_owned()
+    } else {
+        regex::escape(query)
+    };
+    let pattern = if flags & flags::WHOLE_WORD != 0 {
+        format!(r"\b(?:{pattern})\b")
+    } else {
+        pattern
+    };
 
     RegexBuilder::new(&pattern)
         .case_insensitive(flags & flags::CASE_INSENSITIVE != 0)
@@ -76,7 +84,12 @@ pub fn find(document: &mut Document, query: &str, flags: u32) -> Result<Vec<Matc
             let start = document.byte_to_utf16(start_byte);
             let end = document.byte_to_utf16(end_byte);
             let (line, column) = document.utf16_to_line_column(start);
-            Match { start, end, line: line as u32, column: column as u32 }
+            Match {
+                start,
+                end,
+                line: line as u32,
+                column: column as u32,
+            }
         })
         .collect())
 }
@@ -85,7 +98,12 @@ pub fn find(document: &mut Document, query: &str, flags: u32) -> Result<Vec<Matc
 ///
 /// In regex mode `replacement` may reference capture groups (`$1`, `${name}`); in literal mode it is
 /// inserted verbatim, so a replacement containing `$` does not surprise the user.
-pub fn replace_all(document: &mut Document, query: &str, replacement: &str, flags: u32) -> Result<String, SearchError> {
+pub fn replace_all(
+    document: &mut Document,
+    query: &str,
+    replacement: &str,
+    flags: u32,
+) -> Result<String, SearchError> {
     if query.is_empty() {
         return Ok(document.text().to_owned());
     }
@@ -95,7 +113,9 @@ pub fn replace_all(document: &mut Document, query: &str, replacement: &str, flag
     Ok(if flags & flags::REGEX != 0 {
         regex.replace_all(text, replacement).into_owned()
     } else {
-        regex.replace_all(text, regex::NoExpand(replacement)).into_owned()
+        regex
+            .replace_all(text, regex::NoExpand(replacement))
+            .into_owned()
     })
 }
 
@@ -124,8 +144,24 @@ mod tests {
         let mut document = Document::new("one two one\n");
         let matches = find(&mut document, "one", 0).unwrap();
         assert_eq!(matches.len(), 2);
-        assert_eq!(matches[0], Match { start: 0, end: 3, line: 0, column: 0 });
-        assert_eq!(matches[1], Match { start: 8, end: 11, line: 0, column: 8 });
+        assert_eq!(
+            matches[0],
+            Match {
+                start: 0,
+                end: 3,
+                line: 0,
+                column: 0
+            }
+        );
+        assert_eq!(
+            matches[1],
+            Match {
+                start: 8,
+                end: 11,
+                line: 0,
+                column: 8
+            }
+        );
     }
 
     #[test]
@@ -141,7 +177,12 @@ mod tests {
     fn honours_case_insensitivity_and_whole_word() {
         let mut document = Document::new("Alpha alpha ALPHA\n");
         assert_eq!(find(&mut document, "alpha", 0).unwrap().len(), 1);
-        assert_eq!(find(&mut document, "alpha", flags::CASE_INSENSITIVE).unwrap().len(), 3);
+        assert_eq!(
+            find(&mut document, "alpha", flags::CASE_INSENSITIVE)
+                .unwrap()
+                .len(),
+            3
+        );
 
         let mut words = Document::new("cat catalogue cat\n");
         assert_eq!(find(&mut words, "cat", 0).unwrap().len(), 3);
@@ -151,7 +192,12 @@ mod tests {
     #[test]
     fn supports_regex_mode() {
         let mut document = Document::new("a1 b22 c333\n");
-        assert_eq!(find(&mut document, r"[a-z]\d+", flags::REGEX).unwrap().len(), 3);
+        assert_eq!(
+            find(&mut document, r"[a-z]\d+", flags::REGEX)
+                .unwrap()
+                .len(),
+            3
+        );
     }
 
     #[test]
@@ -187,13 +233,22 @@ mod tests {
     #[test]
     fn replaces_literally_without_expanding_dollar_signs() {
         let mut document = Document::new("price: AMOUNT\n");
-        assert_eq!(replace_all(&mut document, "AMOUNT", "$100", 0).unwrap(), "price: $100\n");
+        assert_eq!(
+            replace_all(&mut document, "AMOUNT", "$100", 0).unwrap(),
+            "price: $100\n"
+        );
     }
 
     #[test]
     fn expands_capture_groups_in_regex_mode() {
         let mut document = Document::new("2024-01-31\n");
-        let result = replace_all(&mut document, r"(\d{4})-(\d{2})-(\d{2})", "$3/$2/$1", flags::REGEX).unwrap();
+        let result = replace_all(
+            &mut document,
+            r"(\d{4})-(\d{2})-(\d{2})",
+            "$3/$2/$1",
+            flags::REGEX,
+        )
+        .unwrap();
         assert_eq!(result, "31/01/2024\n");
     }
 

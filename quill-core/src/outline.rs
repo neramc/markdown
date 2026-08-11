@@ -35,7 +35,11 @@ pub fn collect(text: &str) -> Vec<Heading> {
         headings.push(Heading {
             level,
             line: line.saturating_sub(1) as u32,
-            title: if title.trim().is_empty() { "(untitled)".to_owned() } else { title },
+            title: if title.trim().is_empty() {
+                "(untitled)".to_owned()
+            } else {
+                title
+            },
         });
     }
     headings
@@ -68,7 +72,14 @@ mod tests {
     fn collects_headings_in_document_order() {
         let headings = collect("# One\n\ntext\n\n## Two\n\n### Three\n");
         assert_eq!(headings.len(), 3);
-        assert_eq!(headings[0], Heading { level: 1, line: 0, title: "One".to_owned() });
+        assert_eq!(
+            headings[0],
+            Heading {
+                level: 1,
+                line: 0,
+                title: "One".to_owned()
+            }
+        );
         assert_eq!(headings[1].level, 2);
         assert_eq!(headings[1].line, 4);
         assert_eq!(headings[2].title, "Three");
@@ -76,7 +87,10 @@ mod tests {
 
     #[test]
     fn strips_inline_markup_from_titles() {
-        assert_eq!(collect("# A *bold* `code` [link](x)\n")[0].title, "A bold code link");
+        assert_eq!(
+            collect("# A *bold* `code` [link](x)\n")[0].title,
+            "A bold code link"
+        );
     }
 
     #[test]

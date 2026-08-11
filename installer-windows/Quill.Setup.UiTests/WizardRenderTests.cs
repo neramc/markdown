@@ -79,19 +79,35 @@ public sealed class WizardRenderTests : IDisposable
     }
 
     [AvaloniaFact]
-    public void The_welcome_page_says_so_when_the_installer_carries_no_payload()
+    public async Task The_welcome_page_reflects_whether_a_payload_is_present()
     {
-        var viewModel = CreateInstallerViewModel();
-        Assert.False(viewModel.HasPayload);
-        Assert.False(viewModel.CanGoNext);
+        // The assembly searched for the embedded payload is injected, so this test gives the same
+        // answer whether or not tools/build-installer.sh has left a payload in the installer's own
+        // assembly. Reading the shipped assembly here would make the result depend on build order.
+        var without = CreateInstallerViewModel();
+        Assert.False(without.HasPayload);
+        Assert.False(without.CanGoNext, "the wizard must not offer to install nothing");
 
-        var window = new Quill.Installer.Views.MainWindow { DataContext = viewModel };
-        var withoutPayload = Render(window, "wizard-no-payload.png");
+        var noPayloadWindow = new Quill.Installer.Views.MainWindow { DataContext = without };
+        var noPayloadFrame = Render(noPayloadWindow, "wizard-no-payload.png");
 
-        // The warning panel is the only difference, so the two frames must not match.
-        viewModel.Step = WizardStep.License;
-        var licensePage = Render(window, "wizard-license-compare.png");
-        Assert.True(Difference(withoutPayload, licensePage) > 0.05);
+        var archive = await BuildPayloadAsync();
+        var with = new MainWindowViewModel(
+            new DryRunPlatformIntegration(_root),
+            [PayloadSource.FileSwitch, archive],
+            typeof(WizardRenderTests).Assembly);
+
+        Assert.True(with.HasPayload);
+        Assert.Equal(PayloadOrigin.ExternalFile, with.PayloadOrigin);
+        Assert.True(with.CanGoNext);
+
+        var withPayloadWindow = new Quill.Installer.Views.MainWindow { DataContext = with };
+        var withPayloadFrame = Render(withPayloadWindow, "wizard-with-payload.png");
+
+        // The warning panel is the only difference between the two welcome pages.
+        Assert.True(
+            Difference(noPayloadFrame, withPayloadFrame) > 0.01,
+            "the missing-payload warning did not change what is on screen");
     }
 
     [AvaloniaFact]
@@ -204,8 +220,21 @@ public sealed class WizardRenderTests : IDisposable
         return installRoot;
     }
 
+    /// <summary>A wizard view model whose payload assembly embeds nothing, deterministically.</summary>
     private MainWindowViewModel CreateInstallerViewModel() =>
-        new(new DryRunPlatformIntegration(_root), []);
+        new(new DryRunPlatformIntegration(_root), [], typeof(WizardRenderTests).Assembly);
+
+    /// <summary>Packs a small app image and returns the archive path.</summary>
+    private async Task<string> BuildPayloadAsync()
+    {
+        var image = Path.Combine(_root, "payload-image");
+        Directory.CreateDirectory(Path.Combine(image, "bin"));
+        await File.WriteAllTextAsync(Path.Combine(image, "bin", "Quill.exe"), "MZ fake launcher");
+
+        var archive = Path.Combine(_root, "wizard-payload.zip");
+        await PayloadBuilder.CreateAsync(image, archive, "1.2.3");
+        return archive;
+    }
 
     private readonly record struct Frame(int Width, int Height, uint[] Pixels, int Distinct);
 

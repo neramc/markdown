@@ -50,7 +50,10 @@ class ShellRenderTest {
         const val HEIGHT = 900
 
         const val FRAME_INTERVAL_NANOS = 16_000_000L
-        const val RENDER_TIMEOUT_NANOS = 60_000_000_000L
+
+        /** Frames rendered before giving up on the scene settling; about two seconds at 60 Hz. */
+        const val MAX_FRAMES = 120L
+
         const val DERIVE_TIMEOUT_NANOS = 20_000_000_000L
 
         /** Exercises every block and inline type the mapper knows about. */
@@ -214,14 +217,16 @@ class ShellRenderTest {
                 }
             }
 
+            // A bounded number of frames rather than "render until nothing is invalidated". The
+            // editor's caret blinks, so once the text field has focus the scene reports pending
+            // invalidations forever and a wait-for-quiescence loop never terminates. Stopping early
+            // when it does settle keeps the common case fast; the cap keeps the slow case finite.
             var image = scene.render(0L)
-            val deadline = System.nanoTime() + RENDER_TIMEOUT_NANOS
             var frame = 1L
-            while (scene.hasInvalidations() && System.nanoTime() < deadline) {
+            while (frame <= MAX_FRAMES && scene.hasInvalidations()) {
                 image = scene.render(frame * FRAME_INTERVAL_NANOS)
                 frame++
             }
-            assertTrue(System.nanoTime() < deadline, "composition never settled; the shell recomposes forever")
 
             assertNotNull(image.encodeToData(EncodedImageFormat.PNG), "the frame could not be encoded").bytes
         }

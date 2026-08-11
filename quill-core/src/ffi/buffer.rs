@@ -15,13 +15,21 @@ pub struct QuillBuf {
 
 impl QuillBuf {
     pub const fn empty() -> Self {
-        Self { ptr: std::ptr::null_mut(), len: 0, cap: 0 }
+        Self {
+            ptr: std::ptr::null_mut(),
+            len: 0,
+            cap: 0,
+        }
     }
 
     /// Transfers ownership of `bytes` to the caller.
     pub fn from_vec(bytes: Vec<u8>) -> Self {
         let mut bytes = std::mem::ManuallyDrop::new(bytes);
-        Self { ptr: bytes.as_mut_ptr(), len: bytes.len(), cap: bytes.capacity() }
+        Self {
+            ptr: bytes.as_mut_ptr(),
+            len: bytes.len(),
+            cap: bytes.capacity(),
+        }
     }
 
     /// Reclaims the allocation, leaving the struct empty.

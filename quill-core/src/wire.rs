@@ -43,7 +43,9 @@ pub struct Encoder {
 impl Encoder {
     /// Starts a payload, writing the magic, wire version and payload kind.
     pub fn new(kind: PayloadKind) -> Self {
-        let mut encoder = Self { buffer: Vec::with_capacity(1024) };
+        let mut encoder = Self {
+            buffer: Vec::with_capacity(1024),
+        };
         encoder.put_u32(MAGIC);
         encoder.put_u16(WIRE_VERSION);
         encoder.put_u8(kind as u8);
@@ -171,8 +173,14 @@ impl<'a> Decoder<'a> {
     }
 
     fn take(&mut self, count: usize) -> Result<&'a [u8], DecodeError> {
-        let end = self.position.checked_add(count).ok_or(DecodeError::UnexpectedEnd(self.position))?;
-        let slice = self.bytes.get(self.position..end).ok_or(DecodeError::UnexpectedEnd(self.position))?;
+        let end = self
+            .position
+            .checked_add(count)
+            .ok_or(DecodeError::UnexpectedEnd(self.position))?;
+        let slice = self
+            .bytes
+            .get(self.position..end)
+            .ok_or(DecodeError::UnexpectedEnd(self.position))?;
         self.position = end;
         Ok(slice)
     }
@@ -209,7 +217,11 @@ impl<'a> Decoder<'a> {
     }
 
     pub fn opt_string(&mut self) -> Result<Option<String>, DecodeError> {
-        if self.bool()? { Ok(Some(self.string()?)) } else { Ok(None) }
+        if self.bool()? {
+            Ok(Some(self.string()?))
+        } else {
+            Ok(None)
+        }
     }
 
     pub fn is_exhausted(&self) -> bool {
@@ -275,7 +287,10 @@ mod tests {
 
     #[test]
     fn rejects_bad_magic() {
-        assert!(matches!(Decoder::new(&[0u8; 16]), Err(DecodeError::BadMagic(0))));
+        assert!(matches!(
+            Decoder::new(&[0u8; 16]),
+            Err(DecodeError::BadMagic(0))
+        ));
     }
 
     #[test]
@@ -286,7 +301,10 @@ mod tests {
         bytes.truncate(bytes.len() - 2);
 
         let (mut decoder, _) = Decoder::new(&bytes).unwrap();
-        assert!(matches!(decoder.string(), Err(DecodeError::UnexpectedEnd(_))));
+        assert!(matches!(
+            decoder.string(),
+            Err(DecodeError::UnexpectedEnd(_))
+        ));
     }
 
     #[test]

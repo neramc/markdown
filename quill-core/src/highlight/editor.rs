@@ -37,7 +37,11 @@ pub fn highlight(text: &str, first_line: usize, last_line: usize) -> Vec<StyleSp
     // A leading `---` only opens front matter when a closing delimiter exists further down;
     // otherwise it is a thematic break. Deciding this up front keeps the editor's colours consistent
     // with what comrak does for the preview.
-    let mut mode = if has_front_matter(text) { LineMode::FrontMatter } else { LineMode::Normal };
+    let mut mode = if has_front_matter(text) {
+        LineMode::FrontMatter
+    } else {
+        LineMode::Normal
+    };
     let mut fence_marker: Option<(char, usize)> = None;
     let mut offset = 0usize;
     let mut previous_was_text = false;
@@ -50,8 +54,15 @@ pub fn highlight(text: &str, first_line: usize, last_line: usize) -> Vec<StyleSp
         let chars = index_chars(line, offset);
         let line_width: usize = raw_line.chars().map(char::len_utf16).sum();
 
-        let (next_mode, is_text) =
-            scan_line(&chars, index, mode, previous_was_text, &mut fence_marker, emit, &mut spans);
+        let (next_mode, is_text) = scan_line(
+            &chars,
+            index,
+            mode,
+            previous_was_text,
+            &mut fence_marker,
+            emit,
+            &mut spans,
+        );
         mode = next_mode;
         previous_was_text = is_text;
         offset += line_width;
@@ -75,7 +86,11 @@ fn index_chars(line: &str, base: usize) -> Vec<Char> {
     line.chars()
         .map(|value| {
             let width = value.len_utf16();
-            let character = Char { value, offset, width };
+            let character = Char {
+                value,
+                offset,
+                width,
+            };
             offset += width;
             character
         })
@@ -120,14 +135,22 @@ fn scan_line(
             push(spans, emit, start, end, EditorStyle::FrontMatter);
             // Line 0 is the opening delimiter, not the closing one.
             let closes = line_index > 0 && trimmed == "---";
-            return (if closes { LineMode::Normal } else { LineMode::FrontMatter }, false);
+            return (
+                if closes {
+                    LineMode::Normal
+                } else {
+                    LineMode::FrontMatter
+                },
+                false,
+            );
         }
         LineMode::FencedCode => {
             // Fence delimiters and the code they wrap share a style: in the source view the whole
             // block should read as one unit, and the syntax colouring of the code itself belongs to
             // the preview, not the editor.
             push(spans, emit, start, end, EditorStyle::CodeFence);
-            let closes = fence_marker.is_some_and(|(marker, length)| closing_fence(trimmed, marker, length));
+            let closes =
+                fence_marker.is_some_and(|(marker, length)| closing_fence(trimmed, marker, length));
             if closes {
                 *fence_marker = None;
                 return (LineMode::Normal, false);
@@ -166,7 +189,8 @@ fn scan_line(
     // ATX heading — the whole line, so the text reads as a heading in the editor too.
     if trimmed.starts_with('#') {
         let hashes = trimmed.chars().take_while(|c| *c == '#').count();
-        if (1..=6).contains(&hashes) && trimmed.chars().nth(hashes).is_none_or(char::is_whitespace) {
+        if (1..=6).contains(&hashes) && trimmed.chars().nth(hashes).is_none_or(char::is_whitespace)
+        {
             push(spans, emit, start, end, EditorStyle::Heading);
             return (LineMode::Normal, false);
         }
@@ -180,7 +204,13 @@ fn scan_line(
         let marker_start = start + utf16_prefix(chars, cursor);
         cursor += 1;
         let marker_end = start + utf16_prefix(chars, cursor);
-        push(spans, emit, marker_start, marker_end, EditorStyle::BlockQuote);
+        push(
+            spans,
+            emit,
+            marker_start,
+            marker_end,
+            EditorStyle::BlockQuote,
+        );
         while remainder(&text, cursor).starts_with(' ') {
             cursor += 1;
         }
@@ -190,7 +220,13 @@ fn scan_line(
     if let Some(marker_length) = list_marker_length(remainder(&text, cursor)) {
         let marker_start = start + utf16_prefix(chars, cursor);
         let marker_end = start + utf16_prefix(chars, cursor + marker_length);
-        push(spans, emit, marker_start, marker_end, EditorStyle::ListMarker);
+        push(
+            spans,
+            emit,
+            marker_start,
+            marker_end,
+            EditorStyle::ListMarker,
+        );
         cursor += marker_length;
         while remainder(&text, cursor).starts_with(' ') {
             cursor += 1;
@@ -209,13 +245,21 @@ fn scan_line(
         }
     }
 
-    let inline_start = text.get(..cursor).map_or(0, |prefix| prefix.chars().count());
+    let inline_start = text
+        .get(..cursor)
+        .map_or(0, |prefix| prefix.chars().count());
 
     // Table pipes.
     if remainder(&text, cursor).contains('|') {
         for character in chars.iter().skip(inline_start) {
             if character.value == '|' {
-                push(spans, emit, character.offset, character.offset + character.width, EditorStyle::TableDelimiter);
+                push(
+                    spans,
+                    emit,
+                    character.offset,
+                    character.offset + character.width,
+                    EditorStyle::TableDelimiter,
+                );
             }
         }
     }
@@ -297,7 +341,13 @@ fn scan_inline(chars: &[Char], from: usize, emit: bool, spans: &mut Vec<StyleSpa
                 let run = run_length(chars, index, '`');
                 if let Some(close) = find_run(chars, index + run, '`', run) {
                     let end = chars[close + run - 1].offset + chars[close + run - 1].width;
-                    push(spans, emit, chars[index].offset, end, EditorStyle::InlineCode);
+                    push(
+                        spans,
+                        emit,
+                        chars[index].offset,
+                        end,
+                        EditorStyle::InlineCode,
+                    );
                     index = close + run;
                     continue;
                 }
@@ -307,7 +357,11 @@ fn scan_inline(chars: &[Char], from: usize, emit: bool, spans: &mut Vec<StyleSpa
                 let run = run_length(chars, index, current);
                 if let Some(close) = find_run(chars, index + run, current, run) {
                     let end = chars[close + run - 1].offset + chars[close + run - 1].width;
-                    let style = if run >= 2 { EditorStyle::Strong } else { EditorStyle::Emphasis };
+                    let style = if run >= 2 {
+                        EditorStyle::Strong
+                    } else {
+                        EditorStyle::Emphasis
+                    };
                     push(spans, emit, chars[index].offset, end, style);
                     index = close + run;
                     continue;
@@ -320,7 +374,13 @@ fn scan_inline(chars: &[Char], from: usize, emit: bool, spans: &mut Vec<StyleSpa
                     && let Some(close) = find_run(chars, index + run, '~', 2)
                 {
                     let end = chars[close + 1].offset + chars[close + 1].width;
-                    push(spans, emit, chars[index].offset, end, EditorStyle::Strikethrough);
+                    push(
+                        spans,
+                        emit,
+                        chars[index].offset,
+                        end,
+                        EditorStyle::Strikethrough,
+                    );
                     index = close + 2;
                     continue;
                 }
@@ -334,7 +394,13 @@ fn scan_inline(chars: &[Char], from: usize, emit: bool, spans: &mut Vec<StyleSpa
                     && let Some(close) = find_char(chars, index + 1, ']')
                 {
                     let end = chars[close].offset + chars[close].width;
-                    push(spans, emit, chars[index].offset, end, EditorStyle::FootnoteReference);
+                    push(
+                        spans,
+                        emit,
+                        chars[index].offset,
+                        end,
+                        EditorStyle::FootnoteReference,
+                    );
                     index = close + 1;
                     continue;
                 }
@@ -383,14 +449,23 @@ fn scan_link(
         && let Some(close_paren) = find_char(chars, close_bracket + 2, ')')
     {
         let url_end = chars[close_paren].offset + chars[close_paren].width;
-        push(spans, emit, chars[close_bracket + 1].offset, url_end, EditorStyle::LinkUrl);
+        push(
+            spans,
+            emit,
+            chars[close_bracket + 1].offset,
+            url_end,
+            EditorStyle::LinkUrl,
+        );
         return close_paren + 1;
     }
     close_bracket + 1
 }
 
 fn run_length(chars: &[Char], start: usize, marker: char) -> usize {
-    chars[start..].iter().take_while(|c| c.value == marker).count()
+    chars[start..]
+        .iter()
+        .take_while(|c| c.value == marker)
+        .count()
 }
 
 /// Finds a run of at least `length` `marker` characters at or after `from`.
@@ -411,7 +486,11 @@ fn find_run(chars: &[Char], from: usize, marker: char, length: usize) -> Option<
 }
 
 fn find_char(chars: &[Char], from: usize, target: char) -> Option<usize> {
-    chars.get(from..)?.iter().position(|c| c.value == target).map(|position| position + from)
+    chars
+        .get(from..)?
+        .iter()
+        .position(|c| c.value == target)
+        .map(|position| position + from)
 }
 
 #[cfg(test)]
@@ -429,7 +508,10 @@ mod tests {
     #[test]
     fn highlights_atx_headings() {
         assert_eq!(spans_of("# Title\n", EditorStyle::Heading), vec![(0, 7)]);
-        assert_eq!(spans_of("###### Six\n", EditorStyle::Heading), vec![(0, 10)]);
+        assert_eq!(
+            spans_of("###### Six\n", EditorStyle::Heading),
+            vec![(0, 10)]
+        );
         assert!(spans_of("####### Seven\n", EditorStyle::Heading).is_empty());
         assert!(spans_of("#NoSpace\n", EditorStyle::Heading).is_empty());
     }
@@ -451,14 +533,23 @@ mod tests {
     #[test]
     fn an_unclosed_fence_keeps_colouring_to_the_end() {
         // Mid-typing state: the user has opened a fence and not closed it yet.
-        assert_eq!(spans_of("```\nstill code\nand more\n", EditorStyle::CodeFence).len(), 3);
+        assert_eq!(
+            spans_of("```\nstill code\nand more\n", EditorStyle::CodeFence).len(),
+            3
+        );
     }
 
     #[test]
     fn a_leading_dash_rule_is_only_front_matter_when_it_closes() {
-        assert_eq!(spans_of("---\nsome text\n", EditorStyle::ThematicBreak), vec![(0, 3)]);
+        assert_eq!(
+            spans_of("---\nsome text\n", EditorStyle::ThematicBreak),
+            vec![(0, 3)]
+        );
         assert!(spans_of("---\nsome text\n", EditorStyle::FrontMatter).is_empty());
-        assert_eq!(spans_of("---\nkey: v\n---\n", EditorStyle::FrontMatter).len(), 3);
+        assert_eq!(
+            spans_of("---\nkey: v\n---\n", EditorStyle::FrontMatter).len(),
+            3
+        );
     }
 
     #[test]
@@ -466,7 +557,10 @@ mod tests {
         // The same three dashes mean different things depending on what precedes them.
         assert_eq!(spans_of("Title\n---\n", EditorStyle::Heading), vec![(6, 9)]);
         assert!(spans_of("Title\n---\n", EditorStyle::ThematicBreak).is_empty());
-        assert_eq!(spans_of("Para\n\n---\n", EditorStyle::ThematicBreak), vec![(6, 9)]);
+        assert_eq!(
+            spans_of("Para\n\n---\n", EditorStyle::ThematicBreak),
+            vec![(6, 9)]
+        );
         assert_eq!(spans_of("Title\n===\n", EditorStyle::Heading), vec![(6, 9)]);
     }
 
@@ -474,12 +568,18 @@ mod tests {
     fn highlights_emphasis_strong_and_strikethrough() {
         assert_eq!(spans_of("*em*\n", EditorStyle::Emphasis), vec![(0, 4)]);
         assert_eq!(spans_of("**strong**\n", EditorStyle::Strong), vec![(0, 10)]);
-        assert_eq!(spans_of("~~gone~~\n", EditorStyle::Strikethrough), vec![(0, 8)]);
+        assert_eq!(
+            spans_of("~~gone~~\n", EditorStyle::Strikethrough),
+            vec![(0, 8)]
+        );
     }
 
     #[test]
     fn highlights_inline_code() {
-        assert_eq!(spans_of("use `code` here\n", EditorStyle::InlineCode), vec![(4, 10)]);
+        assert_eq!(
+            spans_of("use `code` here\n", EditorStyle::InlineCode),
+            vec![(4, 10)]
+        );
         // An unmatched backtick must not swallow the rest of the line.
         assert!(spans_of("unmatched ` tick\n", EditorStyle::InlineCode).is_empty());
     }
@@ -489,13 +589,19 @@ mod tests {
         let text = "[label](https://example.com)\n";
         assert_eq!(spans_of(text, EditorStyle::LinkText), vec![(0, 7)]);
         assert_eq!(spans_of(text, EditorStyle::LinkUrl), vec![(7, 28)]);
-        assert_eq!(spans_of("![alt](img.png)\n", EditorStyle::Image), vec![(0, 6)]);
+        assert_eq!(
+            spans_of("![alt](img.png)\n", EditorStyle::Image),
+            vec![(0, 6)]
+        );
     }
 
     #[test]
     fn highlights_list_and_task_markers() {
         assert_eq!(spans_of("- item\n", EditorStyle::ListMarker), vec![(0, 1)]);
-        assert_eq!(spans_of("12) item\n", EditorStyle::ListMarker), vec![(0, 3)]);
+        assert_eq!(
+            spans_of("12) item\n", EditorStyle::ListMarker),
+            vec![(0, 3)]
+        );
 
         let task = "- [x] done\n";
         assert_eq!(spans_of(task, EditorStyle::ListMarker), vec![(0, 1)]);
@@ -504,16 +610,28 @@ mod tests {
 
     #[test]
     fn highlights_block_quotes_tables_and_autolinks() {
-        assert_eq!(spans_of("> quoted\n", EditorStyle::BlockQuote), vec![(0, 1)]);
-        assert_eq!(spans_of("| a | b |\n", EditorStyle::TableDelimiter).len(), 3);
-        assert_eq!(spans_of("<https://example.com>\n", EditorStyle::AutoLink), vec![(0, 21)]);
+        assert_eq!(
+            spans_of("> quoted\n", EditorStyle::BlockQuote),
+            vec![(0, 1)]
+        );
+        assert_eq!(
+            spans_of("| a | b |\n", EditorStyle::TableDelimiter).len(),
+            3
+        );
+        assert_eq!(
+            spans_of("<https://example.com>\n", EditorStyle::AutoLink),
+            vec![(0, 21)]
+        );
         assert_eq!(spans_of("<br/>\n", EditorStyle::HtmlTag), vec![(0, 5)]);
     }
 
     #[test]
     fn offsets_are_utf16_not_bytes() {
         // "한국어" is 3 UTF-16 units but 9 UTF-8 bytes; emphasis must start at 4, not 10.
-        assert_eq!(spans_of("한국어 *강조*\n", EditorStyle::Emphasis), vec![(4, 8)]);
+        assert_eq!(
+            spans_of("한국어 *강조*\n", EditorStyle::Emphasis),
+            vec![(4, 8)]
+        );
     }
 
     #[test]
@@ -539,11 +657,21 @@ mod tests {
     fn handles_empty_whitespace_and_crlf_documents() {
         assert!(highlight("", 0, usize::MAX).is_empty());
         assert!(highlight("\n\n\n", 0, usize::MAX).is_empty());
-        assert_eq!(spans_of("# Title\r\n\r\ntext\r\n", EditorStyle::Heading), vec![(0, 7)]);
+        assert_eq!(
+            spans_of("# Title\r\n\r\ntext\r\n", EditorStyle::Heading),
+            vec![(0, 7)]
+        );
     }
 
     #[test]
     fn plain_prose_produces_no_spans() {
-        assert!(highlight("Just a normal paragraph with no markup at all.\n", 0, usize::MAX).is_empty());
+        assert!(
+            highlight(
+                "Just a normal paragraph with no markup at all.\n",
+                0,
+                usize::MAX
+            )
+            .is_empty()
+        );
     }
 }

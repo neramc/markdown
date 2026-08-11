@@ -40,8 +40,9 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$VERSION" ]]; then
-  # One source of truth for the version: the Gradle build's properties file.
-  VERSION="$(sed -n 's/^version=//p' "$REPO_ROOT/gradle.properties" | head -1)"
+  # One source of truth for the version: the same property the Gradle build stamps the app with, so
+  # the installer cannot advertise a version the payload does not have.
+  VERSION="$(sed -n 's/^quill\.version=//p' "$REPO_ROOT/gradle.properties" | head -1)"
   VERSION="${VERSION:-0.1.0}"
 fi
 

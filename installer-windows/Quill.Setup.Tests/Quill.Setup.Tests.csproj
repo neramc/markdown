@@ -11,9 +11,6 @@
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
 
-    <!-- Release publishing settings from Directory.Build.props do not apply to a test host. -->
-    <PublishSingleFile>false</PublishSingleFile>
-    <SelfContained>false</SelfContained>
 
     <!--
       xUnit1051 wants every cancellable call to take TestContext.Current.CancellationToken so a

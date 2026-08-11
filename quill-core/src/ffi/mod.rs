@@ -129,7 +129,11 @@ pub extern "C" fn quill_abi_version() -> i32 {
 /// Creates an engine. `dark_theme` selects the palette used for code-block highlighting.
 #[unsafe(no_mangle)]
 pub extern "C" fn quill_engine_new(dark_theme: i32) -> *mut QuillEngine {
-    guard_ptr(|| Box::into_raw(Box::new(QuillEngine { dark: dark_theme != 0 })))
+    guard_ptr(|| {
+        Box::into_raw(Box::new(QuillEngine {
+            dark: dark_theme != 0,
+        }))
+    })
 }
 
 /// Destroys an engine. Passing null is a no-op; passing the same pointer twice is a double free.
@@ -160,7 +164,11 @@ pub extern "C" fn quill_engine_set_dark(engine: *mut QuillEngine, dark_theme: i3
 
 /// Opens a document from UTF-8 text. Returns null on failure.
 #[unsafe(no_mangle)]
-pub extern "C" fn quill_doc_open(engine: *mut QuillEngine, text: *const u8, len: usize) -> *mut QuillDoc {
+pub extern "C" fn quill_doc_open(
+    engine: *mut QuillEngine,
+    text: *const u8,
+    len: usize,
+) -> *mut QuillDoc {
     guard_ptr(|| {
         if engine.is_null() {
             set_last_error("engine pointer is null");
@@ -171,7 +179,9 @@ pub extern "C" fn quill_doc_open(engine: *mut QuillEngine, text: *const u8, len:
             set_last_error("document text is null or not valid UTF-8");
             return std::ptr::null_mut();
         };
-        Box::into_raw(Box::new(QuillDoc { document: Mutex::new(Document::new(text)) }))
+        Box::into_raw(Box::new(QuillDoc {
+            document: Mutex::new(Document::new(text)),
+        }))
     })
 }
 
@@ -190,7 +200,13 @@ pub extern "C" fn quill_doc_free(doc: *mut QuillDoc) {
 
 /// Replaces the UTF-16 range `start..end` with `text`.
 #[unsafe(no_mangle)]
-pub extern "C" fn quill_doc_replace(doc: *mut QuillDoc, start: u32, end: u32, text: *const u8, len: usize) -> i32 {
+pub extern "C" fn quill_doc_replace(
+    doc: *mut QuillDoc,
+    start: u32,
+    end: u32,
+    text: *const u8,
+    len: usize,
+) -> i32 {
     guard(|| {
         // SAFETY: caller-supplied buffer, validated for UTF-8.
         let Some(text) = (unsafe { borrow_str(text, len) }) else {
@@ -264,7 +280,9 @@ pub extern "C" fn quill_doc_len_utf16(doc: *mut QuillDoc) -> i64 {
 pub extern "C" fn quill_doc_text(doc: *mut QuillDoc, out: *mut QuillBuf) -> i32 {
     guard(|| {
         // SAFETY: handle and output validity are the caller's contract; nulls are handled here.
-        let (Some(mut document), Some(slot)) = (unsafe { lock_document(doc) }, unsafe { out_slot(out) }) else {
+        let (Some(mut document), Some(slot)) =
+            (unsafe { lock_document(doc) }, unsafe { out_slot(out) })
+        else {
             return null_pointer("document or output");
         };
         let mut encoder = Encoder::new(PayloadKind::Text);
@@ -278,7 +296,9 @@ pub extern "C" fn quill_doc_text(doc: *mut QuillDoc, out: *mut QuillBuf) -> i32 
 pub extern "C" fn quill_doc_blocks(doc: *mut QuillDoc, out: *mut QuillBuf) -> i32 {
     guard(|| {
         // SAFETY: handle and output validity are the caller's contract.
-        let (Some(mut document), Some(slot)) = (unsafe { lock_document(doc) }, unsafe { out_slot(out) }) else {
+        let (Some(mut document), Some(slot)) =
+            (unsafe { lock_document(doc) }, unsafe { out_slot(out) })
+        else {
             return null_pointer("document or output");
         };
         if let Some(cached) = document.cached(PayloadKind::Blocks) {
@@ -292,14 +312,21 @@ pub extern "C" fn quill_doc_blocks(doc: *mut QuillDoc, out: *mut QuillBuf) -> i3
 
 /// Writes editor syntax spans for lines `first_line..=last_line` into `out`.
 #[unsafe(no_mangle)]
-pub extern "C" fn quill_doc_spans(doc: *mut QuillDoc, first_line: u32, last_line: u32, out: *mut QuillBuf) -> i32 {
+pub extern "C" fn quill_doc_spans(
+    doc: *mut QuillDoc,
+    first_line: u32,
+    last_line: u32,
+    out: *mut QuillBuf,
+) -> i32 {
     guard(|| {
         if last_line < first_line {
             set_last_error("last_line is before first_line");
             return status::INVALID_ARGUMENT;
         }
         // SAFETY: handle and output validity are the caller's contract.
-        let (Some(mut document), Some(slot)) = (unsafe { lock_document(doc) }, unsafe { out_slot(out) }) else {
+        let (Some(mut document), Some(slot)) =
+            (unsafe { lock_document(doc) }, unsafe { out_slot(out) })
+        else {
             return null_pointer("document or output");
         };
         let spans = editor::highlight(document.text(), first_line as usize, last_line as usize);
@@ -320,7 +347,9 @@ pub extern "C" fn quill_doc_spans(doc: *mut QuillDoc, first_line: u32, last_line
 pub extern "C" fn quill_doc_outline(doc: *mut QuillDoc, out: *mut QuillBuf) -> i32 {
     guard(|| {
         // SAFETY: handle and output validity are the caller's contract.
-        let (Some(mut document), Some(slot)) = (unsafe { lock_document(doc) }, unsafe { out_slot(out) }) else {
+        let (Some(mut document), Some(slot)) =
+            (unsafe { lock_document(doc) }, unsafe { out_slot(out) })
+        else {
             return null_pointer("document or output");
         };
         if let Some(cached) = document.cached(PayloadKind::Outline) {
@@ -337,7 +366,9 @@ pub extern "C" fn quill_doc_outline(doc: *mut QuillDoc, out: *mut QuillBuf) -> i
 pub extern "C" fn quill_doc_stats(doc: *mut QuillDoc, out: *mut QuillBuf) -> i32 {
     guard(|| {
         // SAFETY: handle and output validity are the caller's contract.
-        let (Some(mut document), Some(slot)) = (unsafe { lock_document(doc) }, unsafe { out_slot(out) }) else {
+        let (Some(mut document), Some(slot)) =
+            (unsafe { lock_document(doc) }, unsafe { out_slot(out) })
+        else {
             return null_pointer("document or output");
         };
         if let Some(cached) = document.cached(PayloadKind::Stats) {
@@ -365,7 +396,9 @@ pub extern "C" fn quill_doc_search(
             return status::INVALID_UTF8;
         };
         // SAFETY: handle and output validity are the caller's contract.
-        let (Some(mut document), Some(slot)) = (unsafe { lock_document(doc) }, unsafe { out_slot(out) }) else {
+        let (Some(mut document), Some(slot)) =
+            (unsafe { lock_document(doc) }, unsafe { out_slot(out) })
+        else {
             return null_pointer("document or output");
         };
         match crate::search::encode(&mut document, query, flags) {
@@ -390,9 +423,9 @@ pub extern "C" fn quill_doc_replace_all(
 ) -> i32 {
     guard(|| {
         // SAFETY: caller-supplied buffers, validated for UTF-8.
-        let (Some(query), Some(replacement)) =
-            (unsafe { borrow_str(query, query_len) }, unsafe { borrow_str(replacement, replacement_len) })
-        else {
+        let (Some(query), Some(replacement)) = (unsafe { borrow_str(query, query_len) }, unsafe {
+            borrow_str(replacement, replacement_len)
+        }) else {
             set_last_error("query or replacement is null or not valid UTF-8");
             return status::INVALID_UTF8;
         };
@@ -429,7 +462,9 @@ pub extern "C" fn quill_doc_export_html(
             return status::INVALID_UTF8;
         };
         // SAFETY: handle and output validity are the caller's contract.
-        let (Some(mut document), Some(slot)) = (unsafe { lock_document(doc) }, unsafe { out_slot(out) }) else {
+        let (Some(mut document), Some(slot)) =
+            (unsafe { lock_document(doc) }, unsafe { out_slot(out) })
+        else {
             return null_pointer("document or output");
         };
         let bytes = crate::export::encode(&mut document, title, flags);
@@ -453,9 +488,9 @@ pub extern "C" fn quill_highlight_code(
             return null_pointer("engine");
         };
         // SAFETY: caller-supplied buffers, validated for UTF-8.
-        let (Some(source), Some(language)) =
-            (unsafe { borrow_str(code_ptr, code_len) }, unsafe { borrow_str(language, language_len) })
-        else {
+        let (Some(source), Some(language)) = (unsafe { borrow_str(code_ptr, code_len) }, unsafe {
+            borrow_str(language, language_len)
+        }) else {
             set_last_error("code or language is null or not valid UTF-8");
             return status::INVALID_UTF8;
         };
@@ -543,7 +578,10 @@ mod tests {
         assert_eq!(quill_doc_len_utf16(doc), 5);
 
         let suffix = " world";
-        assert_eq!(quill_doc_replace(doc, 5, 5, suffix.as_ptr(), suffix.len()), status::OK);
+        assert_eq!(
+            quill_doc_replace(doc, 5, 5, suffix.as_ptr(), suffix.len()),
+            status::OK
+        );
         assert_eq!(quill_doc_version(doc), 2);
 
         let payload = capture(|out| quill_doc_text(doc, out));
@@ -557,14 +595,33 @@ mod tests {
 
     #[test]
     fn null_handles_are_rejected_not_dereferenced() {
-        assert_eq!(quill_doc_replace(std::ptr::null_mut(), 0, 0, c"x".as_ptr().cast(), 1), status::NULL_POINTER);
-        assert_eq!(quill_doc_version(std::ptr::null_mut()), i64::from(status::NULL_POINTER));
-        assert_eq!(quill_doc_len_utf16(std::ptr::null_mut()), i64::from(status::NULL_POINTER));
+        assert_eq!(
+            quill_doc_replace(std::ptr::null_mut(), 0, 0, c"x".as_ptr().cast(), 1),
+            status::NULL_POINTER
+        );
+        assert_eq!(
+            quill_doc_version(std::ptr::null_mut()),
+            i64::from(status::NULL_POINTER)
+        );
+        assert_eq!(
+            quill_doc_len_utf16(std::ptr::null_mut()),
+            i64::from(status::NULL_POINTER)
+        );
 
         let mut buffer = QuillBuf::empty();
-        assert_eq!(quill_doc_blocks(std::ptr::null_mut(), &mut buffer), status::NULL_POINTER);
         assert_eq!(
-            quill_highlight_code(std::ptr::null_mut(), std::ptr::null(), 0, std::ptr::null(), 0, &mut buffer),
+            quill_doc_blocks(std::ptr::null_mut(), &mut buffer),
+            status::NULL_POINTER
+        );
+        assert_eq!(
+            quill_highlight_code(
+                std::ptr::null_mut(),
+                std::ptr::null(),
+                0,
+                std::ptr::null(),
+                0,
+                &mut buffer
+            ),
             status::NULL_POINTER
         );
 
@@ -577,11 +634,17 @@ mod tests {
     #[test]
     fn rejects_a_null_output_buffer_and_invalid_utf8() {
         let (engine, doc) = open("x");
-        assert_eq!(quill_doc_blocks(doc, std::ptr::null_mut()), status::NULL_POINTER);
+        assert_eq!(
+            quill_doc_blocks(doc, std::ptr::null_mut()),
+            status::NULL_POINTER
+        );
 
         // 0xFF is never valid UTF-8.
         let invalid = [0xFFu8, 0xFE];
-        assert_eq!(quill_doc_replace(doc, 0, 0, invalid.as_ptr(), invalid.len()), status::INVALID_UTF8);
+        assert_eq!(
+            quill_doc_replace(doc, 0, 0, invalid.as_ptr(), invalid.len()),
+            status::INVALID_UTF8
+        );
 
         quill_doc_free(doc);
         quill_engine_free(engine);
@@ -591,13 +654,19 @@ mod tests {
     fn reports_out_of_range_edits() {
         let (engine, doc) = open("abc");
         let text = "z";
-        assert_eq!(quill_doc_replace(doc, 0, 99, text.as_ptr(), text.len()), status::OUT_OF_RANGE);
+        assert_eq!(
+            quill_doc_replace(doc, 0, 99, text.as_ptr(), text.len()),
+            status::OUT_OF_RANGE
+        );
 
         // The failure detail is retrievable and then cleared.
         let payload = capture(|out| quill_last_error(out));
         let (mut decoder, _) = Decoder::new(&payload).unwrap();
         assert!(decoder.string().unwrap().contains("out of bounds"));
-        assert_eq!(quill_last_error(&mut QuillBuf::empty()), status::INVALID_ARGUMENT);
+        assert_eq!(
+            quill_last_error(&mut QuillBuf::empty()),
+            status::INVALID_ARGUMENT
+        );
 
         quill_doc_free(doc);
         quill_engine_free(engine);
@@ -633,7 +702,10 @@ mod tests {
     #[test]
     fn rejects_an_inverted_line_window() {
         let (engine, doc) = open("a\nb\n");
-        assert_eq!(quill_doc_spans(doc, 5, 1, &mut QuillBuf::empty()), status::INVALID_ARGUMENT);
+        assert_eq!(
+            quill_doc_spans(doc, 5, 1, &mut QuillBuf::empty()),
+            status::INVALID_ARGUMENT
+        );
         quill_doc_free(doc);
         quill_engine_free(engine);
     }
@@ -649,7 +721,14 @@ mod tests {
 
         let replacement = "1";
         assert_eq!(
-            quill_doc_replace_all(doc, query.as_ptr(), query.len(), replacement.as_ptr(), replacement.len(), 0),
+            quill_doc_replace_all(
+                doc,
+                query.as_ptr(),
+                query.len(),
+                replacement.as_ptr(),
+                replacement.len(),
+                0
+            ),
             status::OK
         );
         let payload = capture(|out| quill_doc_text(doc, out));
@@ -665,7 +744,13 @@ mod tests {
         let (engine, doc) = open("text");
         let query = "[unclosed";
         assert_eq!(
-            quill_doc_search(doc, query.as_ptr(), query.len(), crate::search::flags::REGEX, &mut QuillBuf::empty()),
+            quill_doc_search(
+                doc,
+                query.as_ptr(),
+                query.len(),
+                crate::search::flags::REGEX,
+                &mut QuillBuf::empty()
+            ),
             status::INVALID_ARGUMENT
         );
         quill_doc_free(doc);
@@ -677,7 +762,13 @@ mod tests {
         let (engine, doc) = open("# Title\n");
         let title = "Doc";
         let bytes = capture(|out| {
-            quill_doc_export_html(doc, title.as_ptr(), title.len(), crate::export::options::STANDALONE, out)
+            quill_doc_export_html(
+                doc,
+                title.as_ptr(),
+                title.len(),
+                crate::export::options::STANDALONE,
+                out,
+            )
         });
         let (mut decoder, kind) = Decoder::new(&bytes).unwrap();
         assert_eq!(kind, PayloadKind::Text);
@@ -696,11 +787,25 @@ mod tests {
         let language = "rust";
 
         let dark = capture(|out| {
-            quill_highlight_code(engine, source.as_ptr(), source.len(), language.as_ptr(), language.len(), out)
+            quill_highlight_code(
+                engine,
+                source.as_ptr(),
+                source.len(),
+                language.as_ptr(),
+                language.len(),
+                out,
+            )
         });
         assert_eq!(quill_engine_set_dark(engine, 0), status::OK);
         let light = capture(|out| {
-            quill_highlight_code(engine, source.as_ptr(), source.len(), language.as_ptr(), language.len(), out)
+            quill_highlight_code(
+                engine,
+                source.as_ptr(),
+                source.len(),
+                language.as_ptr(),
+                language.len(),
+                out,
+            )
         });
         assert_ne!(dark, light, "the palette switch must change the output");
 
@@ -715,7 +820,10 @@ mod tests {
     fn set_text_replaces_contents() {
         let (engine, doc) = open("old");
         let replacement = "완전히 새로운 내용";
-        assert_eq!(quill_doc_set_text(doc, replacement.as_ptr(), replacement.len()), status::OK);
+        assert_eq!(
+            quill_doc_set_text(doc, replacement.as_ptr(), replacement.len()),
+            status::OK
+        );
         assert_eq!(quill_doc_len_utf16(doc), 10);
 
         quill_doc_free(doc);
@@ -731,7 +839,10 @@ mod tests {
         // After an edit the cache must not serve the stale answer.
         let addition = "\n### C\n";
         let length = quill_doc_len_utf16(doc) as u32;
-        assert_eq!(quill_doc_replace(doc, length, length, addition.as_ptr(), addition.len()), status::OK);
+        assert_eq!(
+            quill_doc_replace(doc, length, length, addition.as_ptr(), addition.len()),
+            status::OK
+        );
         assert_ne!(first, capture(|out| quill_doc_outline(doc, out)));
 
         quill_doc_free(doc);

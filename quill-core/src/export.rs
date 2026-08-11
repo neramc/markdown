@@ -95,7 +95,11 @@ pub fn to_html_document(text: &str, title: &str, flags: u32) -> String {
         return body;
     }
 
-    let palette = if flags & options::DARK != 0 { DARK_CSS } else { LIGHT_CSS };
+    let palette = if flags & options::DARK != 0 {
+        DARK_CSS
+    } else {
+        LIGHT_CSS
+    };
     format!(
         "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n\
@@ -134,7 +138,10 @@ mod tests {
         assert!(html.starts_with("<!doctype html>"));
         assert!(html.contains("<title>My Doc</title>"));
         assert!(html.contains("</html>"));
-        assert!(html.contains("--quill-bg: #ffffff"), "light palette by default");
+        assert!(
+            html.contains("--quill-bg: #ffffff"),
+            "light palette by default"
+        );
     }
 
     #[test]
@@ -155,8 +162,13 @@ mod tests {
     #[test]
     fn escapes_raw_html_in_the_body_by_default() {
         let html = to_html_document("<img src=x onerror=alert(1)>\n", "t", options::STANDALONE);
-        assert!(!html.contains("onerror=alert(1)>"), "raw HTML must be escaped unless opted in");
-        assert!(to_html_document("<b>bold</b>\n", "t", options::ALLOW_RAW_HTML).contains("<b>bold</b>"));
+        assert!(
+            !html.contains("onerror=alert(1)>"),
+            "raw HTML must be escaped unless opted in"
+        );
+        assert!(
+            to_html_document("<b>bold</b>\n", "t", options::ALLOW_RAW_HTML).contains("<b>bold</b>")
+        );
     }
 
     #[test]

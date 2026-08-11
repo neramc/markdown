@@ -11,7 +11,9 @@
 use std::str::FromStr;
 use std::sync::LazyLock;
 
-use syntect::highlighting::{Color, FontStyle, ScopeSelectors, StyleModifier, Theme, ThemeItem, ThemeSettings};
+use syntect::highlighting::{
+    Color, FontStyle, ScopeSelectors, StyleModifier, Theme, ThemeItem, ThemeSettings,
+};
 
 /// Semantic token kinds for Markdown source text.
 ///
@@ -60,7 +62,11 @@ impl StyleSpan {
     pub fn new(start: usize, end: usize, style: EditorStyle) -> Option<Self> {
         // Zero-width and inverted spans are dropped at construction: they cannot be rendered and
         // would otherwise reach the JVM as confusing no-op annotations.
-        if end > start { Some(Self { start, end, style }) } else { None }
+        if end > start {
+            Some(Self { start, end, style })
+        } else {
+            None
+        }
     }
 }
 
@@ -73,13 +79,21 @@ pub struct ColorSpan {
 }
 
 const fn rgb(hex: u32) -> Color {
-    Color { r: ((hex >> 16) & 0xFF) as u8, g: ((hex >> 8) & 0xFF) as u8, b: (hex & 0xFF) as u8, a: 0xFF }
+    Color {
+        r: ((hex >> 16) & 0xFF) as u8,
+        g: ((hex >> 8) & 0xFF) as u8,
+        b: (hex & 0xFF) as u8,
+        a: 0xFF,
+    }
 }
 
 /// Packs a syntect colour into 0xAARRGGBB, which is what `androidx.compose.ui.graphics.Color`
 /// expects on the other side of the bridge.
 pub fn pack_argb(color: Color) -> u32 {
-    (u32::from(color.a) << 24) | (u32::from(color.r) << 16) | (u32::from(color.g) << 8) | u32::from(color.b)
+    (u32::from(color.a) << 24)
+        | (u32::from(color.r) << 16)
+        | (u32::from(color.g) << 8)
+        | u32::from(color.b)
 }
 
 /// Scope-to-colour rules, expressed the way a `.tmTheme` would.
@@ -99,48 +113,200 @@ const LIGHT_BACKGROUND: u32 = 0x00FF_FFFF;
 
 /// IntelliJ Darcula.
 const DARCULA_RULES: &[Rule] = &[
-    Rule { selector: "comment", color: 0x0080_8080, font: Some(FontStyle::ITALIC) },
-    Rule { selector: "string, string.quoted", color: 0x006A_8759, font: None },
-    Rule { selector: "constant.character.escape", color: 0x00CC_7832, font: None },
-    Rule { selector: "constant.numeric", color: 0x0068_97BB, font: None },
-    Rule { selector: "constant.language", color: 0x00CC_7832, font: None },
-    Rule { selector: "constant.other", color: 0x0098_76AA, font: None },
-    Rule { selector: "keyword, storage.type, storage.modifier", color: 0x00CC_7832, font: None },
-    Rule { selector: "keyword.operator", color: 0x00A9_B7C6, font: None },
-    Rule { selector: "entity.name.function, support.function", color: 0x00FF_C66D, font: None },
-    Rule { selector: "entity.name.type, entity.name.class, support.class", color: 0x00A9_B7C6, font: None },
-    Rule { selector: "entity.name.tag", color: 0x00E8_BF6A, font: None },
-    Rule { selector: "entity.other.attribute-name", color: 0x00BA_BABA, font: None },
-    Rule { selector: "variable.parameter", color: 0x00A9_B7C6, font: None },
-    Rule { selector: "variable.language", color: 0x0094_558D, font: None },
-    Rule { selector: "meta.annotation, punctuation.definition.annotation", color: 0x00BB_B529, font: None },
-    Rule { selector: "invalid", color: 0x00FF_6B68, font: None },
-    Rule { selector: "markup.heading", color: 0x00FF_C66D, font: Some(FontStyle::BOLD) },
-    Rule { selector: "markup.inserted", color: 0x006A_8759, font: None },
-    Rule { selector: "markup.deleted", color: 0x00CC_7832, font: None },
+    Rule {
+        selector: "comment",
+        color: 0x0080_8080,
+        font: Some(FontStyle::ITALIC),
+    },
+    Rule {
+        selector: "string, string.quoted",
+        color: 0x006A_8759,
+        font: None,
+    },
+    Rule {
+        selector: "constant.character.escape",
+        color: 0x00CC_7832,
+        font: None,
+    },
+    Rule {
+        selector: "constant.numeric",
+        color: 0x0068_97BB,
+        font: None,
+    },
+    Rule {
+        selector: "constant.language",
+        color: 0x00CC_7832,
+        font: None,
+    },
+    Rule {
+        selector: "constant.other",
+        color: 0x0098_76AA,
+        font: None,
+    },
+    Rule {
+        selector: "keyword, storage.type, storage.modifier",
+        color: 0x00CC_7832,
+        font: None,
+    },
+    Rule {
+        selector: "keyword.operator",
+        color: 0x00A9_B7C6,
+        font: None,
+    },
+    Rule {
+        selector: "entity.name.function, support.function",
+        color: 0x00FF_C66D,
+        font: None,
+    },
+    Rule {
+        selector: "entity.name.type, entity.name.class, support.class",
+        color: 0x00A9_B7C6,
+        font: None,
+    },
+    Rule {
+        selector: "entity.name.tag",
+        color: 0x00E8_BF6A,
+        font: None,
+    },
+    Rule {
+        selector: "entity.other.attribute-name",
+        color: 0x00BA_BABA,
+        font: None,
+    },
+    Rule {
+        selector: "variable.parameter",
+        color: 0x00A9_B7C6,
+        font: None,
+    },
+    Rule {
+        selector: "variable.language",
+        color: 0x0094_558D,
+        font: None,
+    },
+    Rule {
+        selector: "meta.annotation, punctuation.definition.annotation",
+        color: 0x00BB_B529,
+        font: None,
+    },
+    Rule {
+        selector: "invalid",
+        color: 0x00FF_6B68,
+        font: None,
+    },
+    Rule {
+        selector: "markup.heading",
+        color: 0x00FF_C66D,
+        font: Some(FontStyle::BOLD),
+    },
+    Rule {
+        selector: "markup.inserted",
+        color: 0x006A_8759,
+        font: None,
+    },
+    Rule {
+        selector: "markup.deleted",
+        color: 0x00CC_7832,
+        font: None,
+    },
 ];
 
 /// IntelliJ Light.
 const LIGHT_RULES: &[Rule] = &[
-    Rule { selector: "comment", color: 0x008C_8C8C, font: Some(FontStyle::ITALIC) },
-    Rule { selector: "string, string.quoted", color: 0x0006_7D17, font: None },
-    Rule { selector: "constant.character.escape", color: 0x0000_37A6, font: None },
-    Rule { selector: "constant.numeric", color: 0x0017_50EB, font: None },
-    Rule { selector: "constant.language", color: 0x0000_33B3, font: Some(FontStyle::BOLD) },
-    Rule { selector: "constant.other", color: 0x0087_1094, font: None },
-    Rule { selector: "keyword, storage.type, storage.modifier", color: 0x0000_33B3, font: Some(FontStyle::BOLD) },
-    Rule { selector: "keyword.operator", color: 0x0000_0000, font: None },
-    Rule { selector: "entity.name.function, support.function", color: 0x0000_627A, font: None },
-    Rule { selector: "entity.name.type, entity.name.class, support.class", color: 0x0000_0000, font: None },
-    Rule { selector: "entity.name.tag", color: 0x0000_0080, font: Some(FontStyle::BOLD) },
-    Rule { selector: "entity.other.attribute-name", color: 0x0017_50EB, font: None },
-    Rule { selector: "variable.parameter", color: 0x0000_0000, font: None },
-    Rule { selector: "variable.language", color: 0x0087_1094, font: None },
-    Rule { selector: "meta.annotation, punctuation.definition.annotation", color: 0x009E_880D, font: None },
-    Rule { selector: "invalid", color: 0x00FF_0000, font: None },
-    Rule { selector: "markup.heading", color: 0x0000_627A, font: Some(FontStyle::BOLD) },
-    Rule { selector: "markup.inserted", color: 0x0006_7D17, font: None },
-    Rule { selector: "markup.deleted", color: 0x00A3_1515, font: None },
+    Rule {
+        selector: "comment",
+        color: 0x008C_8C8C,
+        font: Some(FontStyle::ITALIC),
+    },
+    Rule {
+        selector: "string, string.quoted",
+        color: 0x0006_7D17,
+        font: None,
+    },
+    Rule {
+        selector: "constant.character.escape",
+        color: 0x0000_37A6,
+        font: None,
+    },
+    Rule {
+        selector: "constant.numeric",
+        color: 0x0017_50EB,
+        font: None,
+    },
+    Rule {
+        selector: "constant.language",
+        color: 0x0000_33B3,
+        font: Some(FontStyle::BOLD),
+    },
+    Rule {
+        selector: "constant.other",
+        color: 0x0087_1094,
+        font: None,
+    },
+    Rule {
+        selector: "keyword, storage.type, storage.modifier",
+        color: 0x0000_33B3,
+        font: Some(FontStyle::BOLD),
+    },
+    Rule {
+        selector: "keyword.operator",
+        color: 0x0000_0000,
+        font: None,
+    },
+    Rule {
+        selector: "entity.name.function, support.function",
+        color: 0x0000_627A,
+        font: None,
+    },
+    Rule {
+        selector: "entity.name.type, entity.name.class, support.class",
+        color: 0x0000_0000,
+        font: None,
+    },
+    Rule {
+        selector: "entity.name.tag",
+        color: 0x0000_0080,
+        font: Some(FontStyle::BOLD),
+    },
+    Rule {
+        selector: "entity.other.attribute-name",
+        color: 0x0017_50EB,
+        font: None,
+    },
+    Rule {
+        selector: "variable.parameter",
+        color: 0x0000_0000,
+        font: None,
+    },
+    Rule {
+        selector: "variable.language",
+        color: 0x0087_1094,
+        font: None,
+    },
+    Rule {
+        selector: "meta.annotation, punctuation.definition.annotation",
+        color: 0x009E_880D,
+        font: None,
+    },
+    Rule {
+        selector: "invalid",
+        color: 0x00FF_0000,
+        font: None,
+    },
+    Rule {
+        selector: "markup.heading",
+        color: 0x0000_627A,
+        font: Some(FontStyle::BOLD),
+    },
+    Rule {
+        selector: "markup.inserted",
+        color: 0x0006_7D17,
+        font: None,
+    },
+    Rule {
+        selector: "markup.deleted",
+        color: 0x00A3_1515,
+        font: None,
+    },
 ];
 
 fn build_theme(name: &str, foreground: u32, background: u32, rules: &[Rule]) -> Theme {
@@ -167,14 +333,31 @@ fn build_theme(name: &str, foreground: u32, background: u32, rules: &[Rule]) -> 
         })
         .collect();
 
-    Theme { name: Some(name.to_owned()), author: Some("Quill".to_owned()), settings, scopes }
+    Theme {
+        name: Some(name.to_owned()),
+        author: Some("Quill".to_owned()),
+        settings,
+        scopes,
+    }
 }
 
-static DARCULA: LazyLock<Theme> =
-    LazyLock::new(|| build_theme("Quill Darcula", DARCULA_FOREGROUND, DARCULA_BACKGROUND, DARCULA_RULES));
+static DARCULA: LazyLock<Theme> = LazyLock::new(|| {
+    build_theme(
+        "Quill Darcula",
+        DARCULA_FOREGROUND,
+        DARCULA_BACKGROUND,
+        DARCULA_RULES,
+    )
+});
 
-static INTELLIJ_LIGHT: LazyLock<Theme> =
-    LazyLock::new(|| build_theme("Quill Light", LIGHT_FOREGROUND, LIGHT_BACKGROUND, LIGHT_RULES));
+static INTELLIJ_LIGHT: LazyLock<Theme> = LazyLock::new(|| {
+    build_theme(
+        "Quill Light",
+        LIGHT_FOREGROUND,
+        LIGHT_BACKGROUND,
+        LIGHT_RULES,
+    )
+});
 
 /// Returns the code-block colour scheme for the requested appearance.
 pub fn code_theme(dark: bool) -> &'static Theme {
@@ -183,7 +366,11 @@ pub fn code_theme(dark: bool) -> &'static Theme {
 
 /// The scheme's default foreground, used for text no rule matched.
 pub fn default_code_foreground(dark: bool) -> u32 {
-    if dark { 0xFF00_0000 | DARCULA_FOREGROUND } else { 0xFF00_0000 | LIGHT_FOREGROUND }
+    if dark {
+        0xFF00_0000 | DARCULA_FOREGROUND
+    } else {
+        0xFF00_0000 | LIGHT_FOREGROUND
+    }
 }
 
 #[cfg(test)]
@@ -192,7 +379,15 @@ mod tests {
 
     #[test]
     fn packs_colors_in_argb_order() {
-        assert_eq!(pack_argb(Color { r: 0x12, g: 0x34, b: 0x56, a: 0xFF }), 0xFF12_3456);
+        assert_eq!(
+            pack_argb(Color {
+                r: 0x12,
+                g: 0x34,
+                b: 0x56,
+                a: 0xFF
+            }),
+            0xFF12_3456
+        );
     }
 
     #[test]

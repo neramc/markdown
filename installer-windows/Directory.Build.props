@@ -24,14 +24,19 @@
   </PropertyGroup>
 
   <!--
-    Single-file publish trims nothing but does need the runtime to be compiled in. NativeAOT is
-    deliberately not used: it cannot cross-compile to Windows from Linux, and the COM interop the
-    shortcut writer relies on would need extra annotation. Trimming is off because Avalonia's XAML
-    loader and the COM interop both resolve types at runtime.
+    Publishing settings only.
+
+    PublishSingleFile and SelfContained are passed on the `dotnet publish` command line by
+    tools/build-installer.sh rather than set here, because SelfContained also affects ordinary
+    builds: with it set for the Release configuration, the test projects cannot reference the two
+    executables at all ("a self-contained executable cannot be referenced by a non self-contained
+    executable", NETSDK1151), and `dotnet test -c Release` stops working.
+
+    NativeAOT is deliberately not used: it cannot cross-compile to Windows from Linux, and the COM
+    interop behind the shortcut writer would need extra annotation. Trimming is off because
+    Avalonia's XAML loader and that same COM interop both resolve types at runtime.
   -->
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
-    <PublishSingleFile>true</PublishSingleFile>
-    <SelfContained>true</SelfContained>
     <PublishTrimmed>false</PublishTrimmed>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <DebugType>embedded</DebugType>

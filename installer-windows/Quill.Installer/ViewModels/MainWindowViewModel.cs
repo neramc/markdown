@@ -30,6 +30,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 {
     private readonly IPlatformIntegration _platform;
     private readonly IReadOnlyList<string> _arguments;
+    private readonly Assembly _payloadAssembly;
     private readonly CancellationTokenSource _cancellation = new();
 
     [ObservableProperty]
@@ -95,15 +96,24 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     /// <param name="platform">The integration to install through.</param>
     /// <param name="arguments">Process arguments, used to find an external payload.</param>
-    public MainWindowViewModel(IPlatformIntegration platform, IReadOnlyList<string>? arguments = null)
+    /// <param name="payloadAssembly">
+    /// Assembly searched for the embedded payload. Defaults to this one, which is the shipped
+    /// arrangement; tests pass their own so the "no payload" state is reachable whether or not a
+    /// payload happens to have been built into this assembly.
+    /// </param>
+    public MainWindowViewModel(
+        IPlatformIntegration platform,
+        IReadOnlyList<string>? arguments = null,
+        Assembly? payloadAssembly = null)
     {
         _platform = platform ?? throw new ArgumentNullException(nameof(platform));
         _arguments = arguments ?? [];
+        _payloadAssembly = payloadAssembly ?? Assembly.GetExecutingAssembly();
 
         TargetDirectory = _platform.GetDefaultInstallRoot(InstallScope.CurrentUser);
         LicenseText = LoadLicense();
 
-        var (payload, origin) = PayloadSource.Open(Assembly.GetExecutingAssembly(), _arguments);
+        var (payload, origin) = PayloadSource.Open(_payloadAssembly, _arguments);
         payload?.Dispose();
         PayloadOrigin = origin;
 
@@ -275,7 +285,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                     "declined. Go back and choose the per-user installation instead.");
             }
 
-            var (payload, _) = PayloadSource.Open(Assembly.GetExecutingAssembly(), _arguments);
+            var (payload, _) = PayloadSource.Open(_payloadAssembly, _arguments);
             if (payload is null)
             {
                 throw new InvalidOperationException(

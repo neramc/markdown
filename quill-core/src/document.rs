@@ -17,7 +17,11 @@ use crate::wire::PayloadKind;
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum DocumentError {
     #[error("range {start}..{end} is out of bounds for a document of {length} UTF-16 code units")]
-    RangeOutOfBounds { start: usize, end: usize, length: usize },
+    RangeOutOfBounds {
+        start: usize,
+        end: usize,
+        length: usize,
+    },
     #[error("range start {start} is greater than end {end}")]
     InvertedRange { start: usize, end: usize },
 }
@@ -36,12 +40,15 @@ impl ResultCache {
     fn get(&self, kind: PayloadKind, version: i64) -> Option<&[u8]> {
         self.entries
             .iter()
-            .find(|(cached_kind, cached_version, _)| *cached_kind == kind && *cached_version == version)
+            .find(|(cached_kind, cached_version, _)| {
+                *cached_kind == kind && *cached_version == version
+            })
             .map(|(_, _, bytes)| bytes.as_slice())
     }
 
     fn put(&mut self, kind: PayloadKind, version: i64, bytes: Vec<u8>) {
-        self.entries.retain(|(cached_kind, _, _)| *cached_kind != kind);
+        self.entries
+            .retain(|(cached_kind, _, _)| *cached_kind != kind);
         self.entries.push((kind, version, bytes));
     }
 }
@@ -59,7 +66,12 @@ pub struct Document {
 
 impl Document {
     pub fn new(text: &str) -> Self {
-        Self { rope: Rope::from_str(text), version: 1, flat: Some(text.to_owned()), cache: ResultCache::default() }
+        Self {
+            rope: Rope::from_str(text),
+            version: 1,
+            flat: Some(text.to_owned()),
+            cache: ResultCache::default(),
+        }
     }
 
     pub fn version(&self) -> i64 {
@@ -189,9 +201,16 @@ mod tests {
         let mut document = Document::new("abc");
         assert_eq!(
             document.replace(0, 99, "x"),
-            Err(DocumentError::RangeOutOfBounds { start: 0, end: 99, length: 3 })
+            Err(DocumentError::RangeOutOfBounds {
+                start: 0,
+                end: 99,
+                length: 3
+            })
         );
-        assert_eq!(document.replace(2, 1, "x"), Err(DocumentError::InvertedRange { start: 2, end: 1 }));
+        assert_eq!(
+            document.replace(2, 1, "x"),
+            Err(DocumentError::InvertedRange { start: 2, end: 1 })
+        );
         // A rejected edit must not have mutated anything.
         assert_eq!(document.text(), "abc");
         assert_eq!(document.version(), 1);
@@ -259,7 +278,10 @@ mod tests {
     fn cache_is_invalidated_by_edits() {
         let mut document = Document::new("a");
         document.cache(PayloadKind::Outline, vec![1, 2, 3]);
-        assert_eq!(document.cached(PayloadKind::Outline), Some([1, 2, 3].as_slice()));
+        assert_eq!(
+            document.cached(PayloadKind::Outline),
+            Some([1, 2, 3].as_slice())
+        );
         document.replace(1, 1, "b").unwrap();
         assert_eq!(document.cached(PayloadKind::Outline), None);
     }

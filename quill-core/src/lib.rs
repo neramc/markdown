@@ -63,7 +63,10 @@ Final ~~struck~~ paragraph with 한국어 and 🪶.\n";
         let (mut decoder, kind) = Decoder::new(&bytes).unwrap();
         assert_eq!(kind, PayloadKind::Blocks);
         let count = decoder.u32().unwrap();
-        assert!(count >= 10, "expected a rich block tree, got {count} top-level blocks");
+        assert!(
+            count >= 10,
+            "expected a rich block tree, got {count} top-level blocks"
+        );
     }
 
     #[test]
@@ -86,7 +89,10 @@ Final ~~struck~~ paragraph with 한국어 and 🪶.\n";
         // AnnotatedString.
         let length = document.len_utf16();
         for span in &spans {
-            assert!(span.end <= length, "span {span:?} exceeds document length {length}");
+            assert!(
+                span.end <= length,
+                "span {span:?} exceeds document length {length}"
+            );
             assert!(span.start < span.end);
         }
     }
@@ -95,7 +101,9 @@ Final ~~struck~~ paragraph with 한국어 and 🪶.\n";
     fn incremental_edits_match_a_full_reparse() {
         let mut incremental = Document::new("# Title\n");
         let end = incremental.len_utf16();
-        incremental.replace(end, end, "\nSome added text.\n").unwrap();
+        incremental
+            .replace(end, end, "\nSome added text.\n")
+            .unwrap();
 
         let mut whole = Document::new("# Title\n\nSome added text.\n");
         assert_eq!(incremental.text(), whole.text());
@@ -108,7 +116,12 @@ Final ~~struck~~ paragraph with 한국어 and 🪶.\n";
     #[test]
     fn round_trips_through_search_and_export() {
         let mut document = Document::new(SAMPLE);
-        assert_eq!(crate::search::find(&mut document, "paragraph", 0).unwrap().len(), 2);
+        assert_eq!(
+            crate::search::find(&mut document, "paragraph", 0)
+                .unwrap()
+                .len(),
+            2
+        );
 
         let html = crate::export::to_html_document(
             document.text(),

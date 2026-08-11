@@ -7,8 +7,6 @@
     <IsTestProject>true</IsTestProject>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
 
-    <PublishSingleFile>false</PublishSingleFile>
-    <SelfContained>false</SelfContained>
 
     <!-- See the note in Quill.Setup.Tests: these tests are millisecond-scale and local. -->
     <NoWarn>$(NoWarn);xUnit1051</NoWarn>

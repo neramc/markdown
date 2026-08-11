@@ -69,7 +69,8 @@ mod tests {
         let static_payload = std::panic::catch_unwind(|| panic!("static message")).unwrap_err();
         assert_eq!(describe_panic(&*static_payload), "static message");
 
-        let owned_payload = std::panic::catch_unwind(|| panic!("{}", "owned".to_owned())).unwrap_err();
+        let owned_payload =
+            std::panic::catch_unwind(|| panic!("{}", "owned".to_owned())).unwrap_err();
         assert_eq!(describe_panic(&*owned_payload), "owned");
     }
 }

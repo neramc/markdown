@@ -11,8 +11,6 @@
     <AssemblyName>quill-pack</AssemblyName>
     <IsPackable>false</IsPackable>
 
-    <PublishSingleFile>false</PublishSingleFile>
-    <SelfContained>false</SelfContained>
   </PropertyGroup>
 
   <ItemGroup>

@@ -1,0 +1,165 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  # The Rust engine on its own. It is the fastest job and the one most changes touch, so failing it
+  # early avoids spending the matrix's time on a build that cannot pass.
+  engine:
+    name: Rust engine
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: quill-core
+
+      - name: Format
+        run: cargo fmt --manifest-path quill-core/Cargo.toml --check
+
+      - name: Clippy
+        run: cargo clippy --manifest-path quill-core/Cargo.toml --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test --manifest-path quill-core/Cargo.toml
+
+  # The bridge and the UI, on every platform Quill ships to. The JetBrains Runtime is provisioned by
+  # the Gradle toolchain resolver, so no JDK is set up here beyond the one Gradle itself runs on.
+  jvm:
+    name: JVM (${{ matrix.os }})
+    needs: engine
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: quill-core
+
+      - name: Set up a JDK for Gradle itself
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # jpackage shells out to fakeroot to build a .deb; without it the bundler is skipped and the
+      # packaging task fails.
+      - name: Install packaging tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y fakeroot
+
+      # The UI tests compose offscreen through Skia, so they need no display server. Everything
+      # else is headless already.
+      - name: Build and test
+        run: ./gradlew build --stacktrace
+
+      - name: Package for this platform
+        run: ./gradlew packageReleaseDistributionForCurrentOS --stacktrace
+
+      - name: Upload the offscreen UI renders
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-renders-${{ matrix.os }}
+          path: quill-app/build/test-renders/
+          if-no-files-found: ignore
+
+      - name: Upload the application image
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-image-${{ matrix.os }}
+          path: quill-app/build/compose/binaries/main-release/app/
+          if-no-files-found: error
+
+      - name: Upload the native packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ matrix.os }}
+          path: |
+            quill-app/build/compose/binaries/main-release/deb/
+            quill-app/build/compose/binaries/main-release/rpm/
+            quill-app/build/compose/binaries/main-release/dmg/
+          if-no-files-found: ignore
+
+  # The installer's own tests. These need no Windows and no application image, so they run on Linux
+  # alongside the matrix rather than waiting for it.
+  setup-tests:
+    name: Installer tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Test
+        run: dotnet test installer-windows/Quill.Setup.sln --configuration Release
+
+      - name: Upload the headless wizard renders
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-ui-renders
+          path: installer-windows/**/bin/**/ui-renders/
+          if-no-files-found: ignore
+
+  # QuillSetup.exe carries a Windows application image, and jpackage cannot cross-build one — hence
+  # the dependency on the Windows leg of the matrix. Publishing itself cross-compiles fine, so this
+  # runs on Linux.
+  installer:
+    name: Windows installer
+    needs: [jvm, setup-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Download the Windows application image
+        uses: actions/download-artifact@v4
+        with:
+          name: app-image-windows-latest
+          path: app-image
+
+      - name: Build the installer and uninstaller
+        run: tools/build-installer.sh --app-image app-image/Quill
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-setup
+          path: |
+            installer-windows/artifacts/installer/QuillSetup.exe
+            installer-windows/artifacts/uninstaller/QuillUninstall.exe
+          if-no-files-found: error
