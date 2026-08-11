@@ -20,6 +20,22 @@ import org.jetbrains.jewel.intui.window.styling.dark
 import org.jetbrains.jewel.intui.window.styling.light
 import org.jetbrains.jewel.ui.ComponentStyling
 import org.jetbrains.jewel.window.styling.TitleBarStyle
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.shape.CornerSize
+import androidx.compose.ui.unit.dp
+import kotlin.time.Duration.Companion.milliseconds
+import org.jetbrains.jewel.intui.standalone.styling.dark
+import org.jetbrains.jewel.intui.standalone.styling.macOsDark
+import org.jetbrains.jewel.intui.standalone.styling.macOsLight
+import org.jetbrains.jewel.intui.standalone.styling.light
+import org.jetbrains.jewel.ui.component.styling.LocalMenuStyle
+import org.jetbrains.jewel.ui.component.styling.LocalScrollbarStyle
+import org.jetbrains.jewel.ui.component.styling.MenuColors
+import org.jetbrains.jewel.ui.component.styling.MenuMetrics
+import org.jetbrains.jewel.ui.component.styling.MenuStyle
+import org.jetbrains.jewel.ui.component.styling.ScrollbarMetrics
+import org.jetbrains.jewel.ui.component.styling.ScrollbarStyle
+import org.jetbrains.jewel.ui.component.styling.ScrollbarVisibility
 
 /**
  * Semantic style identifiers for Markdown source, mirroring `EditorStyle` in the Rust engine.
@@ -162,35 +178,58 @@ public class EditorPalette(
 }
 
 /**
- * The IntelliJ IDEA "New UI" chrome palette.
+ * The IDE shell's palette.
  *
- * Every value here is a colour the IDE names in its own theme files — `MainToolbar.background`,
- * `ToolWindow.Header.background`, `EditorTabs.underlineColor` and so on — rather than something
- * chosen to look approximately right. The New UI's identity comes from a small number of very close
- * greys (#1E1F22 editor, #2B2D30 panels, #393B40 borders, #43454A hover), and getting one of them
- * wrong by a few points is exactly what makes an imitation read as an imitation.
+ * Two things make this read as a tool rather than as a dark web app, and neither is the hue.
+ *
+ * **The tones are very close together.** Root, panel, hover and selection sit within a few points of
+ * each other. Regions are separated by a barely-perceptible tone change rather than by a block of
+ * contrasting colour, which is why the window reads as one continuous work surface.
+ *
+ * **Text is layered rather than uniformly bright.** Primary, secondary and muted are three distinct
+ * steps. Painting every label the same white is the single fastest way to make a dense UI unreadable:
+ * with nothing receding, everything competes.
+ *
+ * Selection in particular is a low-contrast fill, not a saturated blue. Accent is reserved for
+ * saying *what is active* — the selected tab's underline, focus, links — and loses that job the
+ * moment it is used for decoration.
  */
 @Immutable
 public class ShellPalette(
     /** Panels, tool windows, the main toolbar and the status bar. */
     public val toolWindowBackground: Color,
-    /** Status bar; separate because the IDE can theme it apart from the panels. */
+    /**
+     * A panel nested inside another, such as a dialog's category list.
+     *
+     * One step away from [toolWindowBackground], not a contrasting colour.
+     */
+    public val panelSecondary: Color,
+    /** Status bar; separate because it can be themed apart from the panels. */
     public val statusBarBackground: Color,
-    /** The 1px separators between every region of the shell. */
+    /**
+     * The separators between regions.
+     *
+     * Deliberately close to the panel it sits on. A shell whose first impression is "there are a lot
+     * of lines" has borders doing work that a tone change should be doing.
+     */
     public val border: Color,
-    /** Primary UI label colour, distinct from editor text. */
+    /** Primary text: file names, tool window titles, active elements. */
     public val text: Color,
-    /** Secondary labels: status bar items, shortcut hints, tool window headers. */
+    /** Secondary text: descriptions, supporting information. */
+    public val secondaryText: Color,
+    /** Muted text: metadata, counters, inactive states. */
     public val mutedText: Color,
-    /** Default icon tint for toolbar and tree icons. */
+    /** Default icon tint. */
     public val icon: Color,
-    /** Toolbar and stripe button hover fill. */
+    /** Icon tint for something disabled or inactive. */
+    public val mutedIcon: Color,
+    /** Hover fill, shared by every hoverable surface in the shell. */
     public val hoverBackground: Color,
-    /** Toolbar and stripe button pressed or toggled-on fill. */
+    /** Pressed fill. */
     public val pressedBackground: Color,
-    /** Selected row in a focused tree or list. */
+    /** Selected row or toggled-on control. A low-contrast fill, not a saturated blue. */
     public val selectionBackground: Color,
-    /** Selected row when the tree does not have focus. */
+    /** Selected row when its container does not have focus, which is weaker again. */
     public val inactiveSelectionBackground: Color,
     /** The blue the IDE uses for links, underlines and focus. */
     public val accent: Color,
@@ -223,22 +262,25 @@ public class ShellPalette(
 ) {
     public companion object {
         public val Dark: ShellPalette = ShellPalette(
-            toolWindowBackground = Color(0xFF2B2D30),
-            statusBarBackground = Color(0xFF2B2D30),
-            border = Color(0xFF393B40),
-            text = Color(0xFFDFE1E5),
-            mutedText = Color(0xFF6F737A),
-            icon = Color(0xFFCED0D6),
-            hoverBackground = Color(0xFF43454A),
-            pressedBackground = Color(0xFF4E5157),
-            selectionBackground = Color(0xFF2E436E),
-            inactiveSelectionBackground = Color(0xFF43454A),
-            accent = Color(0xFF3574F0),
-            tabBarBackground = Color(0xFF2B2D30),
+            toolWindowBackground = Color(0xFF1F2023),
+            panelSecondary = Color(0xFF25262A),
+            statusBarBackground = Color(0xFF1F2023),
+            border = Color(0xFF2B2D30),
+            text = Color(0xFFD7D9DC),
+            secondaryText = Color(0xFFA6A8AD),
+            mutedText = Color(0xFF777A80),
+            icon = Color(0xFFA6A8AD),
+            mutedIcon = Color(0xFF777A80),
+            hoverBackground = Color(0xFF2B2D30),
+            pressedBackground = Color(0xFF3A3D42),
+            selectionBackground = Color(0xFF34373B),
+            inactiveSelectionBackground = Color(0xFF2B2D30),
+            accent = Color(0xFF4D8DFF),
+            tabBarBackground = Color(0xFF1F2023),
             tabSelectedBackground = Color(0xFF1E1F22),
-            tabUnderline = Color(0xFF3574F0),
-            popupBackground = Color(0xFF2B2D30),
-            popupBorder = Color(0xFF43454A),
+            tabUnderline = Color(0xFF4D8DFF),
+            popupBackground = Color(0xFF25262A),
+            popupBorder = Color(0xFF34373B),
             error = Color(0xFFDB5C5C),
             warning = Color(0xFFE0A22B),
             success = Color(0xFF5FAD65),
@@ -249,23 +291,28 @@ public class ShellPalette(
             welcomeBackground = Color(0xFF1E1F22),
         )
 
+        // The same relationships inverted: tones a few points apart, three text steps, a selection
+        // that is a soft grey rather than a saturated blue.
         public val Light: ShellPalette = ShellPalette(
             toolWindowBackground = Color(0xFFF7F8FA),
+            panelSecondary = Color(0xFFF0F1F4),
             statusBarBackground = Color(0xFFF7F8FA),
-            border = Color(0xFFEBECF0),
-            text = Color(0xFF1E1F22),
-            mutedText = Color(0xFF818594),
-            icon = Color(0xFF6C707E),
-            hoverBackground = Color(0xFFDFE1E5),
-            pressedBackground = Color(0xFFD3D5DB),
-            selectionBackground = Color(0xFFD4E2FF),
+            border = Color(0xFFE4E6EB),
+            text = Color(0xFF25272B),
+            secondaryText = Color(0xFF5A5D63),
+            mutedText = Color(0xFF8C8F96),
+            icon = Color(0xFF5A5D63),
+            mutedIcon = Color(0xFF8C8F96),
+            hoverBackground = Color(0xFFEBECF0),
+            pressedBackground = Color(0xFFDCDEE3),
+            selectionBackground = Color(0xFFE0E2E7),
             inactiveSelectionBackground = Color(0xFFEBECF0),
             accent = Color(0xFF3574F0),
             tabBarBackground = Color(0xFFF7F8FA),
             tabSelectedBackground = Color(0xFFFFFFFF),
             tabUnderline = Color(0xFF3574F0),
             popupBackground = Color(0xFFFFFFFF),
-            popupBorder = Color(0xFFC9CCD6),
+            popupBorder = Color(0xFFD6D9E0),
             error = Color(0xFFC94F4F),
             warning = Color(0xFFC28A18),
             success = Color(0xFF3D8B45),
@@ -328,19 +375,68 @@ public val LocalShellPalette: ProvidableCompositionLocal<ShellPalette> =
 public fun QuillTheme(dark: Boolean, content: @Composable () -> Unit) {
     val themeDefinition = if (dark) JewelTheme.darkThemeDefinition() else JewelTheme.lightThemeDefinition()
 
+    val shell = remember(dark) { ShellPalette.of(dark) }
+
     IntUiTheme(
         theme = themeDefinition,
-        styling = ComponentStyling.default().decoratedWindow(
-            titleBarStyle = if (dark) TitleBarStyle.dark() else TitleBarStyle.light(),
-        ),
+        styling = ComponentStyling.default()
+            .decoratedWindow(titleBarStyle = if (dark) TitleBarStyle.dark() else TitleBarStyle.light())
+            .provide {
+                arrayOf(
+                    LocalScrollbarStyle provides quietScrollbarStyle(dark),
+                    LocalMenuStyle provides shellMenuStyle(dark, shell),
+                )
+            },
         swingCompatMode = false,
     ) {
         val editor = remember(dark) { EditorPalette.of(dark) }
-        val shell = remember(dark) { ShellPalette.of(dark) }
         CompositionLocalProvider(
             LocalEditorPalette provides editor,
             LocalShellPalette provides shell,
             content = content,
         )
     }
+}
+
+/**
+ * A scrollbar that stays out of the way.
+ *
+ * Jewel ships two shapes: an always-visible bar with a track, and an overlay thumb that fades in
+ * while scrolling and fades out afterwards. The overlay is the one an IDE wants. A bright, chunky
+ * scrollbar down the edge of every panel is among the loudest things a dense UI can carry, and it
+ * carries no information — the thumb's position is the only part anybody reads.
+ */
+@Composable
+private fun quietScrollbarStyle(dark: Boolean): ScrollbarStyle =
+    if (dark) ScrollbarStyle.macOsDark() else ScrollbarStyle.macOsLight()
+
+/**
+ * Popup menus drawn from the same palette and type scale as the window behind them.
+ *
+ * A menu that does not match the shell is the fastest way to make a carefully-built window look
+ * assembled from parts, and it is the part users see least often and notice most.
+ */
+@Composable
+private fun shellMenuStyle(dark: Boolean, shell: ShellPalette): MenuStyle {
+    val base = if (dark) MenuStyle.dark() else MenuStyle.light()
+    return MenuStyle(
+        isDark = dark,
+        colors = MenuColors(
+            background = shell.popupBackground,
+            border = shell.popupBorder,
+            shadow = base.colors.shadow,
+            itemColors = base.colors.itemColors,
+        ),
+        metrics = MenuMetrics(
+            cornerSize = CornerSize(Tokens.Radius.Popup),
+            menuMargin = base.metrics.menuMargin,
+            contentPadding = PaddingValues(vertical = Tokens.Spacing.Tiny),
+            offset = base.metrics.offset,
+            shadowSize = base.metrics.shadowSize,
+            borderWidth = 1.dp,
+            itemMetrics = base.metrics.itemMetrics,
+            submenuMetrics = base.metrics.submenuMetrics,
+        ),
+        icons = base.icons,
+    )
 }

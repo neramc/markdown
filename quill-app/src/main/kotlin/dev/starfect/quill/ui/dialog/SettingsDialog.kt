@@ -31,11 +31,12 @@ import dev.starfect.quill.QuillController
 import dev.starfect.quill.model.QuillSettings
 import dev.starfect.quill.model.ViewMode
 import dev.starfect.quill.model.WorkspaceState
-import dev.starfect.quill.ui.theme.IdeaMetrics
+import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalShellPalette
+import dev.starfect.quill.ui.theme.ShellDivider
+import dev.starfect.quill.ui.theme.interactiveSurface
 import org.jetbrains.jewel.ui.Orientation
 import org.jetbrains.jewel.ui.component.CheckboxRow
-import org.jetbrains.jewel.ui.component.Divider
 import org.jetbrains.jewel.ui.component.GroupHeader
 import org.jetbrains.jewel.ui.component.ListComboBox
 import org.jetbrains.jewel.ui.component.RadioButtonRow
@@ -75,7 +76,7 @@ public fun SettingsDialog(controller: QuillController, workspace: WorkspaceState
     ) {
         Row(Modifier.fillMaxSize()) {
             CategoryList(page) { page = it }
-            Divider(Orientation.Vertical, color = LocalShellPalette.current.border)
+            ShellDivider(Orientation.Vertical)
 
             Column(
                 Modifier.weight(1f).fillMaxHeight()
@@ -99,30 +100,23 @@ private fun CategoryList(selected: SettingsPage, onSelect: (SettingsPage) -> Uni
     val shell = LocalShellPalette.current
 
     Column(
-        Modifier.width(IdeaMetrics.DialogListWidth).fillMaxHeight()
-            .background(shell.toolWindowBackground)
-            .padding(vertical = 6.dp)
+        Modifier.width(Tokens.DialogListWidth).fillMaxHeight()
+            .background(shell.panelSecondary)
+            .padding(vertical = Tokens.Spacing.Tiny)
     ) {
         SettingsPage.entries.forEach { entry ->
-            val interaction = remember { MutableInteractionSource() }
-            val hovered by interaction.collectIsHoveredAsState()
-
             Row(
                 Modifier.fillMaxWidth()
-                    .height(IdeaMetrics.TreeRowHeight)
-                    .background(
-                        when {
-                            entry == selected -> shell.selectionBackground
-                            hovered -> shell.hoverBackground
-                            else -> Color.Transparent
-                        }
+                    .height(Tokens.TreeRowHeight)
+                    .interactiveSurface(
+                        onClick = { onSelect(entry) },
+                        palette = shell,
+                        selected = entry == selected,
                     )
-                    .hoverable(interaction)
-                    .clickable(interactionSource = interaction, indication = null) { onSelect(entry) }
-                    .padding(horizontal = 14.dp),
+                    .padding(horizontal = Tokens.Spacing.Medium),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(entry.title, color = shell.text, fontSize = IdeaMetrics.UiFontSize)
+                Text(entry.title, color = shell.text, fontSize = Tokens.FontSize)
             }
         }
     }
@@ -241,7 +235,7 @@ private fun InspectionsPage(settings: QuillSettings, onChange: (QuillSettings) -
             "a language. They are worth having on a document you are writing and worth turning " +
             "off on one you have imported.",
         color = shell.mutedText,
-        fontSize = IdeaMetrics.SmallFontSize,
+        fontSize = Tokens.SmallFontSize,
     )
 
     Spacer(Modifier.height(12.dp))
@@ -249,8 +243,8 @@ private fun InspectionsPage(settings: QuillSettings, onChange: (QuillSettings) -
     Column(Modifier.padding(top = 4.dp)) {
         INSPECTION_DESCRIPTIONS.forEach { (title, description) ->
             Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
-                Text(title, color = shell.text, fontSize = IdeaMetrics.SmallFontSize, modifier = Modifier.width(230.dp))
-                Text(description, color = shell.mutedText, fontSize = IdeaMetrics.SmallFontSize)
+                Text(title, color = shell.text, fontSize = Tokens.SmallFontSize, modifier = Modifier.width(230.dp))
+                Text(description, color = shell.mutedText, fontSize = Tokens.SmallFontSize)
             }
         }
     }

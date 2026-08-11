@@ -27,15 +27,16 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.starfect.quill.ui.icons.IdeIcons
 import dev.starfect.quill.ui.shell.IdeActionButton
-import dev.starfect.quill.ui.theme.IdeaMetrics
+import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalShellPalette
+import dev.starfect.quill.ui.theme.ShellDivider
 import org.jetbrains.jewel.ui.Orientation
 import org.jetbrains.jewel.ui.component.DefaultButton
-import org.jetbrains.jewel.ui.component.Divider
 import org.jetbrains.jewel.ui.component.OutlinedButton
 import org.jetbrains.jewel.ui.component.Text
 
@@ -91,27 +92,27 @@ public fun IdeDialog(
 
         Column(
             Modifier.width(width).height(height)
-                .clip(RoundedCornerShape(IdeaMetrics.DialogCorner))
+                .clip(RoundedCornerShape(Tokens.Radius.Popup))
                 .background(shell.popupBackground)
-                .border(1.dp, shell.popupBorder, RoundedCornerShape(IdeaMetrics.DialogCorner))
+                .border(1.dp, shell.popupBorder, RoundedCornerShape(Tokens.Radius.Popup))
                 // Swallow clicks so they do not reach the scrim and dismiss the dialog.
                 .clickable(interactionSource = panelInteraction, indication = null) {}
         ) {
             DialogTitleBar(title, onDismiss)
-            Divider(Orientation.Horizontal, color = shell.border)
+            ShellDivider(Orientation.Horizontal)
 
             Box(Modifier.weight(1f).fillMaxWidth()) { content() }
 
-            Divider(Orientation.Horizontal, color = shell.border)
+            ShellDivider(Orientation.Horizontal)
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 11.dp),
+                Modifier.fillMaxWidth().padding(horizontal = Tokens.Spacing.Medium, vertical = Tokens.Spacing.Medium),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.End,
             ) {
                 extraButtons()
                 Spacer(Modifier.weight(1f))
                 OutlinedButton(onClick = onDismiss) { Text("Cancel") }
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(Tokens.Spacing.Small))
                 DefaultButton(onClick = { onConfirm?.invoke() ?: onDismiss() }) { Text(confirmLabel) }
             }
         }
@@ -123,13 +124,13 @@ private fun DialogTitleBar(title: String, onDismiss: () -> Unit) {
     val shell = LocalShellPalette.current
 
     Row(
-        Modifier.fillMaxWidth().height(IdeaMetrics.DialogTitleHeight).padding(start = 14.dp, end = 7.dp),
+        Modifier.fillMaxWidth().height(Tokens.DialogTitleHeight).padding(start = Tokens.Spacing.Medium, end = Tokens.Spacing.Tiny),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, color = shell.text, fontSize = IdeaMetrics.UiFontSize)
+        Text(title, color = shell.text, fontSize = Tokens.FontSize, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.weight(1f))
-        IdeActionButton(onClick = onDismiss, tooltip = "Close", size = 24.dp) { tint ->
-            IdeIcons.Close(tint, size = 14.dp)
+        IdeActionButton(onClick = onDismiss, tooltip = "Close", size = Tokens.ControlSize) { tint ->
+            IdeIcons.Close(tint, size = Tokens.IconSize)
         }
     }
 }
@@ -150,13 +151,13 @@ public fun FormRow(
     val shell = LocalShellPalette.current
 
     Row(
-        modifier.fillMaxWidth().padding(vertical = 5.dp),
+        modifier.fillMaxWidth().padding(vertical = Tokens.Spacing.Tiny),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = label,
-            color = shell.text,
-            fontSize = IdeaMetrics.UiFontSize,
+            color = shell.secondaryText,
+            fontSize = Tokens.FontSize,
             modifier = Modifier.width(labelWidth),
         )
         Box(Modifier.weight(1f)) { content() }
@@ -166,7 +167,7 @@ public fun FormRow(
 /** A form row with no label, indented to line up with the controls above it. */
 @Composable
 public fun FormIndent(labelWidth: Dp = 150.dp, content: @Composable () -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().padding(vertical = Tokens.Spacing.Tiny), verticalAlignment = Alignment.CenterVertically) {
         Spacer(Modifier.width(labelWidth))
         Box(Modifier.weight(1f)) { content() }
     }
@@ -183,26 +184,26 @@ public fun ListToolbar(
     val shell = LocalShellPalette.current
 
     Row(
-        Modifier.fillMaxWidth().height(IdeaMetrics.ToolWindowHeaderHeight).padding(horizontal = 4.dp),
+        Modifier.fillMaxWidth().height(Tokens.ToolWindowHeaderHeight).padding(horizontal = Tokens.Spacing.Tiny),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(1.dp),
     ) {
-        IdeActionButton(onClick = onAdd, tooltip = addTooltip, size = 24.dp) { tint ->
-            IdeIcons.Plus(tint, size = 15.dp)
+        IdeActionButton(onClick = onAdd, tooltip = addTooltip, size = Tokens.ControlSize) { tint ->
+            IdeIcons.Plus(tint, size = Tokens.IconSize)
         }
         IdeActionButton(
             onClick = { onRemove?.invoke() },
             tooltip = "Remove",
             enabled = onRemove != null,
-            size = 24.dp,
+            size = Tokens.ControlSize,
         ) { tint ->
-            Box(Modifier.size(15.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(Tokens.IconSize), contentAlignment = Alignment.Center) {
                 Box(Modifier.width(9.dp).height(1.5.dp).background(tint))
             }
         }
         if (onCopy != null) {
-            IdeActionButton(onClick = onCopy, tooltip = "Copy", size = 24.dp) { tint ->
-                IdeIcons.Copy(tint, size = 14.dp)
+            IdeActionButton(onClick = onCopy, tooltip = "Copy", size = Tokens.ControlSize) { tint ->
+                IdeIcons.Copy(tint, size = Tokens.IconSize)
             }
         }
     }

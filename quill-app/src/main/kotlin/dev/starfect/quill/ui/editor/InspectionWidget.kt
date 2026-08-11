@@ -29,8 +29,9 @@ import dev.starfect.quill.model.DocumentSession
 import dev.starfect.quill.model.ToolWindow
 import dev.starfect.quill.ui.icons.IdeIcons
 import dev.starfect.quill.ui.shell.IdeActionButton
-import dev.starfect.quill.ui.theme.IdeaMetrics
+import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalShellPalette
+import dev.starfect.quill.ui.theme.interactiveSurface
 import dev.starfect.quill.ui.theme.ShellPalette
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.Tooltip
@@ -56,7 +57,7 @@ public fun InspectionWidget(
     val findings = document.findings
 
     Row(
-        modifier = modifier.height(IdeaMetrics.ActionButtonSize),
+        modifier = modifier.height(Tokens.ControlSize),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(1.dp),
     ) {
@@ -90,17 +91,15 @@ public fun InspectionWidget(
  */
 @Composable
 private fun SummaryChip(summary: InspectionSummary, shell: ShellPalette, onClick: () -> Unit) {
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
-
     Tooltip(tooltip = { Text(summaryTooltip(summary)) }) {
         Row(
-            modifier = Modifier.height(22.dp)
-                .clip(RoundedCornerShape(IdeaMetrics.ActionButtonCorner))
-                .background(if (hovered) shell.hoverBackground else Color.Transparent)
-                .hoverable(interaction)
-                .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-                .padding(horizontal = 6.dp),
+            modifier = Modifier.height(Tokens.SmallControlSize)
+                .interactiveSurface(
+                    onClick = onClick,
+                    palette = shell,
+                    cornerRadius = Tokens.Radius.Control,
+                )
+                .padding(horizontal = Tokens.Spacing.Tiny),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (summary.total == 0) {
@@ -123,7 +122,7 @@ private fun Count(count: Int, severity: Severity, shell: ShellPalette) {
     Text(
         text = count.toString(),
         color = shell.text,
-        fontSize = IdeaMetrics.TinyFontSize,
+        fontSize = Tokens.TinyFontSize,
     )
     Spacer(Modifier.width(6.dp))
 }

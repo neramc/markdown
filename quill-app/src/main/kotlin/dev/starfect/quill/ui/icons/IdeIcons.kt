@@ -16,7 +16,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import dev.starfect.quill.ui.theme.IdeaMetrics
+import dev.starfect.quill.ui.theme.Tokens
 
 /**
  * The icon set, drawn as vectors rather than loaded as resources.
@@ -38,7 +38,7 @@ public object IdeIcons {
 
     /** The New UI main menu button. */
     @Composable
-    public fun Hamburger(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.IconSize) {
+    public fun Hamburger(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
         IdeIcon(size, modifier) { unit ->
             for (y in intArrayOf(4, 8, 12)) {
                 line(3f, y.toFloat(), 13f, y.toFloat(), tint, unit)
@@ -48,7 +48,7 @@ public object IdeIcons {
 
     /** Search Everywhere. */
     @Composable
-    public fun Search(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.IconSize) {
+    public fun Search(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
         IdeIcon(size, modifier) { unit ->
             circle(7f, 7f, 4.2f, tint, unit)
             line(10.2f, 10.2f, 13.5f, 13.5f, tint, unit)
@@ -57,7 +57,7 @@ public object IdeIcons {
 
     /** Settings. */
     @Composable
-    public fun Gear(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.IconSize) {
+    public fun Gear(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
         IdeIcon(size, modifier) { unit ->
             circle(8f, 8f, 2.4f, tint, unit)
             // Eight teeth, which is what reads as a gear at 16px without becoming mush.
@@ -72,7 +72,7 @@ public object IdeIcons {
 
     /** Close, used on tabs and in the find bar. */
     @Composable
-    public fun Close(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.IconSize) {
+    public fun Close(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
         IdeIcon(size, modifier) { unit ->
             line(4.5f, 4.5f, 11.5f, 11.5f, tint, unit)
             line(11.5f, 4.5f, 4.5f, 11.5f, tint, unit)
@@ -90,7 +90,7 @@ public object IdeIcons {
         tint: Color,
         towardsLeft: Boolean,
         modifier: Modifier = Modifier,
-        size: Dp = IdeaMetrics.IconSize,
+        size: Dp = Tokens.IconSize,
     ) {
         IdeIcon(size, modifier) { unit ->
             if (towardsLeft) {
@@ -105,7 +105,7 @@ public object IdeIcons {
 
     /** A generic action, for rows in Search Everywhere that have no icon of their own. */
     @Composable
-    public fun Action(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.IconSize) {
+    public fun Action(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
         IdeIcon(size, modifier) { unit ->
             polyline(listOf(9f to 2f, 4.5f to 8.8f, 7.6f to 8.8f, 7f to 14f, 11.5f to 7.2f, 8.4f to 7.2f), tint, unit)
         }
@@ -113,7 +113,7 @@ public object IdeIcons {
 
     /** Editing actions. */
     @Composable
-    public fun Pencil(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.IconSize) {
+    public fun Pencil(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
         IdeIcon(size, modifier) { unit ->
             polyline(listOf(3f to 13f, 3.8f to 10.2f, 10.6f to 3.4f, 12.6f to 5.4f, 5.8f to 12.2f, 3f to 13f), tint, unit)
             line(9.2f, 4.8f, 11.2f, 6.8f, tint, unit)
@@ -130,7 +130,7 @@ public object IdeIcons {
 
     /** The VCS widget's branch glyph: two nodes joined by a fork. */
     @Composable
-    public fun Branch(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.IconSize) {
+    public fun Branch(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
         IdeIcon(size, modifier) { unit ->
             circle(4.5f, 3.6f, 1.7f, tint, unit)
             circle(4.5f, 12.4f, 1.7f, tint, unit)
@@ -144,7 +144,7 @@ public object IdeIcons {
 
     /** The overflow menu the IDE puts at the end of a toolbar or tab strip. */
     @Composable
-    public fun MoreVertical(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.IconSize) {
+    public fun MoreVertical(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
         IdeIcon(size, modifier) { unit ->
             for (y in intArrayOf(4, 8, 12)) {
                 drawCircle(tint, 0.85f * unit, Offset(8f * unit, y * unit))
@@ -170,7 +170,7 @@ public object IdeIcons {
 
     /** Collapsed disclosure triangle. */
     @Composable
-    public fun ChevronRight(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.IconSize) {
+    public fun ChevronRight(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
         IdeIcon(size, modifier) { unit ->
             polyline(listOf(6.5f to 4.5f, 10f to 8f, 6.5f to 11.5f), tint, unit)
         }
@@ -178,7 +178,7 @@ public object IdeIcons {
 
     /** Expanded disclosure triangle. */
     @Composable
-    public fun ChevronDown(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.IconSize) {
+    public fun ChevronDown(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
         IdeIcon(size, modifier) { unit ->
             polyline(listOf(4.5f to 6.5f, 8f to 10f, 11.5f to 6.5f), tint, unit)
         }
@@ -196,7 +196,7 @@ public object IdeIcons {
     public fun Folder(
         tint: Color,
         modifier: Modifier = Modifier,
-        size: Dp = IdeaMetrics.IconSize,
+        size: Dp = Tokens.IconSize,
         open: Boolean = false,
     ) {
         IdeIcon(size, modifier) { unit ->
@@ -232,7 +232,7 @@ public object IdeIcons {
         tint: Color,
         accent: Color,
         modifier: Modifier = Modifier,
-        size: Dp = IdeaMetrics.IconSize,
+        size: Dp = Tokens.IconSize,
     ) {
         IdeIcon(size, modifier) { unit ->
             val body = Path().apply {
@@ -251,7 +251,7 @@ public object IdeIcons {
 
     /** The module root: the square the IDE puts at the top of the project tree. */
     @Composable
-    public fun Module(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.IconSize) {
+    public fun Module(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
         IdeIcon(size, modifier) { unit ->
             rect(2.5f, 2.5f, 13.5f, 13.5f, tint, unit)
             line(2.5f, 6.2f, 13.5f, 6.2f, tint, unit)
@@ -260,7 +260,7 @@ public object IdeIcons {
 
     /** A file with no type of its own. */
     @Composable
-    public fun PlainFile(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.IconSize) {
+    public fun PlainFile(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
         IdeIcon(size, modifier) { unit ->
             val page = Path().apply {
                 moveTo(3.5f * unit, 1.8f * unit)
@@ -305,7 +305,7 @@ public object IdeIcons {
         tint: Color,
         accent: Color,
         modifier: Modifier = Modifier,
-        size: Dp = IdeaMetrics.IconSize,
+        size: Dp = Tokens.IconSize,
     ) {
         IdeIcon(size, modifier) { unit ->
             val page = Path().apply {
@@ -328,7 +328,7 @@ public object IdeIcons {
 
     /** The Project tool window's stripe icon. */
     @Composable
-    public fun ProjectStripe(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.StripeIconSize) {
+    public fun ProjectStripe(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
         IdeIcon(size, modifier) { unit ->
             rect(2f, 3f, 14f, 13.5f, tint, unit)
             line(6.5f, 3f, 6.5f, 13.5f, tint, unit)
@@ -337,7 +337,7 @@ public object IdeIcons {
 
     /** The Structure tool window's stripe icon: nested, staggered rows. */
     @Composable
-    public fun StructureStripe(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.StripeIconSize) {
+    public fun StructureStripe(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
         IdeIcon(size, modifier) { unit ->
             line(3f, 4f, 13f, 4f, tint, unit)
             line(6f, 8f, 13f, 8f, tint, unit)
@@ -349,7 +349,7 @@ public object IdeIcons {
 
     /** The Problems tool window's stripe icon: a triangle with a bang. */
     @Composable
-    public fun ProblemsStripe(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.StripeIconSize) {
+    public fun ProblemsStripe(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
         IdeIcon(size, modifier) { unit ->
             polyline(listOf(8f to 2.5f, 14f to 13f, 2f to 13f, 8f to 2.5f), tint, unit)
             line(8f, 6.5f, 8f, 9.5f, tint, unit)
@@ -359,7 +359,7 @@ public object IdeIcons {
 
     /** The Notifications tool window's stripe icon: a bell. */
     @Composable
-    public fun NotificationsStripe(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.StripeIconSize) {
+    public fun NotificationsStripe(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
         IdeIcon(size, modifier) { unit ->
             polyline(
                 listOf(
@@ -381,7 +381,7 @@ public object IdeIcons {
 
     /** The Database tool window's stripe icon: the stacked-cylinder glyph. */
     @Composable
-    public fun DatabaseStripe(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.StripeIconSize) {
+    public fun DatabaseStripe(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
         IdeIcon(size, modifier) { unit ->
             // Three ellipses stacked, with the sides joining the top and bottom ones.
             ellipse(8f, 4f, 5f, 2f, tint, unit)
@@ -394,7 +394,7 @@ public object IdeIcons {
 
     /** The Terminal tool window's stripe icon: a prompt caret. */
     @Composable
-    public fun TerminalStripe(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.StripeIconSize) {
+    public fun TerminalStripe(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
         IdeIcon(size, modifier) { unit ->
             rect(2f, 3f, 14f, 13f, tint, unit)
             polyline(listOf(4.5f to 6.5f, 7f to 8.5f, 4.5f to 10.5f), tint, unit)
@@ -448,7 +448,7 @@ public object IdeIcons {
 
     /** Duplicate: two offset sheets. */
     @Composable
-    public fun Copy(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.IconSize) {
+    public fun Copy(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
         IdeIcon(size, modifier) { unit ->
             rect(5.5f, 2.5f, 13.5f, 10.5f, tint, unit)
             polyline(listOf(10.5f to 13.5f, 2.5f to 13.5f, 2.5f to 5.5f), tint, unit)
@@ -459,7 +459,7 @@ public object IdeIcons {
 
     /** The green run triangle. */
     @Composable
-    public fun Run(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.IconSize) {
+    public fun Run(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
         IdeIcon(size, modifier) { unit ->
             val path = Path().apply {
                 moveTo(4.5f * unit, 3f * unit)
@@ -473,7 +473,7 @@ public object IdeIcons {
 
     /** The debug bug. */
     @Composable
-    public fun Debug(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.IconSize) {
+    public fun Debug(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
         IdeIcon(size, modifier) { unit ->
             circle(8f, 8.5f, 3.6f, tint, unit)
             line(3f, 6f, 4.6f, 6.8f, tint, unit)
@@ -488,19 +488,19 @@ public object IdeIcons {
 
     /** Show the source only: a pane filled on the left. */
     @Composable
-    public fun ViewEditorOnly(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.IconSize) {
+    public fun ViewEditorOnly(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
         SplitGlyph(tint, modifier, size, left = true, right = false)
     }
 
     /** Show source and preview side by side. */
     @Composable
-    public fun ViewSplit(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.IconSize) {
+    public fun ViewSplit(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
         SplitGlyph(tint, modifier, size, left = true, right = true)
     }
 
     /** Show the rendered preview only. */
     @Composable
-    public fun ViewPreviewOnly(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.IconSize) {
+    public fun ViewPreviewOnly(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
         SplitGlyph(tint, modifier, size, left = false, right = true)
     }
 
@@ -522,7 +522,7 @@ public object IdeIcons {
 
     /** Step to the previous match. */
     @Composable
-    public fun ArrowUp(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.IconSize) {
+    public fun ArrowUp(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
         IdeIcon(size, modifier) { unit ->
             polyline(listOf(4.5f to 9.5f, 8f to 6f, 11.5f to 9.5f), tint, unit)
         }
@@ -530,7 +530,7 @@ public object IdeIcons {
 
     /** Step to the next match. */
     @Composable
-    public fun ArrowDown(tint: Color, modifier: Modifier = Modifier, size: Dp = IdeaMetrics.IconSize) {
+    public fun ArrowDown(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
         IdeIcon(size, modifier) { unit ->
             polyline(listOf(4.5f to 6.5f, 8f to 10f, 11.5f to 6.5f), tint, unit)
         }
@@ -542,7 +542,7 @@ public object IdeIcons {
         tint: Color,
         expanded: Boolean,
         modifier: Modifier = Modifier,
-        size: Dp = IdeaMetrics.IconSize,
+        size: Dp = Tokens.IconSize,
     ) {
         if (expanded) ChevronDown(tint, modifier, size) else ChevronRight(tint, modifier, size)
     }

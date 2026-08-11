@@ -23,20 +23,22 @@ import dev.starfect.quill.model.DocumentSession
 import dev.starfect.quill.model.ToolWindow
 import dev.starfect.quill.model.WorkspaceState
 import dev.starfect.quill.ui.icons.IdeIcons
-import dev.starfect.quill.ui.theme.IdeaMetrics
+import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalShellPalette
+import dev.starfect.quill.ui.theme.ShellDivider
 import java.nio.file.Path
 import org.jetbrains.jewel.ui.Orientation
-import org.jetbrains.jewel.ui.component.Divider
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.Tooltip
 
 /**
  * A tool window stripe: the narrow icon rail down each edge of the window.
  *
- * The New UI replaced the old rotated text labels with icon buttons, and the difference is not
- * cosmetic — a 40dp rail of icons and a rail of sideways words read as two different products. The
- * name survives as the tooltip, which is where the IDE puts it.
+ * A rail of icon buttons rather than rotated text labels, at 32dp wide with 32dp square buttons, so
+ * a button fills the rail edge to edge. The name survives as the tooltip.
+ *
+ * This is secondary navigation and is drawn like it: no enlarged icons, no filled background, and
+ * only the selected state carries any weight at all.
  */
 @Composable
 public fun ToolWindowStripe(
@@ -50,11 +52,11 @@ public fun ToolWindowStripe(
 ) {
     val shell = LocalShellPalette.current
     Column(
-        modifier = modifier.width(IdeaMetrics.StripeWidth).fillMaxHeight()
+        modifier = modifier.width(Tokens.ToolWindowBarWidth).fillMaxHeight()
             .background(shell.toolWindowBackground)
-            .padding(vertical = 5.dp),
+            .padding(vertical = Tokens.Spacing.Tiny),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         tools.forEach { tool ->
             StripeButton(tool, selected = tool == active) { onSelect(tool) }
@@ -77,7 +79,7 @@ private fun StripeButton(tool: ToolWindow, selected: Boolean, onClick: () -> Uni
         onClick = onClick,
         tooltip = tool.label,
         selected = selected,
-        size = IdeaMetrics.StripeButtonSize,
+        size = Tokens.ToolWindowBarButton,
     ) { tint ->
         ToolWindowIcon(tool, tint)
     }
@@ -114,44 +116,45 @@ public fun ToolWindowHeader(
     val shell = LocalShellPalette.current
     Column {
         Row(
-            modifier = Modifier.fillMaxWidth().height(IdeaMetrics.ToolWindowHeaderHeight)
-                .padding(start = 12.dp, end = 5.dp),
+            modifier = Modifier.fillMaxWidth().height(Tokens.ToolWindowHeaderHeight)
+                .padding(start = Tokens.Spacing.Medium, end = Tokens.Spacing.Tiny),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = title,
-                    fontSize = IdeaMetrics.SmallFontSize,
+                    fontSize = Tokens.FontSize,
                     color = shell.text,
                     maxLines = 1,
                 )
-                Box(Modifier.padding(start = 4.dp)) { IdeIcons.WidgetChevron(shell.mutedText, size = 9.dp) }
+                Box(Modifier.padding(start = Tokens.Spacing.Tiny)) {
+                    IdeIcons.WidgetChevron(shell.mutedIcon, size = Tokens.SmallIconSize)
+                }
             }
 
             actions()
 
-            IdeActionButton(onClick = {}, tooltip = "Options", size = 22.dp) { tint ->
-                IdeIcons.MoreVertical(tint, size = 14.dp)
+            IdeActionButton(onClick = {}, tooltip = "Options", size = Tokens.SmallControlSize) { tint ->
+                IdeIcons.MoreVertical(tint, size = Tokens.SmallIconSize)
             }
 
             if (onHide != null) {
-                IdeActionButton(onClick = onHide, tooltip = "Hide", size = 22.dp) { tint ->
-                    IdeIcons.Hide(tint, towardsLeft = hidesTowardsLeft, size = 14.dp)
+                IdeActionButton(onClick = onHide, tooltip = "Hide", size = Tokens.SmallControlSize) { tint ->
+                    IdeIcons.Hide(tint, towardsLeft = hidesTowardsLeft, size = Tokens.SmallIconSize)
                 }
             }
         }
-        Divider(Orientation.Horizontal, color = shell.border)
+        ShellDivider(Orientation.Horizontal)
     }
 }
 
 /**
  * The status bar.
  *
- * Its left half is the navigation breadcrumb — project, folders, file, enclosing heading — which is
- * where IntelliJ puts it, not floating above the editor. The right half is the run of widgets the
- * IDE keeps there: caret position, then document facts, then the line separator, encoding and
- * read-only state. Every one of them is a hover target with a tooltip, because in the IDE every one
- * of them is clickable.
+ * Context on the left — project, folders, file, enclosing heading — and status on the right: caret
+ * position, document facts, line separator, encoding, read-only state. Both halves are set in the
+ * metadata size and the muted colour, because this is not the part of the window anyone is meant to
+ * be looking at. It is information to read when it is wanted, and quiet the rest of the time.
  */
 @Composable
 public fun StatusBar(controller: QuillController, workspace: WorkspaceState) {
@@ -159,11 +162,11 @@ public fun StatusBar(controller: QuillController, workspace: WorkspaceState) {
     val document = workspace.activeDocument
 
     Column {
-        Divider(Orientation.Horizontal, color = shell.border)
+        ShellDivider(Orientation.Horizontal)
         Row(
-            modifier = Modifier.fillMaxWidth().height(IdeaMetrics.StatusBarHeight)
+            modifier = Modifier.fillMaxWidth().height(Tokens.StatusBarHeight)
                 .background(shell.statusBarBackground)
-                .padding(start = 6.dp, end = 8.dp),
+                .padding(start = Tokens.Spacing.Small, end = Tokens.Spacing.Small),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(Modifier.weight(1f)) {
@@ -190,9 +193,12 @@ public fun StatusBar(controller: QuillController, workspace: WorkspaceState) {
                 StatusItem("UTF-8", "File encoding")
                 StatusItem("Markdown", "File type")
 
-                Spacer(Modifier.width(2.dp))
-                IdeActionButton(onClick = {}, tooltip = "The file is writable", size = 22.dp) { tint ->
-                    IdeIcons.Lock(tint, locked = false)
+                IdeActionButton(
+                    onClick = {},
+                    tooltip = "The file is writable",
+                    size = Tokens.SmallControlSize,
+                ) { tint ->
+                    IdeIcons.Lock(tint, locked = false, size = Tokens.SmallIconSize)
                 }
             }
         }
@@ -218,24 +224,26 @@ private fun Breadcrumbs(controller: QuillController, workspace: WorkspaceState) 
         crumbs.forEachIndexed { index, crumb ->
             if (index > 0) {
                 Box(Modifier.padding(horizontal = 1.dp)) {
-                    IdeIcons.ChevronRight(shell.mutedText, size = 10.dp)
+                    IdeIcons.ChevronRight(shell.mutedIcon, size = Tokens.SmallIconSize)
                 }
             }
 
             IdeWidgetButton(onClick = { crumb.onClick(controller) }) {
                 when (crumb.kind) {
-                    CrumbKind.PROJECT -> IdeIcons.Module(shell.icon, size = 13.dp)
-                    CrumbKind.FOLDER -> IdeIcons.Folder(shell.folderIcon, size = 13.dp)
-                    CrumbKind.FILE -> IdeIcons.MarkdownFile(shell.icon, shell.accent, size = 13.dp)
+                    CrumbKind.PROJECT -> IdeIcons.Module(shell.mutedIcon, size = Tokens.SmallIconSize)
+                    CrumbKind.FOLDER -> IdeIcons.Folder(shell.mutedIcon, size = Tokens.SmallIconSize)
+                    CrumbKind.FILE -> IdeIcons.MarkdownFile(shell.mutedIcon, shell.accent, size = Tokens.SmallIconSize)
                     CrumbKind.HEADING -> Unit
                 }
                 Text(
                     text = crumb.label,
-                    fontSize = IdeaMetrics.TinyFontSize,
+                    fontSize = Tokens.TinyFontSize,
                     color = shell.mutedText,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(start = if (crumb.kind == CrumbKind.HEADING) 0.dp else 4.dp),
+                    modifier = Modifier.padding(
+                        start = if (crumb.kind == CrumbKind.HEADING) 0.dp else Tokens.Spacing.Tiny,
+                    ),
                 )
             }
         }
@@ -278,7 +286,7 @@ private fun buildCrumbs(projectRoot: Path?, document: DocumentSession): List<Cru
 @Composable
 private fun StatusMessage(message: String, color: Color, onDismiss: () -> Unit) {
     IdeWidgetButton(onClick = onDismiss) {
-        Text(message, fontSize = IdeaMetrics.TinyFontSize, color = color, maxLines = 1)
+        Text(message, fontSize = Tokens.TinyFontSize, color = color, maxLines = 1)
     }
 }
 
@@ -289,7 +297,7 @@ private fun StatusItem(label: String, tooltip: String, modifier: Modifier = Modi
         IdeWidgetButton(onClick = {}, modifier = modifier) {
             Text(
                 label,
-                fontSize = IdeaMetrics.TinyFontSize,
+                fontSize = Tokens.TinyFontSize,
                 color = LocalShellPalette.current.mutedText,
                 maxLines = 1,
             )

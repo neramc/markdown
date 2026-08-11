@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -44,7 +44,7 @@ import dev.starfect.quill.bridge.wire.StyleSpan
 import dev.starfect.quill.model.DocumentSession
 import dev.starfect.quill.model.WorkspaceState
 import dev.starfect.quill.ui.theme.EditorPalette
-import dev.starfect.quill.ui.theme.IdeaMetrics
+import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalEditorPalette
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.component.TextArea
@@ -85,6 +85,9 @@ public fun SourceEditor(
     // and the numbers drifted out of step with the text the moment a line wrapped.
     var layout by remember(document.id) { mutableStateOf<TextLayoutResult?>(null) }
 
+    // How many logical lines there are, which is what the gutter has to be wide enough to number.
+    val lineCount = remember(document.text.text) { document.text.text.count { it == '\n' } + 1 }
+
     // The advance of one character in the editor's font, which is what a column-based right margin
     // has to be measured in. Monospace is assumed because the editor font is; a proportional font
     // has no column to draw a guide at.
@@ -100,6 +103,7 @@ public fun SourceEditor(
                     LineGutter(
                         layout = layout,
                         caretOffset = document.caretPosition.offset,
+                        lineCount = lineCount,
                         palette = palette,
                         textStyle = textStyle,
                     )
@@ -118,7 +122,12 @@ public fun SourceEditor(
                         .insertSpacesForTab(settings.tabWidth, document.text) { updated ->
                             controller.onTextChanged(document.id, updated)
                         }
-                        .padding(start = 6.dp, end = 12.dp, top = EditorTopPadding, bottom = 24.dp),
+                        .padding(
+                            start = Tokens.Spacing.Tiny,
+                            end = Tokens.Spacing.Medium,
+                            top = EditorTopPadding,
+                            bottom = Tokens.Spacing.XXLarge,
+                        ),
                     undecorated = true,
                     visualTransformation = transformation,
                     onTextLayout = { result -> layout = result },
@@ -184,7 +193,7 @@ private fun Modifier.rightMargin(
 ): Modifier {
     if (column <= 0 || characterWidth <= 0f) return this
     return drawBehind {
-        val x = 6.dp.toPx() + column * characterWidth
+        val x = Tokens.Spacing.Tiny.toPx() + column * characterWidth
         if (x < size.width) {
             drawLine(palette.rightMargin, Offset(x, 0f), Offset(x, size.height), strokeWidth = 1f)
         }
@@ -224,6 +233,7 @@ private fun Modifier.caretRow(
 private fun LineGutter(
     layout: TextLayoutResult?,
     caretOffset: Int,
+    lineCount: Int,
     palette: EditorPalette,
     textStyle: TextStyle,
 ) {
@@ -234,8 +244,16 @@ private fun LineGutter(
         ((layout?.size?.height ?: 0) + EditorTopPadding.roundToPx()).toDp()
     }
 
+    // Sized from the widest number it will actually draw, not from a fixed guess. A fixed width is
+    // right until a document passes the digit count it was chosen for, and then the leading digit of
+    // every line number is quietly clipped — which is how this was wrong before.
+    val gutterWidth = with(density) {
+        val widest = measurer.measure(AnnotatedString("9".repeat(lineCount.toString().length)), textStyle)
+        (widest.size.width.toDp() + GutterLeftInset + GutterRightInset).coerceAtLeast(Tokens.GutterMinWidth)
+    }
+
     Canvas(
-        Modifier.widthIn(min = IdeaMetrics.GutterMinWidth)
+        Modifier.width(gutterWidth)
             .height(gutterHeight)
             .background(palette.gutterBackground),
     ) {
@@ -243,6 +261,12 @@ private fun LineGutter(
         drawLineNumbers(result, caretOffset, palette, textStyle, measurer)
     }
 }
+
+/** Space between the panel edge and the leftmost digit a line number can reach. */
+private val GutterLeftInset = Tokens.Spacing.Small
+
+/** Space between the last digit and the text it numbers. */
+private val GutterRightInset = Tokens.Spacing.Small
 
 /** Draws one right-aligned number per logical line, at that line's first visual row. */
 private fun DrawScope.drawLineNumbers(
@@ -258,7 +282,7 @@ private fun DrawScope.drawLineNumbers(
     }.getOrNull()
 
     val topInset = EditorTopPadding.toPx()
-    val rightInset = 10.dp.toPx()
+    val rightInset = GutterRightInset.toPx()
 
     var lineNumber = 1
     var offset = 0

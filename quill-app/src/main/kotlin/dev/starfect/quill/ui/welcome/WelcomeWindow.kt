@@ -37,12 +37,12 @@ import androidx.compose.ui.unit.sp
 import dev.starfect.quill.io.RecentProject
 import dev.starfect.quill.ui.icons.IdeIcons
 import dev.starfect.quill.ui.shell.IdeActionButton
-import dev.starfect.quill.ui.theme.IdeaMetrics
+import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalShellPalette
+import dev.starfect.quill.ui.theme.ShellDivider
 import dev.starfect.quill.ui.theme.ShellPalette
 import java.nio.file.Path
 import org.jetbrains.jewel.ui.Orientation
-import org.jetbrains.jewel.ui.component.Divider
 import org.jetbrains.jewel.ui.component.Icon
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.TextField
@@ -91,7 +91,7 @@ public fun WelcomeContent(
 
     Row(modifier.fillMaxSize().background(shell.welcomeBackground)) {
         WelcomeRail(version, page, onSelect = { page = it }, onToggleTheme = onToggleTheme, darkTheme = darkTheme)
-        Divider(Orientation.Vertical, color = shell.border)
+        ShellDivider(Orientation.Vertical)
 
         Box(Modifier.weight(1f).fillMaxHeight()) {
             when (page) {
@@ -129,7 +129,7 @@ private fun WelcomeRail(
     val shell = LocalShellPalette.current
 
     Column(
-        modifier = Modifier.width(IdeaMetrics.WelcomeRailWidth).fillMaxHeight()
+        modifier = Modifier.width(Tokens.WelcomeRailWidth).fillMaxHeight()
             .background(shell.toolWindowBackground)
             .padding(horizontal = 12.dp, vertical = 16.dp),
     ) {
@@ -144,7 +144,7 @@ private fun WelcomeRail(
             )
             Column(Modifier.padding(start = 10.dp)) {
                 Text("Quill", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = shell.text)
-                Text(version, fontSize = IdeaMetrics.SmallFontSize, color = shell.mutedText)
+                Text(version, fontSize = Tokens.SmallFontSize, color = shell.mutedText)
             }
         }
 
@@ -182,7 +182,7 @@ private fun RailItem(title: String, selected: Boolean, onClick: () -> Unit) {
             .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, fontSize = IdeaMetrics.UiFontSize, color = shell.text, maxLines = 1)
+        Text(title, fontSize = Tokens.FontSize, color = shell.text, maxLines = 1)
     }
 }
 
@@ -204,13 +204,13 @@ private fun EmptyProjects(onNewDocument: () -> Unit, onBrowse: () -> Unit) {
         Text("Welcome to Quill", fontSize = 26.sp, fontWeight = FontWeight.SemiBold, color = shell.text)
         Text(
             text = "Create a document to start from scratch.",
-            fontSize = IdeaMetrics.UiFontSize,
+            fontSize = Tokens.FontSize,
             color = shell.mutedText,
             modifier = Modifier.padding(top = 12.dp),
         )
         Text(
             text = "Open a folder from disk to work on an existing set of notes.",
-            fontSize = IdeaMetrics.UiFontSize,
+            fontSize = Tokens.FontSize,
             color = shell.mutedText,
             modifier = Modifier.padding(top = 2.dp, bottom = 32.dp),
         )
@@ -247,7 +247,7 @@ private fun BigAction(
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
-            modifier = Modifier.size(IdeaMetrics.WelcomeActionSize)
+            modifier = Modifier.size(Tokens.WelcomeActionSize)
                 .clip(RoundedCornerShape(10.dp))
                 .background(if (hovered) shell.hoverBackground else Color.Transparent)
                 .border(1.dp, borderColor, RoundedCornerShape(10.dp))
@@ -259,7 +259,7 @@ private fun BigAction(
         }
         Text(
             text = label,
-            fontSize = IdeaMetrics.UiFontSize,
+            fontSize = Tokens.FontSize,
             color = shell.text,
             modifier = Modifier.padding(top = 10.dp),
         )
@@ -309,7 +309,7 @@ private fun RecentProjectsPane(
 
         if (projects.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("No projects match", color = shell.mutedText, fontSize = IdeaMetrics.SmallFontSize)
+                Text("No projects match", color = shell.mutedText, fontSize = Tokens.SmallFontSize)
             }
             return@Column
         }
@@ -333,7 +333,7 @@ private fun RecentProjectRow(
     val hovered by interaction.collectIsHoveredAsState()
 
     Row(
-        modifier = Modifier.fillMaxWidth().height(IdeaMetrics.WelcomeRecentRowHeight)
+        modifier = Modifier.fillMaxWidth().height(Tokens.WelcomeRecentRowHeight)
             .clip(RoundedCornerShape(6.dp))
             .background(if (hovered) shell.hoverBackground else Color.Transparent)
             .hoverable(interaction)
@@ -349,7 +349,7 @@ private fun RecentProjectRow(
         ) {
             Text(
                 text = project.name.take(2).uppercase(),
-                fontSize = IdeaMetrics.SmallFontSize,
+                fontSize = Tokens.SmallFontSize,
                 fontWeight = FontWeight.SemiBold,
                 color = Color.White,
                 maxLines = 1,
@@ -357,10 +357,10 @@ private fun RecentProjectRow(
         }
 
         Column(Modifier.weight(1f).padding(start = 12.dp)) {
-            Text(project.name, fontSize = IdeaMetrics.UiFontSize, color = shell.text, maxLines = 1)
+            Text(project.name, fontSize = Tokens.FontSize, color = shell.text, maxLines = 1)
             Text(
                 text = project.displayPath,
-                fontSize = IdeaMetrics.TinyFontSize,
+                fontSize = Tokens.TinyFontSize,
                 color = shell.mutedText,
                 maxLines = 1,
             )
@@ -393,7 +393,7 @@ private fun WelcomeButton(label: String, onClick: () -> Unit) {
             .padding(horizontal = 14.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, fontSize = IdeaMetrics.SmallFontSize, color = shell.text, maxLines = 1)
+        Text(label, fontSize = Tokens.SmallFontSize, color = shell.text, maxLines = 1)
     }
 }
 
@@ -406,7 +406,7 @@ private fun CustomizePane(darkTheme: Boolean, onToggleTheme: () -> Unit) {
         Text("Customize", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = shell.text)
         Text(
             text = "Colour theme",
-            fontSize = IdeaMetrics.SmallFontSize,
+            fontSize = Tokens.SmallFontSize,
             color = shell.mutedText,
             modifier = Modifier.padding(top = 20.dp, bottom = 8.dp),
         )
@@ -433,6 +433,6 @@ private fun ThemeChoice(label: String, selected: Boolean, onClick: () -> Unit) {
             .padding(horizontal = 16.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, fontSize = IdeaMetrics.UiFontSize, color = shell.text, maxLines = 1)
+        Text(label, fontSize = Tokens.FontSize, color = shell.text, maxLines = 1)
     }
 }

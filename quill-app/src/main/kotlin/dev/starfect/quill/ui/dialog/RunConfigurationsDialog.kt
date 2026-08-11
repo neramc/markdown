@@ -35,12 +35,13 @@ import dev.starfect.quill.model.RunConfiguration
 import dev.starfect.quill.model.RunTask
 import dev.starfect.quill.model.WorkspaceState
 import dev.starfect.quill.ui.icons.IdeIcons
-import dev.starfect.quill.ui.theme.IdeaMetrics
+import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalShellPalette
+import dev.starfect.quill.ui.theme.ShellDivider
+import dev.starfect.quill.ui.theme.interactiveSurface
 import java.nio.file.Path
 import org.jetbrains.jewel.ui.Orientation
 import org.jetbrains.jewel.ui.component.CheckboxRow
-import org.jetbrains.jewel.ui.component.Divider
 import org.jetbrains.jewel.ui.component.GroupHeader
 import org.jetbrains.jewel.ui.component.ListComboBox
 import org.jetbrains.jewel.ui.component.Text
@@ -92,7 +93,7 @@ public fun RunConfigurationsDialog(controller: QuillController, workspace: Works
         },
     ) {
         Row(Modifier.fillMaxSize()) {
-            Column(Modifier.width(IdeaMetrics.DialogListWidth).fillMaxHeight().background(shell.toolWindowBackground)) {
+            Column(Modifier.width(Tokens.DialogListWidth).fillMaxHeight().background(shell.toolWindowBackground)) {
                 ListToolbar(
                     onAdd = {
                         val added = RunConfiguration(
@@ -123,12 +124,12 @@ public fun RunConfigurationsDialog(controller: QuillController, workspace: Works
                     },
                     addTooltip = "Add a configuration",
                 )
-                Divider(Orientation.Horizontal, color = shell.border)
+                ShellDivider(Orientation.Horizontal)
 
                 ConfigurationList(draft, selectedId) { selectedId = it }
             }
 
-            Divider(Orientation.Vertical, color = shell.border)
+            ShellDivider(Orientation.Vertical)
 
             Box(Modifier.weight(1f).fillMaxHeight()) {
                 if (selected == null) {
@@ -136,7 +137,7 @@ public fun RunConfigurationsDialog(controller: QuillController, workspace: Works
                         Text(
                             "Add a configuration with +",
                             color = shell.mutedText,
-                            fontSize = IdeaMetrics.SmallFontSize,
+                            fontSize = Tokens.SmallFontSize,
                         )
                     }
                 } else {
@@ -161,30 +162,24 @@ private fun ConfigurationList(
     LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(vertical = 4.dp)) {
         items(configurations.size, key = { configurations[it].id }) { index ->
             val configuration = configurations[index]
-            val interaction = remember { MutableInteractionSource() }
-            val hovered by interaction.collectIsHoveredAsState()
 
             Row(
                 Modifier.fillMaxWidth()
-                    .height(IdeaMetrics.TreeRowHeight)
-                    .background(
-                        when {
-                            configuration.id == selectedId -> shell.selectionBackground
-                            hovered -> shell.hoverBackground
-                            else -> Color.Transparent
-                        }
+                    .height(Tokens.TreeRowHeight)
+                    .interactiveSurface(
+                        onClick = { onSelect(configuration.id) },
+                        palette = shell,
+                        selected = configuration.id == selectedId,
                     )
-                    .hoverable(interaction)
-                    .clickable(interactionSource = interaction, indication = null) { onSelect(configuration.id) }
-                    .padding(horizontal = 10.dp),
+                    .padding(horizontal = Tokens.Spacing.Small),
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.Tiny),
             ) {
-                IdeIcons.Run(shell.success, size = 13.dp)
-                Spacer(Modifier.width(7.dp))
+                IdeIcons.Run(shell.success, size = Tokens.SmallIconSize)
                 Text(
                     text = configuration.name,
                     color = shell.text,
-                    fontSize = IdeaMetrics.SmallFontSize,
+                    fontSize = Tokens.FontSize,
                     maxLines = 1,
                 )
             }
@@ -222,7 +217,7 @@ private fun ConfigurationForm(configuration: RunConfiguration, onChange: (RunCon
             )
         }
         FormIndent {
-            Text(configuration.task.description, color = shell.mutedText, fontSize = IdeaMetrics.SmallFontSize)
+            Text(configuration.task.description, color = shell.mutedText, fontSize = Tokens.SmallFontSize)
         }
 
         Spacer(Modifier.height(10.dp))
@@ -238,7 +233,7 @@ private fun ConfigurationForm(configuration: RunConfiguration, onChange: (RunCon
                     onChange(configuration.copy(targetPath = value.text.toPathOrNull()))
                 },
                 placeholder = {
-                    Text("The focused document", color = shell.mutedText, fontSize = IdeaMetrics.SmallFontSize)
+                    Text("The focused document", color = shell.mutedText, fontSize = Tokens.SmallFontSize)
                 },
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -259,7 +254,7 @@ private fun ConfigurationForm(configuration: RunConfiguration, onChange: (RunCon
                         Text(
                             "Beside the document, with an .html extension",
                             color = shell.mutedText,
-                            fontSize = IdeaMetrics.SmallFontSize,
+                            fontSize = Tokens.SmallFontSize,
                         )
                     },
                     modifier = Modifier.fillMaxWidth(),
@@ -303,23 +298,20 @@ private fun ConfigurationForm(configuration: RunConfiguration, onChange: (RunCon
 @Composable
 private fun RunButton(label: String, onClick: () -> Unit) {
     val shell = LocalShellPalette.current
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
 
     Row(
-        Modifier.height(28.dp)
-            .background(
-                if (hovered) shell.hoverBackground else Color.Transparent,
-                androidx.compose.foundation.shape.RoundedCornerShape(IdeaMetrics.ActionButtonCorner),
+        Modifier.height(Tokens.ControlSize)
+            .interactiveSurface(
+                onClick = onClick,
+                palette = shell,
+                cornerRadius = Tokens.Radius.Control,
             )
-            .hoverable(interaction)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(horizontal = 10.dp),
+            .padding(horizontal = Tokens.Spacing.Small),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.Tiny),
     ) {
-        IdeIcons.Run(shell.success, size = 14.dp)
-        Spacer(Modifier.width(6.dp))
-        Text(label, color = shell.text, fontSize = IdeaMetrics.UiFontSize)
+        IdeIcons.Run(shell.success, size = Tokens.IconSize)
+        Text(label, color = shell.text, fontSize = Tokens.FontSize)
     }
 }
 

@@ -12,11 +12,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -35,9 +33,10 @@ import dev.starfect.quill.ui.palette.CommandPalette
 import dev.starfect.quill.ui.preview.PreviewPane
 import dev.starfect.quill.ui.shell.StatusBar
 import dev.starfect.quill.ui.shell.ToolWindowStripe
-import dev.starfect.quill.ui.theme.IdeaMetrics
+import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalEditorPalette
 import dev.starfect.quill.ui.theme.LocalShellPalette
+import dev.starfect.quill.ui.theme.ShellDivider
 import dev.starfect.quill.ui.tools.FindReplaceBar
 import dev.starfect.quill.ui.tools.NotificationsPanel
 import dev.starfect.quill.ui.tools.OutlinePanel
@@ -45,8 +44,9 @@ import dev.starfect.quill.ui.tools.PlaceholderPanel
 import dev.starfect.quill.ui.tools.ProblemsPanel
 import dev.starfect.quill.ui.tools.ProjectTree
 import org.jetbrains.jewel.ui.Orientation
-import org.jetbrains.jewel.ui.component.Divider
 import org.jetbrains.jewel.ui.component.HorizontalSplitLayout
+import org.jetbrains.jewel.ui.component.styling.DividerMetrics
+import org.jetbrains.jewel.ui.component.styling.DividerStyle
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.VerticalSplitLayout
 import org.jetbrains.jewel.ui.component.rememberSplitLayoutState
@@ -74,13 +74,13 @@ public fun QuillWindowContent(
                     bottomActive = workspace.bottomToolWindow,
                     onSelectBottom = controller::setBottomToolWindow,
                 )
-                Divider(Orientation.Vertical, color = shell.border)
+                ShellDivider(Orientation.Vertical)
 
                 if (workspace.leftToolWindow == ToolWindow.PROJECT) {
                     Box(Modifier.width(260.dp).fillMaxHeight().background(shell.toolWindowBackground)) {
                         ProjectTree(controller, workspace)
                     }
-                    Divider(Orientation.Vertical, color = shell.border)
+                    ShellDivider(Orientation.Vertical)
                 }
 
                 Column(Modifier.weight(1f).fillMaxHeight()) {
@@ -98,7 +98,7 @@ public fun QuillWindowContent(
 
                 RightDock(controller, workspace)
 
-                Divider(Orientation.Vertical, color = shell.border)
+                ShellDivider(Orientation.Vertical)
                 ToolWindowStripe(
                     tools = ToolWindow.on(Dock.RIGHT),
                     active = workspace.rightToolWindow,
@@ -128,7 +128,7 @@ private fun RightDock(controller: QuillController, workspace: WorkspaceState) {
     val tool = workspace.rightToolWindow ?: return
     val shell = LocalShellPalette.current
 
-    Divider(Orientation.Vertical, color = shell.border)
+    ShellDivider(Orientation.Vertical)
     Box(Modifier.width(280.dp).fillMaxHeight().background(shell.toolWindowBackground)) {
         when (tool) {
             ToolWindow.STRUCTURE -> OutlinePanel(controller, workspace)
@@ -159,7 +159,7 @@ private fun CentreArea(controller: QuillController, workspace: WorkspaceState, m
         first = { EditorArea(controller, workspace, Modifier.fillMaxSize()) },
         second = {
             Column(Modifier.fillMaxSize()) {
-                Divider(Orientation.Horizontal, color = shell.border)
+                ShellDivider(Orientation.Horizontal)
                 when (bottom) {
                     ToolWindow.PROBLEMS -> ProblemsPanel(controller, workspace)
                     else -> PlaceholderPanel(bottom, onHide = { controller.setBottomToolWindow(null) })
@@ -178,6 +178,7 @@ private fun CentreArea(controller: QuillController, workspace: WorkspaceState, m
 private fun EditorArea(controller: QuillController, workspace: WorkspaceState, modifier: Modifier) {
     val document = workspace.activeDocument
     val editor = LocalEditorPalette.current
+    val shell = LocalShellPalette.current
 
     if (document == null) {
         Box(modifier.background(editor.background), contentAlignment = Alignment.Center) {
@@ -192,60 +193,35 @@ private fun EditorArea(controller: QuillController, workspace: WorkspaceState, m
         return
     }
 
-    Column(modifier.background(LocalShellPalette.current.toolWindowBackground)) {
+    Column(modifier.background(editor.background)) {
         MarkdownEditorToolbar(controller, workspace)
 
-        // The panes float on the panel colour with a gutter between them, rather than butting
-        // against a shared divider. It is what makes the split read as two documents — the source
-        // you are writing and the page it becomes — instead of one region with a line through it.
-        Row(
-            Modifier.weight(1f).fillMaxWidth().padding(start = 6.dp, end = 6.dp, bottom = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            when (workspace.settings.viewMode) {
-                ViewMode.EDITOR -> Pane(Modifier.weight(1f)) {
-                    SourceEditor(controller, workspace, document, Modifier.fillMaxSize())
-                }
+        // The source and the page it becomes sit directly against each other, divided by the
+        // splitter and nothing else. They were floating panes with rounded corners, a border and a
+        // gutter; that reads as two cards on a dashboard. A work surface is continuous, and the
+        // boundary between two halves of it is a line you can drag, not a frame around each half.
+        when (workspace.settings.viewMode) {
+            ViewMode.EDITOR ->
+                SourceEditor(controller, workspace, document, Modifier.weight(1f).fillMaxWidth())
 
-                ViewMode.PREVIEW -> Pane(Modifier.weight(1f)) {
-                    PreviewPane(controller, workspace, document, Modifier.fillMaxSize())
-                }
+            ViewMode.PREVIEW ->
+                PreviewPane(controller, workspace, document, Modifier.weight(1f).fillMaxWidth())
 
-                ViewMode.SPLIT -> {
-                    val splitState = rememberSplitLayoutState(0.5f)
-                    HorizontalSplitLayout(
-                        first = {
-                            Pane(Modifier.fillMaxSize().padding(end = 3.dp)) {
-                                SourceEditor(controller, workspace, document, Modifier.fillMaxSize())
-                            }
-                        },
-                        second = {
-                            Pane(Modifier.fillMaxSize().padding(start = 3.dp)) {
-                                PreviewPane(controller, workspace, document, Modifier.fillMaxSize())
-                            }
-                        },
-                        modifier = Modifier.weight(1f).fillMaxSize(),
-                        state = splitState,
-                        firstPaneMinWidth = 220.dp,
-                        secondPaneMinWidth = 220.dp,
-                    )
-                }
+            ViewMode.SPLIT -> {
+                val splitState = rememberSplitLayoutState(0.5f)
+                HorizontalSplitLayout(
+                    first = { SourceEditor(controller, workspace, document, Modifier.fillMaxSize()) },
+                    second = { PreviewPane(controller, workspace, document, Modifier.fillMaxSize()) },
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    // The splitter is the only thing dividing the two halves, so it takes the same
+                    // near-invisible border as every other separator in the shell.
+                    dividerStyle = DividerStyle(shell.border, DividerMetrics.defaults()),
+                    state = splitState,
+                    firstPaneMinWidth = 220.dp,
+                    secondPaneMinWidth = 220.dp,
+                )
             }
         }
-    }
-}
-
-/** One rounded, bordered pane of the editor area. */
-@Composable
-private fun Pane(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    val shell = LocalShellPalette.current
-
-    Box(
-        modifier
-            .clip(RoundedCornerShape(IdeaMetrics.PaneCorner))
-            .border(1.dp, shell.border, RoundedCornerShape(IdeaMetrics.PaneCorner))
-    ) {
-        content()
     }
 }
 
@@ -276,24 +252,24 @@ private fun AboutDialog(controller: QuillController) {
             Text(
                 text = System.getProperty("quill.version")?.let { "Version $it" } ?: "Development build",
                 color = shell.mutedText,
-                fontSize = IdeaMetrics.SmallFontSize,
+                fontSize = Tokens.SmallFontSize,
             )
             Box(Modifier.height(6.dp))
             Text(
                 "A Markdown editor with a Rust engine.",
                 color = shell.mutedText,
-                fontSize = IdeaMetrics.SmallFontSize,
+                fontSize = Tokens.SmallFontSize,
             )
             Box(Modifier.height(8.dp))
             Text(
                 "Runtime: ${System.getProperty("java.vm.name")} ${System.getProperty("java.version")}",
                 color = shell.mutedText,
-                fontSize = IdeaMetrics.TinyFontSize,
+                fontSize = Tokens.TinyFontSize,
             )
             Text(
                 "Renderer: Skia via Compose Multiplatform",
                 color = shell.mutedText,
-                fontSize = IdeaMetrics.TinyFontSize,
+                fontSize = Tokens.TinyFontSize,
             )
         }
     }

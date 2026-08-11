@@ -21,8 +21,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import dev.starfect.quill.ui.theme.IdeaMetrics
+import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalShellPalette
+import dev.starfect.quill.ui.theme.SurfaceState
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.Tooltip
 
@@ -40,7 +41,7 @@ public fun IdeActionButton(
     modifier: Modifier = Modifier,
     selected: Boolean = false,
     enabled: Boolean = true,
-    size: Dp = IdeaMetrics.ActionButtonSize,
+    size: Dp = Tokens.ControlSize,
     content: @Composable (tint: Color) -> Unit,
 ) {
     val shell = LocalShellPalette.current
@@ -48,20 +49,18 @@ public fun IdeActionButton(
     val hovered by interaction.collectIsHoveredAsState()
     val pressed by interaction.collectIsPressedAsState()
 
-    val background = when {
-        !enabled -> Color.Transparent
-        pressed || selected -> shell.pressedBackground
-        hovered -> shell.hoverBackground
-        else -> Color.Transparent
-    }
-    // A disabled action stays visible but recedes, rather than disappearing and shifting the row.
-    val tint = if (enabled) shell.icon else shell.icon.copy(alpha = 0.4f)
+    val state = SurfaceState.of(
+        hovered = hovered,
+        pressed = pressed,
+        selected = selected,
+        enabled = enabled,
+    )
 
     Tooltip(tooltip = { Text(tooltip) }) {
         Box(
             modifier = modifier.size(size)
-                .clip(RoundedCornerShape(IdeaMetrics.ActionButtonCorner))
-                .background(background)
+                .clip(RoundedCornerShape(Tokens.Radius.Control))
+                .background(state.background(shell))
                 .hoverable(interaction, enabled = enabled)
                 .clickable(
                     interactionSource = interaction,
@@ -71,7 +70,8 @@ public fun IdeActionButton(
                 ),
             contentAlignment = Alignment.Center,
         ) {
-            content(tint)
+            // A disabled action recedes rather than disappearing, so the row does not shift.
+            content(state.iconTint(shell))
         }
     }
 }
@@ -95,19 +95,15 @@ public fun IdeWidgetButton(
     val hovered by interaction.collectIsHoveredAsState()
     val pressed by interaction.collectIsPressedAsState()
 
-    val background = when {
-        pressed || selected -> shell.pressedBackground
-        hovered -> shell.hoverBackground
-        else -> Color.Transparent
-    }
+    val state = SurfaceState.of(hovered = hovered, pressed = pressed, selected = selected)
 
     Row(
-        modifier = modifier.height(IdeaMetrics.ActionButtonSize)
-            .clip(RoundedCornerShape(IdeaMetrics.ActionButtonCorner))
-            .background(background)
+        modifier = modifier.height(Tokens.ControlSize)
+            .clip(RoundedCornerShape(Tokens.Radius.Control))
+            .background(state.background(shell))
             .hoverable(interaction)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(horizontal = 8.dp),
+            .padding(horizontal = Tokens.Spacing.Small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         content()
@@ -137,7 +133,7 @@ public fun IdeToggleChip(
     ) { tint ->
         Text(
             text = label,
-            fontSize = IdeaMetrics.TinyFontSize,
+            fontSize = Tokens.TinyFontSize,
             color = if (checked) shell.text else tint,
             maxLines = 1,
         )

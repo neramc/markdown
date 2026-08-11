@@ -37,10 +37,10 @@ import dev.starfect.quill.model.ToolWindow
 import dev.starfect.quill.model.ViewMode
 import dev.starfect.quill.model.WorkspaceState
 import dev.starfect.quill.ui.icons.IdeIcons
-import dev.starfect.quill.ui.theme.IdeaMetrics
+import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalShellPalette
+import dev.starfect.quill.ui.theme.ShellDivider
 import org.jetbrains.jewel.ui.Orientation
-import org.jetbrains.jewel.ui.component.Divider
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.TextField
 
@@ -82,7 +82,7 @@ public fun CommandPalette(controller: QuillController, workspace: WorkspaceState
         contentAlignment = Alignment.TopCenter,
     ) {
         Column(
-            modifier = Modifier.padding(top = 100.dp).width(IdeaMetrics.SearchPopupWidth)
+            modifier = Modifier.padding(top = 100.dp).width(Tokens.SearchPopupWidth)
                 .clip(RoundedCornerShape(10.dp))
                 .background(shell.popupBackground)
                 .border(1.dp, shell.popupBorder, RoundedCornerShape(10.dp))
@@ -94,10 +94,10 @@ public fun CommandPalette(controller: QuillController, workspace: WorkspaceState
                 ) {},
         ) {
             ScopeTabs(scope) { scope = it }
-            Divider(Orientation.Horizontal, color = shell.border)
+            ShellDivider(Orientation.Horizontal)
 
             Row(
-                modifier = Modifier.fillMaxWidth().height(IdeaMetrics.SearchFieldHeight)
+                modifier = Modifier.fillMaxWidth().height(Tokens.SearchFieldHeight)
                     .padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -112,11 +112,11 @@ public fun CommandPalette(controller: QuillController, workspace: WorkspaceState
                 )
             }
 
-            Divider(Orientation.Horizontal, color = shell.border)
+            ShellDivider(Orientation.Horizontal)
 
             if (filtered.isEmpty()) {
                 Box(Modifier.fillMaxWidth().height(72.dp), contentAlignment = Alignment.Center) {
-                    Text("Nothing found", color = shell.mutedText, fontSize = IdeaMetrics.SmallFontSize)
+                    Text("Nothing found", color = shell.mutedText, fontSize = Tokens.SmallFontSize)
                 }
             } else {
                 LazyColumn(state = listState, modifier = Modifier.heightIn(max = 380.dp).padding(vertical = 4.dp)) {
@@ -144,18 +144,18 @@ public fun CommandPalette(controller: QuillController, workspace: WorkspaceState
                 }
             }
 
-            Divider(Orientation.Horizontal, color = shell.border)
+            ShellDivider(Orientation.Horizontal)
             Row(
                 modifier = Modifier.fillMaxWidth().height(28.dp).padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     text = "${filtered.size} result${if (filtered.size == 1) "" else "s"}",
-                    fontSize = IdeaMetrics.TinyFontSize,
+                    fontSize = Tokens.TinyFontSize,
                     color = shell.mutedText,
                     modifier = Modifier.weight(1f),
                 )
-                Text("Enter to run  ·  Esc to close", fontSize = IdeaMetrics.TinyFontSize, color = shell.mutedText)
+                Text("Enter to run  ·  Esc to close", fontSize = Tokens.TinyFontSize, color = shell.mutedText)
             }
         }
     }
@@ -189,7 +189,7 @@ private fun ScopeTabs(selected: SearchScope, onSelect: (SearchScope) -> Unit) {
 
             Box(
                 modifier = Modifier.height(26.dp)
-                    .clip(RoundedCornerShape(IdeaMetrics.ActionButtonCorner))
+                    .clip(RoundedCornerShape(Tokens.Radius.Control))
                     .background(
                         when {
                             isSelected -> shell.pressedBackground
@@ -204,7 +204,7 @@ private fun ScopeTabs(selected: SearchScope, onSelect: (SearchScope) -> Unit) {
             ) {
                 Text(
                     text = scope.title,
-                    fontSize = IdeaMetrics.SmallFontSize,
+                    fontSize = Tokens.SmallFontSize,
                     color = if (isSelected) shell.text else shell.mutedText,
                     maxLines = 1,
                 )
@@ -220,7 +220,7 @@ private fun CategoryHeader(category: String) {
         modifier = Modifier.fillMaxWidth().height(22.dp).padding(start = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(category, fontSize = IdeaMetrics.TinyFontSize, color = shell.mutedText, maxLines = 1)
+        Text(category, fontSize = Tokens.TinyFontSize, color = shell.mutedText, maxLines = 1)
     }
 }
 
@@ -231,7 +231,7 @@ private fun CommandRow(command: Command, selected: Boolean, onRun: () -> Unit) {
     val hovered by interaction.collectIsHoveredAsState()
 
     Row(
-        modifier = Modifier.fillMaxWidth().height(IdeaMetrics.SearchRowHeight)
+        modifier = Modifier.fillMaxWidth().height(Tokens.SearchRowHeight)
             .background(
                 when {
                     hovered || selected -> shell.selectionBackground
@@ -246,10 +246,10 @@ private fun CommandRow(command: Command, selected: Boolean, onRun: () -> Unit) {
     ) {
         // Each category gets its own glyph. A column of identical icons carries no information and
         // is one of the things that makes a copied Search Everywhere feel like a plain list.
-        Box(Modifier.size(IdeaMetrics.IconSize), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(Tokens.IconSize), contentAlignment = Alignment.Center) {
             when (command.category) {
-                "Files" -> IdeIcons.MarkdownFile(shell.icon, shell.accent, size = IdeaMetrics.IconSize)
-                "File" -> IdeIcons.MarkdownFile(shell.icon, shell.mutedText, size = IdeaMetrics.IconSize)
+                "Files" -> IdeIcons.MarkdownFile(shell.icon, shell.accent, size = Tokens.IconSize)
+                "File" -> IdeIcons.MarkdownFile(shell.icon, shell.mutedText, size = Tokens.IconSize)
                 "Edit" -> IdeIcons.Pencil(shell.icon, size = 14.dp)
                 "View" -> IdeIcons.ViewSplit(shell.icon, size = 14.dp)
                 else -> IdeIcons.Action(shell.icon, size = 14.dp)
@@ -258,14 +258,14 @@ private fun CommandRow(command: Command, selected: Boolean, onRun: () -> Unit) {
 
         Text(
             text = command.title,
-            fontSize = IdeaMetrics.UiFontSize,
+            fontSize = Tokens.FontSize,
             color = shell.text,
             modifier = Modifier.weight(1f),
             maxLines = 1,
         )
 
         command.shortcut?.let {
-            Text(it, fontSize = IdeaMetrics.TinyFontSize, color = shell.mutedText, maxLines = 1)
+            Text(it, fontSize = Tokens.TinyFontSize, color = shell.mutedText, maxLines = 1)
         }
     }
 }

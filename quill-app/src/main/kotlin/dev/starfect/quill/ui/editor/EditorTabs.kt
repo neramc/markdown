@@ -26,12 +26,16 @@ import dev.starfect.quill.QuillController
 import dev.starfect.quill.model.DocumentSession
 import dev.starfect.quill.model.WorkspaceState
 import dev.starfect.quill.ui.icons.IdeIcons
-import dev.starfect.quill.ui.theme.IdeaMetrics
+import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.shell.IdeActionButton
 import dev.starfect.quill.ui.theme.LocalShellPalette
+import dev.starfect.quill.ui.theme.ShellDivider
+import dev.starfect.quill.ui.theme.interactiveSurface
 import org.jetbrains.jewel.ui.Orientation
-import org.jetbrains.jewel.ui.component.Divider
 import org.jetbrains.jewel.ui.component.Text
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 
 /**
  * The editor tab strip.
@@ -48,7 +52,7 @@ public fun EditorTabs(controller: QuillController, workspace: WorkspaceState) {
 
     val shell = LocalShellPalette.current
 
-    Box(Modifier.fillMaxWidth().height(IdeaMetrics.TabHeight).background(shell.tabBarBackground)) {
+    Box(Modifier.fillMaxWidth().height(Tokens.TabHeight).background(shell.tabBarBackground)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             LazyRow(
                 modifier = Modifier.weight(1f),
@@ -70,16 +74,12 @@ public fun EditorTabs(controller: QuillController, workspace: WorkspaceState) {
             IdeActionButton(
                 onClick = {},
                 tooltip = "Tab Actions",
-                size = 24.dp,
-                modifier = Modifier.padding(end = 6.dp),
-            ) { tint -> IdeIcons.MoreVertical(tint, size = 14.dp) }
+                size = Tokens.SmallControlSize,
+                modifier = Modifier.padding(end = Tokens.Spacing.Tiny),
+            ) { tint -> IdeIcons.MoreVertical(tint, size = Tokens.SmallIconSize) }
         }
 
-        Divider(
-            orientation = Orientation.Horizontal,
-            color = shell.border,
-            modifier = Modifier.align(Alignment.BottomStart),
-        )
+        ShellDivider(Orientation.Horizontal, Modifier.align(Alignment.BottomStart))
     }
 }
 
@@ -94,6 +94,14 @@ private fun EditorTab(
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
 
+    // Captured outside the draw lambda: reading a composition local or a token inside it would run
+    // on every frame rather than on every recomposition.
+    val underlineColor = shell.tabUnderline
+    val underlineThickness = Tokens.TabUnderlineThickness
+
+    // The active tab is marked by the accent line beneath it and by taking the editor's own
+    // background, not by a filled panel. A tab with a strong fill reads as a browser tab sitting on
+    // top of the editor; one that shares the editor's colour reads as part of it.
     val background = when {
         selected -> shell.tabSelectedBackground
         hovered -> shell.hoverBackground
@@ -101,28 +109,46 @@ private fun EditorTab(
     }
 
     Box(
-        Modifier.height(IdeaMetrics.TabHeight)
+        Modifier.height(Tokens.TabHeight)
             .background(background)
+            // The underline is drawn rather than laid out. As a child Box it used `fillMaxWidth`,
+            // and inside a horizontally-scrolling LazyRow the width constraint is unbounded, so
+            // "fill the available width" resolved to zero and the accent line was never on screen
+            // in any build. Drawing it reads the tab's resolved width at paint time instead.
+            .drawBehind {
+                if (!selected) return@drawBehind
+                val thickness = underlineThickness.toPx()
+                drawRect(
+                    color = underlineColor,
+                    topLeft = Offset(0f, size.height - thickness),
+                    size = Size(size.width, thickness),
+                )
+            }
             .hoverable(interaction)
             .clickable(interactionSource = interaction, indication = null, onClick = onSelect),
     ) {
         Row(
-            modifier = Modifier.height(IdeaMetrics.TabHeight).padding(start = 10.dp, end = 6.dp),
+            modifier = Modifier.height(Tokens.TabHeight)
+                .padding(start = Tokens.Spacing.Small, end = Tokens.Spacing.Tiny),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.Tiny),
         ) {
             IdeIcons.MarkdownFile(
-                tint = shell.icon,
+                tint = if (selected) shell.icon else shell.mutedIcon,
                 accent = shell.accent,
-                size = IdeaMetrics.IconSize,
+                size = Tokens.IconSize,
             )
 
             Text(
                 text = session.displayName,
-                fontSize = IdeaMetrics.UiFontSize,
-                // An unsaved tab is tinted rather than marked, which is what the IDE does; the
-                // asterisk lives in the window title instead.
-                color = if (session.isModified) shell.modified else shell.text,
+                fontSize = Tokens.FontSize,
+                // An unsaved tab is tinted rather than marked with an asterisk. An inactive tab
+                // recedes to secondary, so the strip says which file you are in without an outline.
+                color = when {
+                    session.isModified -> shell.modified
+                    selected -> shell.text
+                    else -> shell.secondaryText
+                },
                 maxLines = 1,
             )
 
@@ -131,17 +157,8 @@ private fun EditorTab(
             if (hovered || selected) {
                 TabCloseButton(onClose)
             } else {
-                Spacer(Modifier.size(IdeaMetrics.IconSize))
+                Spacer(Modifier.size(Tokens.TabCloseSize))
             }
-        }
-
-        if (selected) {
-            Box(
-                Modifier.align(Alignment.BottomStart)
-                    .fillMaxWidth()
-                    .height(IdeaMetrics.TabUnderlineThickness)
-                    .background(shell.tabUnderline),
-            )
         }
     }
 }
@@ -153,15 +170,19 @@ private fun TabCloseButton(onClose: () -> Unit) {
     val hovered by interaction.collectIsHoveredAsState()
 
     Box(
-        modifier = Modifier.size(IdeaMetrics.IconSize)
-            .background(if (hovered) shell.pressedBackground else Color.Transparent)
-            .hoverable(interaction)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClose),
+        modifier = Modifier.size(Tokens.TabCloseSize)
+            .interactiveSurface(
+                onClick = onClose,
+                palette = shell,
+                cornerRadius = Tokens.Radius.Row,
+                interactionSource = interaction,
+            ),
         contentAlignment = Alignment.Center,
     ) {
-        IdeIcons.Close(if (hovered) shell.text else shell.mutedText, size = 12.dp)
+        // Muted until pointed at, which keeps a row of tabs from looking like a row of close buttons.
+        IdeIcons.Close(if (hovered) shell.text else shell.mutedIcon, size = Tokens.SmallIconSize)
     }
 }
 
 /** Width reserved for a tab's close affordance, so callers can align around it. */
-internal val TabCloseWidth = 16.dp
+internal val TabCloseWidth = Tokens.TabCloseSize

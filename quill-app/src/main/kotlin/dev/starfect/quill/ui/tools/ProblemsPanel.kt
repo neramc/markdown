@@ -31,8 +31,9 @@ import dev.starfect.quill.model.ToolWindow
 import dev.starfect.quill.model.WorkspaceState
 import dev.starfect.quill.ui.editor.SeverityIcon
 import dev.starfect.quill.ui.shell.ToolWindowHeader
-import dev.starfect.quill.ui.theme.IdeaMetrics
+import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalShellPalette
+import dev.starfect.quill.ui.theme.interactiveSurface
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.VerticallyScrollableContainer
 
@@ -99,44 +100,40 @@ private fun problemsTitle(document: DocumentSession?, findings: List<Finding>): 
 @Composable
 private fun FindingRow(finding: Finding, onClick: () -> Unit) {
     val shell = LocalShellPalette.current
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
 
     Row(
         modifier = Modifier.fillMaxWidth()
-            .height(IdeaMetrics.TreeRowHeight)
-            .background(if (hovered) shell.hoverBackground else androidx.compose.ui.graphics.Color.Transparent)
-            .hoverable(interaction)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(horizontal = 10.dp),
+            .height(Tokens.TreeRowHeight)
+            .interactiveSurface(onClick = onClick, palette = shell)
+            .padding(horizontal = Tokens.Spacing.Small),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.Tiny),
     ) {
         SeverityIcon(finding.severity, shell)
-        Spacer(Modifier.width(7.dp))
 
         Text(
             text = finding.message,
             color = shell.text,
-            fontSize = IdeaMetrics.SmallFontSize,
+            fontSize = Tokens.FontSize,
             maxLines = 1,
             modifier = Modifier.weight(1f),
         )
 
-        // The inspection's own name, dimmed, the way the IDE labels a finding's source.
+        // The inspection's own name, dimmed, labelling where the finding came from.
         finding.inspection?.let { inspection ->
             Text(
                 text = inspection.title,
                 color = shell.mutedText,
-                fontSize = IdeaMetrics.TinyFontSize,
+                fontSize = Tokens.TinyFontSize,
                 maxLines = 1,
             )
-            Spacer(Modifier.width(10.dp))
         }
 
         Text(
             text = ":${finding.line + 1}",
             color = shell.mutedText,
-            fontSize = IdeaMetrics.TinyFontSize,
+            fontSize = Tokens.TinyFontSize,
+            modifier = Modifier.padding(start = Tokens.Spacing.Small),
         )
     }
 }
@@ -144,7 +141,7 @@ private fun FindingRow(finding: Finding, onClick: () -> Unit) {
 @Composable
 private fun EmptyState(message: String) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(message, color = LocalShellPalette.current.mutedText, fontSize = IdeaMetrics.SmallFontSize)
+        Text(message, color = LocalShellPalette.current.mutedText, fontSize = Tokens.SmallFontSize)
     }
 }
 
@@ -191,12 +188,12 @@ public fun NotificationsPanel(
                         Text(
                             text = entry.title,
                             color = notificationColour(entry.severity, shell),
-                            fontSize = IdeaMetrics.SmallFontSize,
+                            fontSize = Tokens.SmallFontSize,
                         )
                         Text(
                             text = entry.body,
                             color = shell.mutedText,
-                            fontSize = IdeaMetrics.TinyFontSize,
+                            fontSize = Tokens.TinyFontSize,
                         )
                     }
                 }
@@ -237,7 +234,7 @@ public fun PlaceholderPanel(
             Text(
                 text = placeholderMessage(tool),
                 color = shell.mutedText,
-                fontSize = IdeaMetrics.SmallFontSize,
+                fontSize = Tokens.SmallFontSize,
             )
         }
     }

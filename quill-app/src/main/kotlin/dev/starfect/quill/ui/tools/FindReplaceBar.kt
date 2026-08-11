@@ -19,11 +19,11 @@ import dev.starfect.quill.model.WorkspaceState
 import dev.starfect.quill.ui.icons.IdeIcons
 import dev.starfect.quill.ui.shell.IdeActionButton
 import dev.starfect.quill.ui.shell.IdeToggleChip
-import dev.starfect.quill.ui.theme.IdeaMetrics
+import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalShellPalette
+import dev.starfect.quill.ui.theme.ShellDivider
 import org.jetbrains.jewel.ui.Orientation
 import org.jetbrains.jewel.ui.Outline
-import org.jetbrains.jewel.ui.component.Divider
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.TextField
 
@@ -49,7 +49,7 @@ public fun FindReplaceBar(controller: QuillController, workspace: WorkspaceState
 
     Column(Modifier.fillMaxWidth().background(shell.toolWindowBackground)) {
         Row(
-            modifier = Modifier.fillMaxWidth().height(IdeaMetrics.FindBarHeight).padding(horizontal = 6.dp),
+            modifier = Modifier.fillMaxWidth().height(Tokens.FindBarHeight).padding(horizontal = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
@@ -74,7 +74,7 @@ public fun FindReplaceBar(controller: QuillController, workspace: WorkspaceState
                             matchCount == 0 -> "No results"
                             else -> "${currentMatch + 1}/$matchCount"
                         },
-                        fontSize = IdeaMetrics.TinyFontSize,
+                        fontSize = Tokens.TinyFontSize,
                         color = if (matchCount == 0 && find.query.isNotEmpty()) shell.error else shell.mutedText,
                         modifier = Modifier.padding(end = 6.dp),
                         maxLines = 1,
@@ -96,7 +96,7 @@ public fun FindReplaceBar(controller: QuillController, workspace: WorkspaceState
                 size = 22.dp,
             ) { tint -> IdeIcons.ArrowDown(tint, size = 14.dp) }
 
-            Divider(Orientation.Vertical, color = shell.border, modifier = Modifier.height(16.dp))
+            ShellDivider(Orientation.Vertical, Modifier.height(Tokens.IconSize))
 
             IdeToggleChip(
                 label = "Aa",
@@ -120,7 +120,7 @@ public fun FindReplaceBar(controller: QuillController, workspace: WorkspaceState
             find.error?.let { message ->
                 Text(
                     text = message,
-                    fontSize = IdeaMetrics.TinyFontSize,
+                    fontSize = Tokens.TinyFontSize,
                     color = shell.error,
                     maxLines = 1,
                     modifier = Modifier.padding(start = 4.dp),
@@ -138,7 +138,7 @@ public fun FindReplaceBar(controller: QuillController, workspace: WorkspaceState
 
         if (find.replaceVisible) {
             Row(
-                modifier = Modifier.fillMaxWidth().height(IdeaMetrics.FindBarHeight)
+                modifier = Modifier.fillMaxWidth().height(Tokens.FindBarHeight)
                     .padding(start = 32.dp, end = 6.dp, bottom = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -153,7 +153,7 @@ public fun FindReplaceBar(controller: QuillController, workspace: WorkspaceState
             }
         }
 
-        Divider(Orientation.Horizontal, color = shell.border)
+        ShellDivider(Orientation.Horizontal)
     }
 }
 
@@ -170,7 +170,7 @@ private fun ReplaceAction(label: String, enabled: Boolean, onClick: () -> Unit) 
     ) { tint ->
         Text(
             text = label,
-            fontSize = IdeaMetrics.SmallFontSize,
+            fontSize = Tokens.SmallFontSize,
             color = if (enabled) shell.text else tint,
             maxLines = 1,
         )

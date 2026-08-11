@@ -37,13 +37,13 @@ import dev.starfect.quill.model.ToolWindow
 import dev.starfect.quill.model.ViewMode
 import dev.starfect.quill.model.WorkspaceState
 import dev.starfect.quill.ui.icons.IdeIcons
-import dev.starfect.quill.ui.theme.IdeaMetrics
+import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalShellPalette
+import dev.starfect.quill.ui.theme.ShellDivider
 import dev.starfect.quill.ui.theme.ShellPalette
 import dev.starfect.quill.ui.theme.QuillTheme
 import java.nio.file.Path
 import org.jetbrains.jewel.ui.Orientation
-import org.jetbrains.jewel.ui.component.Divider
 import org.jetbrains.jewel.ui.component.Icon
 import org.jetbrains.jewel.ui.component.MenuScope
 import org.jetbrains.jewel.ui.component.MenuSeparator
@@ -69,18 +69,18 @@ public fun DecoratedWindowScope.QuillTitleBar(
     workspace: WorkspaceState,
     onExit: () -> Unit,
 ) {
-    TitleBar(Modifier.fillMaxWidth().height(IdeaMetrics.TitleBarHeight)) {
+    TitleBar(Modifier.fillMaxWidth().height(Tokens.ToolbarHeight)) {
         Row(
-            Modifier.align(Alignment.Start).padding(start = 8.dp),
+            Modifier.align(Alignment.Start).padding(start = Tokens.Spacing.Small),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.Tiny),
         ) {
             // Product icon, then the main menu, then the project widget: the order the New UI
             // uses on the platforms where the window carries its own decoration.
             Icon(
                 painter = painterResource("icons/icon.png"),
                 contentDescription = "Quill",
-                modifier = Modifier.padding(end = 2.dp).size(20.dp),
+                modifier = Modifier.size(Tokens.IconSize),
             )
             MainMenuButton(controller, workspace, onExit)
             ProjectWidget(workspace)
@@ -88,9 +88,9 @@ public fun DecoratedWindowScope.QuillTitleBar(
         }
 
         Row(
-            Modifier.align(Alignment.End).padding(end = 8.dp),
+            Modifier.align(Alignment.End).padding(end = Tokens.Spacing.Small),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            horizontalArrangement = Arrangement.spacedBy(0.dp),
         ) {
             TitleBarActions(controller, workspace)
         }
@@ -107,16 +107,16 @@ public fun DecoratedWindowScope.QuillTitleBar(
 public fun QuillToolBar(controller: QuillController, workspace: WorkspaceState, onExit: () -> Unit) {
     val shell = LocalShellPalette.current
     Row(
-        modifier = Modifier.fillMaxWidth().height(IdeaMetrics.TitleBarHeight)
+        modifier = Modifier.fillMaxWidth().height(Tokens.ToolbarHeight)
             .background(shell.toolWindowBackground)
-            .padding(horizontal = 8.dp),
+            .padding(horizontal = Tokens.Spacing.Small),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.Tiny),
     ) {
         Icon(
             painter = painterResource("icons/icon.png"),
             contentDescription = "Quill",
-            modifier = Modifier.padding(end = 2.dp).size(20.dp),
+            modifier = Modifier.size(Tokens.IconSize),
         )
         MainMenuButton(controller, workspace, onExit)
         ProjectWidget(workspace)
@@ -126,7 +126,7 @@ public fun QuillToolBar(controller: QuillController, workspace: WorkspaceState, 
 
         TitleBarActions(controller, workspace)
     }
-    Divider(Orientation.Horizontal, color = shell.border)
+    ShellDivider(Orientation.Horizontal)
 }
 
 /** Search Everywhere and Settings, the two actions the New UI keeps at the toolbar's right end. */
@@ -170,14 +170,14 @@ private fun ProjectWidget(workspace: WorkspaceState) {
 
     IdeWidgetButton(onClick = {}) {
         Box(
-            modifier = Modifier.size(IdeaMetrics.ProjectBadgeSize)
-                .clip(RoundedCornerShape(IdeaMetrics.ProjectBadgeCorner))
+            modifier = Modifier.size(Tokens.ProjectBadgeSize)
+                .clip(RoundedCornerShape(Tokens.ProjectBadgeCorner))
                 .background(ShellPalette.badgeColor(project)),
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 text = project.firstOrNull()?.uppercase() ?: "Q",
-                fontSize = IdeaMetrics.TinyFontSize,
+                fontSize = Tokens.TinyFontSize,
                 fontWeight = FontWeight.SemiBold,
                 color = Color.White,
                 maxLines = 1,
@@ -186,10 +186,10 @@ private fun ProjectWidget(workspace: WorkspaceState) {
 
         Text(
             text = project,
-            fontSize = IdeaMetrics.UiFontSize,
+            fontSize = Tokens.FontSize,
             color = shell.text,
             maxLines = 1,
-            modifier = Modifier.padding(start = 6.dp),
+            modifier = Modifier.padding(start = Tokens.Spacing.Tiny),
         )
         // The chevron is what marks this as a widget rather than a caption; the IDE draws one on
         // every toolbar widget that can be opened.
@@ -214,7 +214,7 @@ private fun BranchWidget(workspace: WorkspaceState) {
         IdeIcons.Branch(shell.icon, size = 14.dp)
         Text(
             text = branch,
-            fontSize = IdeaMetrics.UiFontSize,
+            fontSize = Tokens.FontSize,
             color = shell.text,
             maxLines = 1,
             modifier = Modifier.padding(start = 5.dp),

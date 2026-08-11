@@ -31,9 +31,10 @@ import dev.starfect.quill.model.WorkspaceState
 import dev.starfect.quill.ui.icons.IdeIcons
 import dev.starfect.quill.ui.shell.IdeActionButton
 import dev.starfect.quill.ui.shell.label
-import dev.starfect.quill.ui.theme.IdeaMetrics
+import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalEditorPalette
 import dev.starfect.quill.ui.theme.LocalShellPalette
+import dev.starfect.quill.ui.theme.interactiveSurface
 import org.jetbrains.jewel.ui.component.PopupMenu
 import org.jetbrains.jewel.ui.component.Text
 
@@ -49,14 +50,17 @@ import org.jetbrains.jewel.ui.component.Text
 @Composable
 public fun MarkdownEditorToolbar(controller: QuillController, workspace: WorkspaceState) {
     val shell = LocalShellPalette.current
+    val editor = LocalEditorPalette.current
     val document = workspace.activeDocument
 
-    Box(Modifier.fillMaxWidth().height(30.dp).background(shell.toolWindowBackground)) {
+    // Sits on the editor's own background, not on a panel colour. It is part of the document's
+    // surface, and giving it a different fill would draw a band across the top of the editor.
+    Box(Modifier.fillMaxWidth().height(Tokens.EditorToolbarHeight).background(editor.background)) {
         // The flavour sits at the left, where the IDE puts a file's language: it is a property of
         // the document, and it belongs next to the document rather than beside the view controls.
         if (document != null) {
             Row(
-                modifier = Modifier.align(Alignment.CenterStart).padding(start = 10.dp),
+                modifier = Modifier.align(Alignment.CenterStart).padding(start = Tokens.Spacing.Small),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 FlavourPicker(controller, document)
@@ -64,13 +68,18 @@ public fun MarkdownEditorToolbar(controller: QuillController, workspace: Workspa
         }
 
         Row(
-            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 8.dp),
+            modifier = Modifier.align(Alignment.CenterEnd).padding(end = Tokens.Spacing.Small),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(1.dp),
+            horizontalArrangement = Arrangement.spacedBy(0.dp),
         ) {
             if (document != null) {
                 InspectionWidget(controller, document)
-                Box(Modifier.padding(horizontal = 5.dp).width(1.dp).height(14.dp).background(shell.border))
+                Box(
+                    Modifier.padding(horizontal = Tokens.Spacing.Small)
+                        .width(1.dp)
+                        .height(Tokens.SmallIconSize)
+                        .background(shell.border),
+                )
             }
 
             val current = workspace.settings.viewMode
@@ -79,22 +88,22 @@ public fun MarkdownEditorToolbar(controller: QuillController, workspace: Workspa
                 onClick = { controller.setViewMode(ViewMode.EDITOR) },
                 tooltip = "${ViewMode.EDITOR.label}  Ctrl+1",
                 selected = current == ViewMode.EDITOR,
-                size = 24.dp,
-            ) { tint -> IdeIcons.ViewEditorOnly(tint, size = IdeaMetrics.IconSize) }
+                size = Tokens.ControlSize,
+            ) { tint -> IdeIcons.ViewEditorOnly(tint, size = Tokens.IconSize) }
 
             IdeActionButton(
                 onClick = { controller.setViewMode(ViewMode.SPLIT) },
                 tooltip = "${ViewMode.SPLIT.label}  Ctrl+2",
                 selected = current == ViewMode.SPLIT,
-                size = 24.dp,
-            ) { tint -> IdeIcons.ViewSplit(tint, size = IdeaMetrics.IconSize) }
+                size = Tokens.ControlSize,
+            ) { tint -> IdeIcons.ViewSplit(tint, size = Tokens.IconSize) }
 
             IdeActionButton(
                 onClick = { controller.setViewMode(ViewMode.PREVIEW) },
                 tooltip = "${ViewMode.PREVIEW.label}  Ctrl+3",
                 selected = current == ViewMode.PREVIEW,
-                size = 24.dp,
-            ) { tint -> IdeIcons.ViewPreviewOnly(tint, size = IdeaMetrics.IconSize) }
+                size = Tokens.ControlSize,
+            ) { tint -> IdeIcons.ViewPreviewOnly(tint, size = Tokens.IconSize) }
         }
     }
 }
@@ -110,21 +119,22 @@ public fun MarkdownEditorToolbar(controller: QuillController, workspace: Workspa
 private fun FlavourPicker(controller: QuillController, document: DocumentSession) {
     val shell = LocalShellPalette.current
     var open by remember { mutableStateOf(false) }
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
 
     Box {
         Row(
-            Modifier.height(22.dp)
-                .clip(RoundedCornerShape(IdeaMetrics.ActionButtonCorner))
-                .background(if (hovered || open) shell.hoverBackground else Color.Transparent)
-                .hoverable(interaction)
-                .clickable(interactionSource = interaction, indication = null) { open = true }
-                .padding(horizontal = 7.dp),
+            Modifier.height(Tokens.SmallControlSize)
+                .interactiveSurface(
+                    onClick = { open = true },
+                    palette = shell,
+                    selected = open,
+                    cornerRadius = Tokens.Radius.Control,
+                )
+                .padding(horizontal = Tokens.Spacing.Small),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.Tiny),
         ) {
-            Text(document.flavour.displayName, color = shell.mutedText, fontSize = IdeaMetrics.TinyFontSize)
-            Box(Modifier.padding(start = 4.dp)) { IdeIcons.WidgetChevron(shell.mutedText, size = 9.dp) }
+            Text(document.flavour.displayName, color = shell.secondaryText, fontSize = Tokens.TinyFontSize)
+            IdeIcons.WidgetChevron(shell.mutedIcon, size = Tokens.SmallIconSize)
         }
 
         if (open) {

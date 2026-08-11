@@ -1,40 +1,24 @@
 package dev.starfect.quill.ui.tools
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.hoverable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import dev.starfect.quill.QuillController
 import dev.starfect.quill.model.FileNode
 import dev.starfect.quill.model.ToolWindow
 import dev.starfect.quill.model.WorkspaceState
 import dev.starfect.quill.ui.icons.IdeIcons
 import dev.starfect.quill.ui.shell.ToolWindowHeader
-import dev.starfect.quill.ui.theme.IdeaMetrics
+import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalShellPalette
 import java.nio.file.Path
 import org.jetbrains.jewel.ui.component.Text
@@ -76,7 +60,7 @@ public fun ProjectTree(controller: QuillController, workspace: WorkspaceState) {
                 items(rows.size, key = { rows[it].path.toString() }) { index ->
                     val node = rows[index]
                     val isOpen = workspace.documents.any { it.path == node.path }
-                    TreeRow(
+                    FileRow(
                         node = node,
                         selected = isOpen && workspace.activeDocument?.path == node.path,
                         open = isOpen,
@@ -101,119 +85,47 @@ private fun ProjectRootRow(root: Path) {
         if (home.isNotEmpty() && absolute.startsWith(home)) "~" + absolute.removePrefix(home) else absolute
     }
 
-    Row(
-        modifier = Modifier.fillMaxWidth().height(IdeaMetrics.TreeRowHeight).padding(start = 6.dp, end = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Box(Modifier.size(14.dp), contentAlignment = Alignment.Center) {
-            IdeIcons.ChevronDown(shell.icon, size = 12.dp)
-        }
-        IdeIcons.Module(shell.sourceFolderIcon, size = IdeaMetrics.IconSize)
-        Text(
-            text = root.fileName?.toString() ?: root.toString(),
-            fontSize = IdeaMetrics.UiFontSize,
-            color = shell.text,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        // The location is the IDE's own secondary text: dimmer, smaller, and clipped from the right
-        // so the project name never gets pushed out by a deep path.
-        Text(
-            text = location,
-            fontSize = IdeaMetrics.TinyFontSize,
-            color = shell.mutedText,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
+    TreeRow(depth = 0, onClick = {}, expandable = true, expanded = true) {
+        IdeIcons.Module(shell.sourceFolderIcon, size = Tokens.IconSize)
+        TreeLabel(root.fileName?.toString() ?: root.toString())
+        // The location is clipped from the right so a deep path never pushes the name out.
+        TreeMetadata(location, Modifier.weight(1f))
     }
 }
 
 @Composable
-private fun TreeRow(node: FileNode, selected: Boolean, open: Boolean, onClick: () -> Unit) {
+private fun FileRow(node: FileNode, selected: Boolean, open: Boolean, onClick: () -> Unit) {
     val shell = LocalShellPalette.current
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
 
-    val background = when {
-        selected -> shell.selectionBackground
-        hovered -> shell.hoverBackground
-        else -> Color.Transparent
-    }
-    val indent = IdeaMetrics.TreeIndentStep * node.depth
-
-    Row(
-        modifier = Modifier.fillMaxWidth().height(IdeaMetrics.TreeRowHeight)
-            .background(background)
-            .hoverable(interaction)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .indentGuides(node.depth, shell.border)
-            .padding(start = 6.dp + indent, end = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    TreeRow(
+        depth = node.depth,
+        onClick = onClick,
+        selected = selected,
+        expandable = node.isDirectory,
+        expanded = node.isExpanded,
     ) {
-        // The disclosure column is always present, so file rows line up with folder rows instead of
-        // shifting left by the width of a missing chevron.
-        Box(Modifier.size(14.dp), contentAlignment = Alignment.Center) {
-            when {
-                node.isDirectory && node.isExpanded -> IdeIcons.ChevronDown(shell.icon, size = 12.dp)
-                node.isDirectory -> IdeIcons.ChevronRight(shell.icon, size = 12.dp)
-                else -> Spacer(Modifier.size(12.dp))
-            }
-        }
-
-        // The icon says what the row is. IntelliJ fills folder icons and tints them by role, and
-        // gives every file type its own glyph; a tree where every row carries the same mark is the
-        // single biggest reason a copy reads as a list rather than as a project view.
+        // The icon says what the row is. Folders are filled and tinted by role and each file type
+        // gets its own glyph; a tree where every row carries the same mark reads as a list.
         when {
             node.isDirectory -> IdeIcons.Folder(
                 tint = shell.folderIcon,
-                size = IdeaMetrics.IconSize,
+                size = Tokens.IconSize,
                 open = node.isExpanded,
             )
 
             node.name.substringAfterLast('.', "").lowercase() in MARKDOWN_EXTENSIONS ->
-                IdeIcons.MarkdownFile(shell.icon, shell.accent, size = IdeaMetrics.IconSize)
+                IdeIcons.MarkdownFile(shell.icon, shell.accent, size = Tokens.IconSize)
 
-            else -> IdeIcons.PlainFile(shell.icon, size = IdeaMetrics.IconSize)
+            else -> IdeIcons.PlainFile(shell.mutedIcon, size = Tokens.IconSize)
         }
 
-        Text(
-            text = node.name,
-            fontSize = IdeaMetrics.UiFontSize,
-            color = if (open) shell.accent else shell.text,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        // An open file is named in the accent, which is the one place in the tree it appears.
+        TreeLabel(node.name, color = if (open) shell.accent else shell.text)
     }
 }
 
 /** Extensions the project view marks with the Markdown glyph rather than a plain page. */
 private val MARKDOWN_EXTENSIONS = setOf("md", "markdown", "mdx")
-
-/**
- * Draws the vertical guide lines that connect a nested row back to its ancestors.
- *
- * IntelliJ draws one line per level at the level's indent position. They are what let the eye follow
- * a deep tree without counting indentation, and their absence is why a plain indented list reads as
- * flat even when it is not.
- */
-private fun Modifier.indentGuides(depth: Int, color: Color): Modifier = drawBehind {
-    if (depth == 0) return@drawBehind
-
-    val step = IdeaMetrics.TreeIndentStep.toPx()
-    val origin = 13.dp.toPx()
-    for (level in 0 until depth) {
-        val x = origin + (level * step)
-        drawLine(
-            color = color,
-            start = Offset(x, 0f),
-            end = Offset(x, size.height),
-            strokeWidth = 1f,
-        )
-    }
-}
 
 /** Flattens the expanded parts of the tree into the rows the list renders. */
 private fun flatten(nodes: List<FileNode>): List<FileNode> = buildList {
@@ -265,29 +177,15 @@ public fun OutlinePanel(controller: QuillController, workspace: WorkspaceState) 
 @Composable
 private fun OutlineRow(level: Int, title: String, onClick: () -> Unit) {
     val shell = LocalShellPalette.current
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
-    val depth = (level - 1).coerceAtLeast(0)
 
-    Row(
-        modifier = Modifier.fillMaxWidth().height(IdeaMetrics.TreeRowHeight)
-            .background(if (hovered) shell.hoverBackground else Color.Transparent)
-            .hoverable(interaction)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .indentGuides(depth, shell.border)
-            .padding(start = 8.dp + (IdeaMetrics.TreeIndentStep * depth), end = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        // The IDE's structure view badges each symbol with its kind; for a document that is the
-        // heading level, which is also the only thing that distinguishes two identically-named rows.
-        Box(
-            modifier = Modifier.width(18.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text("H$level", fontSize = IdeaMetrics.TinyFontSize, color = shell.mutedText, maxLines = 1)
+    // A heading's level is its depth, so the outline indents exactly as the document nests.
+    TreeRow(depth = (level - 1).coerceAtLeast(0), onClick = onClick) {
+        // The structure view badges each symbol with its kind; for a document that is the heading
+        // level, which is also the only thing distinguishing two identically-named rows.
+        Box(Modifier.width(Tokens.IconSize), contentAlignment = Alignment.Center) {
+            TreeMetadata("H$level")
         }
-        Text(title, fontSize = IdeaMetrics.UiFontSize, color = shell.text, maxLines = 1)
+        TreeLabel(title, color = shell.text)
     }
 }
 
@@ -295,6 +193,6 @@ private fun OutlineRow(level: Int, title: String, onClick: () -> Unit) {
 @Composable
 private fun EmptyPanelMessage(message: String) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(message, color = LocalShellPalette.current.mutedText, fontSize = IdeaMetrics.SmallFontSize)
+        Text(message, color = LocalShellPalette.current.mutedText, fontSize = Tokens.SmallFontSize)
     }
 }
