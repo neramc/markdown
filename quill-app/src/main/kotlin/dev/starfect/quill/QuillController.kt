@@ -787,7 +787,13 @@ public class QuillController(
 
     // ---------------------------------------------------------------- notifications
 
-    /** Records a notification and opens the tool window that holds them if it is not already up. */
+    /**
+     * Records a notification and brings the tool window holding them to the front.
+     *
+     * Opening the panel is deliberate rather than intrusive: every caller is the result of a run the
+     * user just started, and a result they have to go looking for is one they will not see. Quill has
+     * no balloon to show it in instead.
+     */
     public fun notify(title: String, body: String, severity: NotificationSeverity = NotificationSeverity.INFO) {
         val entry = Notification(id = nextId.getAndIncrement(), title = title, body = body, severity = severity)
         update { workspace ->

@@ -17,7 +17,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.starfect.quill.QuillController
 import dev.starfect.quill.model.Dialog
 import dev.starfect.quill.model.Dock
@@ -263,7 +265,20 @@ private fun AboutDialog(controller: QuillController) {
             Modifier.fillMaxSize().padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text("Quill", color = shell.text, fontSize = androidx.compose.ui.unit.TextUnit.Unspecified)
+            Text(
+                text = "Quill",
+                color = shell.text,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            // The packaged launcher passes -Dquill.version; a Gradle run does not, and saying so is
+            // better than showing a number that would be a guess.
+            Text(
+                text = System.getProperty("quill.version")?.let { "Version $it" } ?: "Development build",
+                color = shell.mutedText,
+                fontSize = IdeaMetrics.SmallFontSize,
+            )
+            Box(Modifier.height(6.dp))
             Text(
                 "A Markdown editor with a Rust engine.",
                 color = shell.mutedText,
