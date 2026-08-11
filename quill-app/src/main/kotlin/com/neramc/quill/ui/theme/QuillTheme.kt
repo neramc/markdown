@@ -72,6 +72,12 @@ public class EditorPalette(
     public val background: Color,
     public val gutterBackground: Color,
     public val gutterForeground: Color,
+    /** The line number on the caret's row, which the IDE draws brighter than the rest. */
+    public val gutterCurrentLineForeground: Color,
+    /** Caret row highlight, painted the full width of the editor behind the text. */
+    public val caretRowBackground: Color,
+    /** Fill behind a search match. */
+    public val searchMatchBackground: Color,
     private val tokens: Map<Int, EditorTokenStyle>,
 ) {
     public fun styleFor(styleId: Int): EditorTokenStyle? = tokens[styleId]
@@ -126,16 +132,24 @@ public class EditorPalette(
         public val Dark: EditorPalette = EditorPalette(
             text = Color(0xFFBCBEC4),
             background = Color(0xFF1E1F22),
+            // The New UI gutter shares the editor's background rather than sitting on a panel
+            // colour; only the numbers themselves are dimmer.
             gutterBackground = Color(0xFF1E1F22),
-            gutterForeground = Color(0xFF4E5157),
+            gutterForeground = Color(0xFF4B5059),
+            gutterCurrentLineForeground = Color(0xFFA1A3AB),
+            caretRowBackground = Color(0xFF26282E),
+            searchMatchBackground = Color(0xFF32593D),
             tokens = DARK_TOKENS,
         )
 
         public val Light: EditorPalette = EditorPalette(
             text = Color(0xFF000000),
             background = Color(0xFFFFFFFF),
-            gutterBackground = Color(0xFFF7F8FA),
-            gutterForeground = Color(0xFFA8ADBD),
+            gutterBackground = Color(0xFFFFFFFF),
+            gutterForeground = Color(0xFFADB1B8),
+            gutterCurrentLineForeground = Color(0xFF5A5D63),
+            caretRowBackground = Color(0xFFF2F5F9),
+            searchMatchBackground = Color(0xFFC2E5C2),
             tokens = LIGHT_TOKENS,
         )
 
@@ -143,36 +157,95 @@ public class EditorPalette(
     }
 }
 
-/** Chrome colours the IDE shell needs that Jewel does not expose directly. */
+/**
+ * The IntelliJ IDEA "New UI" chrome palette.
+ *
+ * Every value here is a colour the IDE names in its own theme files — `MainToolbar.background`,
+ * `ToolWindow.Header.background`, `EditorTabs.underlineColor` and so on — rather than something
+ * chosen to look approximately right. The New UI's identity comes from a small number of very close
+ * greys (#1E1F22 editor, #2B2D30 panels, #393B40 borders, #43454A hover), and getting one of them
+ * wrong by a few points is exactly what makes an imitation read as an imitation.
+ */
 @Immutable
 public class ShellPalette(
+    /** Panels, tool windows, the main toolbar and the status bar. */
     public val toolWindowBackground: Color,
+    /** Status bar; separate because the IDE can theme it apart from the panels. */
     public val statusBarBackground: Color,
+    /** The 1px separators between every region of the shell. */
     public val border: Color,
+    /** Primary UI label colour, distinct from editor text. */
+    public val text: Color,
+    /** Secondary labels: status bar items, shortcut hints, tool window headers. */
     public val mutedText: Color,
+    /** Default icon tint for toolbar and tree icons. */
+    public val icon: Color,
+    /** Toolbar and stripe button hover fill. */
+    public val hoverBackground: Color,
+    /** Toolbar and stripe button pressed or toggled-on fill. */
+    public val pressedBackground: Color,
+    /** Selected row in a focused tree or list. */
     public val selectionBackground: Color,
+    /** Selected row when the tree does not have focus. */
+    public val inactiveSelectionBackground: Color,
+    /** The blue the IDE uses for links, underlines and focus. */
     public val accent: Color,
+    /** Editor tab strip background, behind the tabs. */
+    public val tabBarBackground: Color,
+    /** The selected editor tab's fill, which matches the editor itself. */
+    public val tabSelectedBackground: Color,
+    /** The accent bar under the selected editor tab. */
+    public val tabUnderline: Color,
+    /** Popup and dialog surface, a step above the panels. */
+    public val popupBackground: Color,
+    /** Popup border, stronger than the shell separators. */
+    public val popupBorder: Color,
+    /** Error text and invalid-input outlines. */
     public val error: Color,
+    /** Modified-file marker in tabs and the project tree. */
+    public val modified: Color,
 ) {
     public companion object {
         public val Dark: ShellPalette = ShellPalette(
             toolWindowBackground = Color(0xFF2B2D30),
             statusBarBackground = Color(0xFF2B2D30),
             border = Color(0xFF393B40),
-            mutedText = Color(0xFF7A7E85),
+            text = Color(0xFFDFE1E5),
+            mutedText = Color(0xFF6F737A),
+            icon = Color(0xFFCED0D6),
+            hoverBackground = Color(0xFF43454A),
+            pressedBackground = Color(0xFF4E5157),
             selectionBackground = Color(0xFF2E436E),
-            accent = Color(0xFF548AF7),
+            inactiveSelectionBackground = Color(0xFF43454A),
+            accent = Color(0xFF3574F0),
+            tabBarBackground = Color(0xFF2B2D30),
+            tabSelectedBackground = Color(0xFF1E1F22),
+            tabUnderline = Color(0xFF3574F0),
+            popupBackground = Color(0xFF2B2D30),
+            popupBorder = Color(0xFF43454A),
             error = Color(0xFFDB5C5C),
+            modified = Color(0xFF548AF7),
         )
 
         public val Light: ShellPalette = ShellPalette(
             toolWindowBackground = Color(0xFFF7F8FA),
             statusBarBackground = Color(0xFFF7F8FA),
             border = Color(0xFFEBECF0),
-            mutedText = Color(0xFF6C707E),
+            text = Color(0xFF1E1F22),
+            mutedText = Color(0xFF818594),
+            icon = Color(0xFF6C707E),
+            hoverBackground = Color(0xFFDFE1E5),
+            pressedBackground = Color(0xFFD3D5DB),
             selectionBackground = Color(0xFFD4E2FF),
+            inactiveSelectionBackground = Color(0xFFEBECF0),
             accent = Color(0xFF3574F0),
+            tabBarBackground = Color(0xFFF7F8FA),
+            tabSelectedBackground = Color(0xFFFFFFFF),
+            tabUnderline = Color(0xFF3574F0),
+            popupBackground = Color(0xFFFFFFFF),
+            popupBorder = Color(0xFFC9CCD6),
             error = Color(0xFFC94F4F),
+            modified = Color(0xFF3574F0),
         )
 
         public fun of(dark: Boolean): ShellPalette = if (dark) Dark else Light

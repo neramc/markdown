@@ -1,141 +1,188 @@
 package com.neramc.quill.ui.shell
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.neramc.quill.QuillController
 import com.neramc.quill.model.ToolWindow
 import com.neramc.quill.model.WorkspaceState
+import com.neramc.quill.ui.icons.IdeIcons
+import com.neramc.quill.ui.theme.IdeaMetrics
 import com.neramc.quill.ui.theme.LocalShellPalette
 import org.jetbrains.jewel.ui.Orientation
 import org.jetbrains.jewel.ui.component.Divider
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.Tooltip
 
-/** Vertical tool window stripe: the narrow strip of rotated labels down each edge of an IDE. */
+/**
+ * A tool window stripe: the narrow icon rail down each edge of the window.
+ *
+ * The New UI replaced the old rotated text labels with icon buttons, and the difference is not
+ * cosmetic — a 40dp rail of icons and a rail of sideways words read as two different products. The
+ * name survives as the tooltip, which is where the IDE puts it.
+ */
 @Composable
-public fun ToolWindowStripe(tools: List<ToolWindow>, active: ToolWindow?, onSelect: (ToolWindow) -> Unit) {
+public fun ToolWindowStripe(
+    tools: List<ToolWindow>,
+    active: ToolWindow?,
+    onSelect: (ToolWindow) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val shell = LocalShellPalette.current
     Column(
-        modifier = Modifier.width(26.dp).fillMaxHeight().background(shell.toolWindowBackground),
+        modifier = modifier.width(IdeaMetrics.StripeWidth).fillMaxHeight()
+            .background(shell.toolWindowBackground)
+            .padding(top = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         tools.forEach { tool ->
-            val selected = tool == active
-            Box(
-                modifier = Modifier
-                    .padding(top = 8.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(if (selected) shell.selectionBackground else Color.Transparent)
-                    .clickable { onSelect(tool) }
-                    .padding(vertical = 6.dp, horizontal = 2.dp),
-            ) {
-                Text(
-                    text = tool.label,
-                    // Rotated so the stripe stays narrow, exactly as the IDE draws it.
-                    modifier = Modifier.rotate(if (tool == ToolWindow.PROJECT) -90f else 90f),
-                    fontSize = 11.sp,
-                    color = if (selected) shell.accent else shell.mutedText,
-                    maxLines = 1,
-                )
+            IdeActionButton(
+                onClick = { onSelect(tool) },
+                tooltip = tool.label,
+                selected = tool == active,
+                size = IdeaMetrics.StripeButtonSize,
+            ) { tint ->
+                when (tool) {
+                    ToolWindow.PROJECT -> IdeIcons.ProjectStripe(tint)
+                    ToolWindow.STRUCTURE -> IdeIcons.StructureStripe(tint)
+                }
             }
         }
     }
 }
 
-private val ToolWindow.label: String
+internal val ToolWindow.label: String
     get() = when (this) {
         ToolWindow.PROJECT -> "Project"
         ToolWindow.STRUCTURE -> "Structure"
     }
 
-/** Header shown at the top of every docked tool window. */
+/**
+ * The header above a docked tool window.
+ *
+ * Mixed case, not upper case: the New UI stopped shouting its panel titles, and an all-caps header
+ * is one of the clearest tells of a UI copied from the old look.
+ */
 @Composable
-public fun ToolWindowHeader(title: String) {
+public fun ToolWindowHeader(
+    title: String,
+    onHide: (() -> Unit)? = null,
+    hidesTowardsLeft: Boolean = true,
+    actions: @Composable () -> Unit = {},
+) {
     val shell = LocalShellPalette.current
     Column {
         Row(
-            modifier = Modifier.fillMaxWidth().height(28.dp).padding(horizontal = 10.dp),
+            modifier = Modifier.fillMaxWidth().height(IdeaMetrics.ToolWindowHeaderHeight)
+                .padding(start = 12.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(title.uppercase(), fontSize = 11.sp, color = shell.mutedText, maxLines = 1)
+            Text(
+                text = title,
+                fontSize = IdeaMetrics.SmallFontSize,
+                color = shell.text,
+                maxLines = 1,
+                modifier = Modifier.weight(1f),
+            )
+
+            actions()
+
+            if (onHide != null) {
+                IdeActionButton(onClick = onHide, tooltip = "Hide", size = 22.dp) { tint ->
+                    IdeIcons.Hide(tint, towardsLeft = hidesTowardsLeft, size = 14.dp)
+                }
+            }
         }
         Divider(Orientation.Horizontal, color = shell.border)
     }
 }
 
-/** The status bar: caret position, document statistics and the theme switch. */
+/**
+ * The status bar.
+ *
+ * The New UI keeps a message on the left and a right-aligned run of widgets — caret position, line
+ * separator, encoding — each of which is a hover target. The theme switch stands in for the IDE's
+ * own settings widget at the far right.
+ */
 @Composable
 public fun StatusBar(controller: QuillController, workspace: WorkspaceState) {
     val shell = LocalShellPalette.current
     val document = workspace.activeDocument
 
-    Row(
-        modifier = Modifier.fillMaxWidth().height(24.dp).background(shell.statusBarBackground)
-            .padding(horizontal = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        val notification = workspace.notification
-        val error = document?.loadError
-        Text(
-            text = notification ?: error ?: "Ready",
-            modifier = Modifier.weight(1f).clickable { controller.dismissNotification() },
-            fontSize = 11.sp,
-            color = when {
-                error != null -> shell.error
-                notification != null -> shell.accent
-                else -> shell.mutedText
-            },
-            maxLines = 1,
-        )
-
-        if (document != null) {
-            val caret = document.caretPosition
-            StatusItem("${caret.line + 1}:${caret.column + 1}", "Caret line and column")
-            val stats = document.stats
-            StatusItem("${stats.words} words", "Words in prose, excluding code and front matter")
-            StatusItem("${stats.characters} chars", "Characters, in UTF-16 code units")
-            StatusItem(readingTime(stats.readingTimeSeconds), "Estimated reading time at 200 wpm")
-            StatusItem("UTF-8", "File encoding")
-            StatusItem("LF", "Line separator")
-        }
-
-        Box(
-            Modifier.clip(RoundedCornerShape(3.dp)).clickable { controller.toggleTheme() }
-                .padding(horizontal = 6.dp, vertical = 2.dp)
+    Column {
+        Divider(Orientation.Horizontal, color = shell.border)
+        Row(
+            modifier = Modifier.fillMaxWidth().height(IdeaMetrics.StatusBarHeight)
+                .background(shell.statusBarBackground)
+                .padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                if (workspace.settings.darkTheme) "Dark" else "Light",
-                fontSize = 11.sp,
-                color = shell.mutedText,
+            val notification = workspace.notification
+            val error = document?.loadError
+
+            StatusItem(
+                label = notification ?: error ?: "",
+                tooltip = "Last message",
+                modifier = Modifier.weight(1f),
+                color = when {
+                    error != null -> shell.error
+                    notification != null -> shell.text
+                    else -> shell.mutedText
+                },
+                onClick = controller::dismissNotification,
             )
+
+            if (document != null) {
+                val caret = document.caretPosition
+                val stats = document.stats
+                StatusItem("${caret.line + 1}:${caret.column + 1}", "Go to line and column")
+                StatusItem("${stats.words} words", "Words in prose, excluding code and front matter")
+                StatusItem(readingTime(stats.readingTimeSeconds), "Estimated reading time at 200 wpm")
+                StatusItem("LF", "Line separator")
+                StatusItem("UTF-8", "File encoding")
+            }
+
+            Spacer(Modifier.width(2.dp))
+            IdeActionButton(
+                onClick = controller::toggleTheme,
+                tooltip = if (workspace.settings.darkTheme) "Switch to Light theme" else "Switch to Dark theme",
+                size = 22.dp,
+            ) { tint -> IdeIcons.Gear(tint, size = 14.dp) }
         }
     }
 }
 
+/** One status bar widget: a label with a hover fill and a tooltip, as every IDE widget is. */
 @Composable
-private fun StatusItem(label: String, description: String) {
-    Tooltip(tooltip = { Text(description) }) {
-        Text(label, fontSize = 11.sp, color = LocalShellPalette.current.mutedText, maxLines = 1)
+private fun StatusItem(
+    label: String,
+    tooltip: String,
+    modifier: Modifier = Modifier,
+    color: androidx.compose.ui.graphics.Color = LocalShellPalette.current.mutedText,
+    onClick: () -> Unit = {},
+) {
+    if (label.isEmpty()) {
+        Box(modifier)
+        return
+    }
+
+    Tooltip(tooltip = { Text(tooltip) }) {
+        IdeWidgetButton(onClick = onClick, modifier = modifier) {
+            Text(label, fontSize = IdeaMetrics.TinyFontSize, color = color, maxLines = 1)
+        }
     }
 }
 

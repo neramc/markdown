@@ -25,12 +25,12 @@ a separate C# / Avalonia application rather than a generated MSI.
 
 | | |
 |---|---|
-| **IDE workspace** | Decorated window with an in-title-bar menu, project and structure tool windows behind rotated stripes, editor tabs, and a status bar with caret position, word count and reading time. |
-| **Split editing** | Source, preview, or both side by side, switched from a segmented control or `Ctrl+1/2/3`. |
+| **IDE workspace** | IntelliJ IDEA New UI: a 40pt main toolbar with the main menu behind a hamburger, icon tool window stripes, editor tabs with file icons and an accent underline, and a status bar of hover widgets. |
+| **Split editing** | Source, preview, or both side by side, switched from the toggle group at the editor's top-right or `Ctrl+1/2/3`. |
 | **Syntax highlighting** | A line-oriented lexer in Rust colours the source as you type — including half-typed markup, which a structural parse gets wrong. |
 | **Rendered preview** | GitHub-flavoured Markdown: tables, task lists, strikethrough, footnotes, alerts, front matter. Fenced code is highlighted by syntect against the active IntelliJ colour scheme. |
-| **Find & replace** | Literal, whole-word or regular expression, with match stepping and replace-all performed by the engine. |
-| **Command palette** | `Ctrl+Shift+P`, with subsequence matching over every command. |
+| **Find & replace** | Docked at the top of the editor as in the IDE, with `Aa` / `W` / `.*` toggles and the match counter inside the field. Literal, whole-word or regular expression; stepping and replace-all are performed by the engine. |
+| **Search Everywhere** | `Ctrl+Shift+P`, with scope tabs, grouped results and subsequence matching over every command. |
 | **Outline** | Live document structure, click to jump. |
 | **HTML export** | Standalone themed HTML, light or dark. |
 | **Themes** | IntelliJ Darcula and Light, switched at runtime. |
@@ -40,7 +40,7 @@ a separate C# / Avalonia application rather than a generated MSI.
 ```
 ┌──────────────────── quill-app ─────────────────────────────────────┐
 │ Compose Multiplatform + Jewel                                      │
-│ DecoratedWindow · TitleBar · tool windows · TabStrip · split view   │
+│ Main toolbar · icon stripes · tool windows · editor tabs · split    │
 │ SourceEditor (VisualTransformation) │ PreviewPane (Jewel renderer)  │
 └────────────────────────────┬───────────────────────────────────────┘
                              │ Kotlin API, suspending, Dispatchers.Default

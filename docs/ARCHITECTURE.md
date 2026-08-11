@@ -102,6 +102,36 @@ Two cases the line lexer gets right because it was made to:
   thematic break.
 - A `---` directly under paragraph text is a setext heading, not a break.
 
+## Looking like IntelliJ IDEA
+
+Jewel supplies IntelliJ's *components* — buttons, fields, menus, the Markdown renderer — but not the
+IDE's *layout*, and the layout is most of what makes a window recognisable. `ui/theme/IdeaMetrics.kt`
+holds the New UI's measurements in one place, and `ui/theme/QuillTheme.kt` holds its palette, so the
+shell is built from the IDE's own numbers rather than from per-component guesses.
+
+The details that carry the resemblance, and what each replaced:
+
+| Element | New UI behaviour | What a naive build does instead |
+|---|---|---|
+| Main menu | A hamburger in the 40pt main toolbar opening the whole menu | A File/Edit/View strip of combo boxes, which is the clearest tell |
+| Tool window stripes | 40pt rails of 30pt icon buttons, names in tooltips | Rotated text labels, which is the pre-2023 look |
+| Tool window headers | Mixed case, with a fold-away arrow | ALL CAPS with a close X |
+| Editor tabs | File icon, hover-only close, 2pt accent underline, selected tab in the *editor's* colour | A generic tab strip with no icon and no underline |
+| View mode switch | An icon toggle group at the editor's top-right | A segmented control in the title bar |
+| Find bar | Docked at the *top*, one row, `Aa` / `W` / `.*` glyph chips, counter inside the field | Docked at the bottom with labelled checkboxes |
+| Search Everywhere | 700pt floating surface, scope tabs, grouped results, borderless field | A narrow palette with a boxed input |
+| Trees | File-type icons, indent guides, full-width selection | Indented text |
+
+Icons are drawn as Compose vectors in `ui/icons/IdeIcons.kt` rather than loaded as resources.
+IntelliJ's own `expui` artwork is not published to Maven Central — Jewel ships without most of it —
+so the alternatives were bundling artwork Quill has no licence to, or a window full of
+missing-resource boxes. Drawing them on the same 16-unit grid the IDE designs on also means every
+icon takes the theme tint, exactly as the IDE's SVGs do.
+
+**On fidelity:** this matches the New UI's documented palette, metrics and arrangement, and the
+offscreen render tests show the result. It is not, and cannot be verified as, pixel-identical to a
+proprietary IDE — there is no reference build here to diff against.
+
 ## Window decoration and the JetBrains Runtime
 
 `DecoratedWindow` draws the window's own title bar through JBR-only APIs and throws on any other

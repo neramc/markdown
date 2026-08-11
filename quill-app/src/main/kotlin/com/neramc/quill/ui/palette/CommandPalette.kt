@@ -1,7 +1,11 @@
 package com.neramc.quill.ui.palette
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,8 +15,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -25,78 +31,241 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.neramc.quill.QuillController
 import com.neramc.quill.io.FileService
 import com.neramc.quill.model.ToolWindow
 import com.neramc.quill.model.ViewMode
 import com.neramc.quill.model.WorkspaceState
+import com.neramc.quill.ui.icons.IdeIcons
+import com.neramc.quill.ui.theme.IdeaMetrics
 import com.neramc.quill.ui.theme.LocalShellPalette
+import org.jetbrains.jewel.ui.Orientation
+import org.jetbrains.jewel.ui.component.Divider
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.TextField
 
-/** One entry in the command palette. */
+/** One entry in the palette. */
 internal data class Command(val title: String, val category: String, val shortcut: String?, val run: () -> Unit)
 
 /**
- * The command palette, on `Ctrl+Shift+P`.
+ * Search Everywhere, on `Ctrl+Shift+P`.
+ *
+ * Modelled on IntelliJ's dialog rather than on a generic command palette: a wide floating surface
+ * near the top of the window, a tab row of scopes across the top, a tall borderless query field, and
+ * results grouped under muted category headers with their shortcut right-aligned. The proportions
+ * are what carry the resemblance — IntelliJ's is 700pt wide with a 44pt field, and a narrow palette
+ * with a boxed input reads as a different application entirely.
  *
  * Matching is subsequence-based rather than substring-based, so "epht" finds "Export to HTML" the
- * way the IDE's Search Everywhere does.
+ * same way the IDE's does.
  */
 @Composable
 public fun CommandPalette(controller: QuillController, workspace: WorkspaceState) {
     val shell = LocalShellPalette.current
     var query by remember { mutableStateOf(TextFieldValue("")) }
+    var scope by remember { mutableStateOf(SearchScope.All) }
+
     val commands = remember(workspace) { buildCommands(controller, workspace) }
-    val filtered = remember(query.text, commands) { filter(commands, query.text) }
+    val filtered = remember(query.text, commands, scope) {
+        filter(commands.filter { scope.accepts(it) }, query.text)
+    }
+    val listState = rememberLazyListState()
 
     Box(
         modifier = Modifier.fillMaxSize()
-            // A scrim that also dismisses, matching how modal popups behave in the IDE.
+            // A scrim that also dismisses, matching how the IDE's modal popups behave.
             .background(Color.Black.copy(alpha = 0.35f))
-            .clickable { controller.setCommandPaletteVisible(false) },
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+            ) { controller.setCommandPaletteVisible(false) },
         contentAlignment = Alignment.TopCenter,
     ) {
         Column(
-            modifier = Modifier.padding(top = 96.dp).width(560.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(shell.toolWindowBackground)
+            modifier = Modifier.padding(top = 100.dp).width(IdeaMetrics.SearchPopupWidth)
+                .clip(RoundedCornerShape(10.dp))
+                .background(shell.popupBackground)
+                .border(1.dp, shell.popupBorder, RoundedCornerShape(10.dp))
                 // Swallow clicks so they do not reach the dismissing scrim behind.
-                .clickable(enabled = false) {}
-                .padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    enabled = false,
+                ) {},
         ) {
-            TextField(
-                value = query,
-                onValueChange = { query = it },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Type a command…", color = shell.mutedText) },
-            )
+            ScopeTabs(scope) { scope = it }
+            Divider(Orientation.Horizontal, color = shell.border)
+
+            Row(
+                modifier = Modifier.fillMaxWidth().height(IdeaMetrics.SearchFieldHeight)
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                IdeIcons.Search(shell.mutedText, size = 18.dp)
+                TextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    undecorated = true,
+                    placeholder = { Text(scope.placeholder, color = shell.mutedText) },
+                )
+            }
+
+            Divider(Orientation.Horizontal, color = shell.border)
 
             if (filtered.isEmpty()) {
-                Text("No matching commands", color = shell.mutedText, fontSize = 12.sp)
+                Box(Modifier.fillMaxWidth().height(72.dp), contentAlignment = Alignment.Center) {
+                    Text("Nothing found", color = shell.mutedText, fontSize = IdeaMetrics.SmallFontSize)
+                }
             } else {
-                LazyColumn(Modifier.heightIn(max = 320.dp)) {
-                    items(filtered.size, key = { filtered[it].title }) { index ->
-                        val command = filtered[index]
-                        Row(
-                            modifier = Modifier.fillMaxWidth().height(28.dp)
-                                .clickable {
+                LazyColumn(state = listState, modifier = Modifier.heightIn(max = 380.dp).padding(vertical = 4.dp)) {
+                    var lastCategory: String? = null
+                    filtered.forEachIndexed { index, command ->
+                        // Group headers appear whenever the category changes, which after ranking
+                        // means they follow relevance rather than a fixed order.
+                        if (command.category != lastCategory) {
+                            lastCategory = command.category
+                            item(key = "header-${command.category}-$index") {
+                                CategoryHeader(command.category)
+                            }
+                        }
+                        item(key = "command-${command.title}-$index") {
+                            CommandRow(
+                                command = command,
+                                selected = index == 0 && query.text.isNotEmpty(),
+                                onRun = {
                                     controller.setCommandPaletteVisible(false)
                                     command.run()
-                                }
-                                .padding(horizontal = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Text(command.category, fontSize = 11.sp, color = shell.mutedText)
-                            Text(command.title, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1)
-                            command.shortcut?.let { Text(it, fontSize = 11.sp, color = shell.mutedText) }
+                                },
+                            )
                         }
                     }
                 }
             }
+
+            Divider(Orientation.Horizontal, color = shell.border)
+            Row(
+                modifier = Modifier.fillMaxWidth().height(28.dp).padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "${filtered.size} result${if (filtered.size == 1) "" else "s"}",
+                    fontSize = IdeaMetrics.TinyFontSize,
+                    color = shell.mutedText,
+                    modifier = Modifier.weight(1f),
+                )
+                Text("Enter to run  ·  Esc to close", fontSize = IdeaMetrics.TinyFontSize, color = shell.mutedText)
+            }
+        }
+    }
+}
+
+/** The scopes Search Everywhere offers, mapped onto what a Markdown editor actually has. */
+internal enum class SearchScope(val title: String, val placeholder: String) {
+    All("All", "Type to search everywhere"),
+    Actions("Actions", "Type an action name"),
+    Files("Files", "Type a file name"),
+    ;
+
+    fun accepts(command: Command): Boolean = when (this) {
+        All -> true
+        Files -> command.category == "Files"
+        Actions -> command.category != "Files"
+    }
+}
+
+@Composable
+private fun ScopeTabs(selected: SearchScope, onSelect: (SearchScope) -> Unit) {
+    val shell = LocalShellPalette.current
+    Row(
+        modifier = Modifier.fillMaxWidth().height(34.dp).padding(horizontal = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        SearchScope.entries.forEach { scope ->
+            val isSelected = scope == selected
+            val interaction = remember { MutableInteractionSource() }
+            val hovered by interaction.collectIsHoveredAsState()
+
+            Box(
+                modifier = Modifier.height(26.dp)
+                    .clip(RoundedCornerShape(IdeaMetrics.ActionButtonCorner))
+                    .background(
+                        when {
+                            isSelected -> shell.pressedBackground
+                            hovered -> shell.hoverBackground
+                            else -> Color.Transparent
+                        }
+                    )
+                    .hoverable(interaction)
+                    .clickable(interactionSource = interaction, indication = null) { onSelect(scope) }
+                    .padding(horizontal = 10.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = scope.title,
+                    fontSize = IdeaMetrics.SmallFontSize,
+                    color = if (isSelected) shell.text else shell.mutedText,
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CategoryHeader(category: String) {
+    val shell = LocalShellPalette.current
+    Row(
+        modifier = Modifier.fillMaxWidth().height(22.dp).padding(start = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(category, fontSize = IdeaMetrics.TinyFontSize, color = shell.mutedText, maxLines = 1)
+    }
+}
+
+@Composable
+private fun CommandRow(command: Command, selected: Boolean, onRun: () -> Unit) {
+    val shell = LocalShellPalette.current
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+
+    Row(
+        modifier = Modifier.fillMaxWidth().height(IdeaMetrics.SearchRowHeight)
+            .background(
+                when {
+                    hovered || selected -> shell.selectionBackground
+                    else -> Color.Transparent
+                }
+            )
+            .hoverable(interaction)
+            .clickable(interactionSource = interaction, indication = null, onClick = onRun)
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        // Each category gets its own glyph. A column of identical icons carries no information and
+        // is one of the things that makes a copied Search Everywhere feel like a plain list.
+        Box(Modifier.size(IdeaMetrics.IconSize), contentAlignment = Alignment.Center) {
+            when (command.category) {
+                "Files" -> IdeIcons.MarkdownFile(shell.icon, shell.accent, size = IdeaMetrics.IconSize)
+                "File" -> IdeIcons.MarkdownFile(shell.icon, shell.mutedText, size = IdeaMetrics.IconSize)
+                "Edit" -> IdeIcons.Pencil(shell.icon, size = 14.dp)
+                "View" -> IdeIcons.ViewSplit(shell.icon, size = 14.dp)
+                else -> IdeIcons.Action(shell.icon, size = 14.dp)
+            }
+        }
+
+        Text(
+            text = command.title,
+            fontSize = IdeaMetrics.UiFontSize,
+            color = shell.text,
+            modifier = Modifier.weight(1f),
+            maxLines = 1,
+        )
+
+        command.shortcut?.let {
+            Text(it, fontSize = IdeaMetrics.TinyFontSize, color = shell.mutedText, maxLines = 1)
         }
     }
 }
@@ -137,7 +306,7 @@ private fun buildCommands(controller: QuillController, workspace: WorkspaceState
         )
 
         workspace.documents.forEach { session ->
-            add(Command("Go to ${session.displayName}", "Navigate", null) { controller.selectDocument(session.id) })
+            add(Command(session.displayName, "Files", null) { controller.selectDocument(session.id) })
         }
     }
 }

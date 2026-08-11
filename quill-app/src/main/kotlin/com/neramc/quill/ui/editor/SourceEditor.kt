@@ -27,6 +27,7 @@ import com.neramc.quill.bridge.wire.StyleSpan
 import com.neramc.quill.model.DocumentSession
 import com.neramc.quill.model.WorkspaceState
 import com.neramc.quill.ui.theme.EditorPalette
+import com.neramc.quill.ui.theme.IdeaMetrics
 import com.neramc.quill.ui.theme.LocalEditorPalette
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.component.Text
@@ -52,17 +53,18 @@ public fun SourceEditor(
     val scrollState = rememberScrollState()
     val lineCount = remember(document.text.text) { document.text.text.count { it == '\n' } + 1 }
     val transformation = remember(document.spans, palette) { MarkdownVisualTransformation(document.spans, palette) }
+    val caretLine = document.caretPosition.line
 
     Box(modifier.background(palette.background)) {
         VerticallyScrollableContainer(scrollState = scrollState, modifier = Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxWidth()) {
                 if (workspace.settings.showLineNumbers) {
-                    LineGutter(lineCount, palette)
+                    LineGutter(lineCount, caretLine, palette, workspace.settings.editorFontSize)
                 }
                 TextArea(
                     value = document.text,
                     onValueChange = { controller.onTextChanged(document.id, it) },
-                    modifier = Modifier.weight(1f).padding(start = 8.dp, end = 12.dp, top = 6.dp, bottom = 24.dp),
+                    modifier = Modifier.weight(1f).padding(start = 6.dp, end = 12.dp, top = 6.dp, bottom = 24.dp),
                     undecorated = true,
                     visualTransformation = transformation,
                     textStyle = JewelTheme.editorTextStyle.copy(
@@ -75,20 +77,30 @@ public fun SourceEditor(
     }
 }
 
-/** Line-number gutter, sharing the editor's scroll container so the numbers stay aligned. */
+/**
+ * The line-number gutter.
+ *
+ * Numbers are right-aligned against the text, and the caret's own line is drawn in the brighter
+ * colour the IDE reserves for it — which is the only cue in the gutter that tells you where you are
+ * when the document is longer than the window.
+ */
 @Composable
-private fun LineGutter(lineCount: Int, palette: EditorPalette) {
+private fun LineGutter(lineCount: Int, caretLine: Int, palette: EditorPalette, fontSize: Int) {
     Column(
-        modifier = Modifier.fillMaxHeight().widthIn(min = 44.dp)
+        modifier = Modifier.fillMaxHeight().widthIn(min = IdeaMetrics.GutterMinWidth)
             .background(palette.gutterBackground)
-            .padding(start = 8.dp, end = 8.dp, top = 6.dp),
+            .padding(start = 10.dp, end = 10.dp, top = 6.dp),
         horizontalAlignment = Alignment.End,
     ) {
         for (line in 1..lineCount) {
             Text(
                 text = line.toString(),
-                style = JewelTheme.editorTextStyle,
-                color = palette.gutterForeground,
+                style = JewelTheme.editorTextStyle.copy(fontSize = fontSize.sp),
+                color = if (line - 1 == caretLine) {
+                    palette.gutterCurrentLineForeground
+                } else {
+                    palette.gutterForeground
+                },
                 textAlign = TextAlign.End,
                 maxLines = 1,
             )

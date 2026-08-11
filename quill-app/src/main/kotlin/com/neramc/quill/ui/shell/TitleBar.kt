@@ -12,6 +12,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -27,27 +31,31 @@ import com.neramc.quill.io.FileService
 import com.neramc.quill.model.ToolWindow
 import com.neramc.quill.model.ViewMode
 import com.neramc.quill.model.WorkspaceState
+import com.neramc.quill.ui.icons.IdeIcons
+import com.neramc.quill.ui.theme.IdeaMetrics
 import com.neramc.quill.ui.theme.LocalShellPalette
 import com.neramc.quill.ui.theme.QuillTheme
 import java.nio.file.Path
 import org.jetbrains.jewel.ui.Orientation
 import org.jetbrains.jewel.ui.component.Divider
-import org.jetbrains.jewel.ui.component.Dropdown
 import org.jetbrains.jewel.ui.component.Icon
 import org.jetbrains.jewel.ui.component.MenuScope
 import org.jetbrains.jewel.ui.component.MenuSeparator
-import org.jetbrains.jewel.ui.component.SegmentedControl
-import org.jetbrains.jewel.ui.component.SegmentedControlButtonData
+import org.jetbrains.jewel.ui.component.PopupMenu
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.window.DecoratedWindowScope
 import org.jetbrains.jewel.window.TitleBar
 
 /**
- * The IDE-style title bar: application menu on the left, project and document in the middle, view
- * controls on the right.
+ * The main toolbar, laid out the way IntelliJ IDEA's New UI lays it out.
  *
- * Putting the menu inside the window decoration rather than in a native menu bar is what makes the
- * window read as a JetBrains IDE on every platform.
+ * Left: the hamburger that holds the whole main menu, the product icon, and the project widget.
+ * Centre: the open file. Right: Search Everywhere and Settings.
+ *
+ * The menu lives behind a hamburger rather than being spelled out as a File/Edit/View strip because
+ * that is what the New UI does on every platform where the window is custom-decorated. It also
+ * matters that these are flat hover-highlighted buttons and not combo boxes: a bordered control with
+ * a drop-down arrow is the single detail that most gives away a JetBrains lookalike.
  */
 @Composable
 public fun DecoratedWindowScope.QuillTitleBar(
@@ -55,208 +63,328 @@ public fun DecoratedWindowScope.QuillTitleBar(
     workspace: WorkspaceState,
     onExit: () -> Unit,
 ) {
-    val shell = LocalShellPalette.current
-    TitleBar(Modifier.fillMaxWidth()) {
-        Row(Modifier.align(Alignment.Start), verticalAlignment = Alignment.CenterVertically) {
+    TitleBar(Modifier.fillMaxWidth().height(IdeaMetrics.TitleBarHeight)) {
+        Row(
+            Modifier.align(Alignment.Start).padding(start = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            // Product icon, then the main menu, then the project widget: the order the New UI
+            // uses on the platforms where the window carries its own decoration.
             Icon(
                 painter = painterResource("icons/icon.png"),
                 contentDescription = "Quill",
-                modifier = Modifier.padding(horizontal = 8.dp).size(18.dp),
+                modifier = Modifier.padding(end = 2.dp).size(20.dp),
             )
-            MainMenu(controller, workspace, onExit)
+            MainMenuButton(controller, workspace, onExit)
+            ProjectWidget(workspace)
         }
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            val project = workspace.projectRoot?.fileName?.toString()
-            val document = workspace.activeDocument
-            Text(
-                text = listOfNotNull(
-                    project,
-                    document?.displayName?.let { if (document.isModified) "$it *" else it },
-                ).joinToString("  —  ").ifEmpty { "No document" },
-                color = shell.mutedText,
-                maxLines = 1,
-            )
-        }
+        CurrentFileLabel(workspace)
 
         Row(
             Modifier.align(Alignment.End).padding(end = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            ViewModeControl(workspace.settings.viewMode, controller::setViewMode)
+            TitleBarActions(controller, workspace)
         }
     }
 }
 
 /**
- * The same controls as [QuillTitleBar], drawn as an ordinary toolbar row.
+ * The same controls drawn as an ordinary toolbar row.
  *
- * Used when the platform window keeps its own decoration, so the menu, project label and view switch
- * stay available regardless of which runtime the application is launched with.
+ * Used when the platform keeps its own window decoration, so the shell is identical below the title
+ * bar regardless of which runtime the application was launched with.
  */
 @Composable
 public fun QuillToolBar(controller: QuillController, workspace: WorkspaceState, onExit: () -> Unit) {
     val shell = LocalShellPalette.current
     Row(
-        modifier = Modifier.fillMaxWidth().height(36.dp).background(shell.toolWindowBackground)
+        modifier = Modifier.fillMaxWidth().height(IdeaMetrics.TitleBarHeight)
+            .background(shell.toolWindowBackground)
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Icon(
             painter = painterResource("icons/icon.png"),
             contentDescription = "Quill",
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.padding(end = 2.dp).size(20.dp),
         )
-        MainMenu(controller, workspace, onExit)
+        MainMenuButton(controller, workspace, onExit)
+        ProjectWidget(workspace)
 
-        Row(Modifier.weight(1f), horizontalArrangement = Arrangement.Center) {
-            val project = workspace.projectRoot?.fileName?.toString()
-            val document = workspace.activeDocument
-            Text(
-                text = listOfNotNull(
-                    project,
-                    document?.displayName?.let { if (document.isModified) "$it *" else it },
-                ).joinToString("  —  "),
-                color = shell.mutedText,
-                maxLines = 1,
-            )
+        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+            CurrentFileLabel(workspace)
         }
 
-        ViewModeControl(workspace.settings.viewMode, controller::setViewMode)
+        TitleBarActions(controller, workspace)
     }
     Divider(Orientation.Horizontal, color = shell.border)
 }
 
-/** Editor / Split / Preview switch, the same control the IDE uses for its Markdown editor. */
+/** Search Everywhere and Settings, the two actions the New UI keeps at the toolbar's right end. */
 @Composable
-private fun ViewModeControl(current: ViewMode, onSelect: (ViewMode) -> Unit) {
-    val buttons = ViewMode.entries.map { mode ->
-        SegmentedControlButtonData(
-            selected = mode == current,
-            content = { Text(mode.label, fontSize = 12.sp) },
-            onSelect = { onSelect(mode) },
-        )
-    }
-    SegmentedControl(buttons = buttons, modifier = Modifier.width(220.dp))
+private fun TitleBarActions(controller: QuillController, workspace: WorkspaceState) {
+    IdeActionButton(
+        onClick = { controller.setCommandPaletteVisible(true) },
+        tooltip = "Search Everywhere  Ctrl+Shift+P",
+        selected = workspace.commandPaletteVisible,
+    ) { tint -> IdeIcons.Search(tint) }
+
+    IdeActionButton(
+        onClick = controller::toggleTheme,
+        tooltip = if (workspace.settings.darkTheme) "Switch to Light theme" else "Switch to Dark theme",
+    ) { tint -> IdeIcons.Gear(tint) }
 }
 
-private val ViewMode.label: String
-    get() = when (this) {
-        ViewMode.EDITOR -> "Editor"
-        ViewMode.SPLIT -> "Split"
-        ViewMode.PREVIEW -> "Preview"
-    }
-
-/** File / Edit / View / Tools, rendered as dropdowns. */
+/** The project widget: the open directory's name, as a pill that opens nothing but reads as one. */
 @Composable
-private fun MainMenu(controller: QuillController, workspace: WorkspaceState, onExit: () -> Unit) {
-    val activeId = workspace.activeDocumentId
+private fun ProjectWidget(workspace: WorkspaceState) {
+    val shell = LocalShellPalette.current
+    val project = workspace.projectRoot?.fileName?.toString() ?: "quill"
+
+    IdeWidgetButton(onClick = {}) {
+        Text(
+            text = project,
+            fontSize = IdeaMetrics.UiFontSize,
+            color = shell.text,
+            maxLines = 1,
+        )
+        // The chevron is what marks this as a widget rather than a caption; the IDE draws one on
+        // every toolbar widget that can be opened.
+        Box(Modifier.padding(start = 4.dp)) { IdeIcons.WidgetChevron(shell.mutedText) }
+    }
+}
+
+/** The active file, centred, with the IDE's asterisk for unsaved changes. */
+@Composable
+private fun CurrentFileLabel(workspace: WorkspaceState) {
+    val shell = LocalShellPalette.current
+    val document = workspace.activeDocument ?: return
 
     Row(verticalAlignment = Alignment.CenterVertically) {
-        MenuButton("File") {
-            selectableItem(selected = false, keybinding = setOf("Ctrl", "N"), onClick = controller::newDocument) {
-                Text("New Document")
-            }
-            selectableItem(
-                selected = false,
-                keybinding = setOf("Ctrl", "S"),
-                enabled = activeId != null,
-                onClick = { activeId?.let { id -> controller.save(id) { null } } },
-            ) { Text("Save") }
-            passiveItem { MenuSeparator() }
-            selectableItem(
-                selected = false,
-                enabled = activeId != null,
-                onClick = {
-                    if (activeId != null) {
-                        controller.exportHtml(activeId, FileService().htmlExportTarget(workspace.activeDocument?.path))
-                    }
-                },
-            ) { Text("Export to HTML…") }
-            passiveItem { MenuSeparator() }
-            selectableItem(
-                selected = false,
-                keybinding = setOf("Ctrl", "W"),
-                enabled = activeId != null,
-                onClick = { activeId?.let(controller::closeDocument) },
-            ) { Text("Close Document") }
-            selectableItem(selected = false, onClick = onExit) { Text("Exit") }
-        }
-
-        MenuButton("Edit") {
-            selectableItem(
-                selected = workspace.find.visible && !workspace.find.replaceVisible,
-                keybinding = setOf("Ctrl", "F"),
-                onClick = { controller.setFindVisible(true) },
-            ) { Text("Find…") }
-            selectableItem(
-                selected = workspace.find.replaceVisible,
-                keybinding = setOf("Ctrl", "R"),
-                onClick = { controller.setFindVisible(visible = true, withReplace = true) },
-            ) { Text("Replace…") }
-            passiveItem { MenuSeparator() }
-            selectableItem(
-                selected = false,
-                keybinding = setOf("Ctrl", "G"),
-                enabled = workspace.activeDocument?.matches?.isNotEmpty() == true,
-                onClick = { controller.stepMatch(forward = true) },
-            ) { Text("Find Next") }
-        }
-
-        MenuButton("View") {
-            ViewMode.entries.forEach { mode ->
-                selectableItem(
-                    selected = workspace.settings.viewMode == mode,
-                    keybinding = setOf("Ctrl", "${mode.ordinal + 1}"),
-                    onClick = { controller.setViewMode(mode) },
-                ) { Text(mode.label) }
-            }
-            passiveItem { MenuSeparator() }
-            selectableItem(
-                selected = workspace.leftToolWindow != null,
-                onClick = { controller.setLeftToolWindow(ToolWindow.PROJECT) },
-            ) { Text("Project") }
-            selectableItem(
-                selected = workspace.rightToolWindow != null,
-                onClick = { controller.setRightToolWindow(ToolWindow.STRUCTURE) },
-            ) { Text("Structure") }
-            passiveItem { MenuSeparator() }
-            selectableItem(
-                selected = workspace.settings.showLineNumbers,
-                onClick = { controller.updateSettings { it.copy(showLineNumbers = !it.showLineNumbers) } },
-            ) { Text("Line Numbers") }
-            selectableItem(
-                selected = workspace.settings.darkTheme,
-                keybinding = setOf("Ctrl", "Shift", "T"),
-                onClick = controller::toggleTheme,
-            ) { Text("Dark Theme") }
-        }
-
-        MenuButton("Tools") {
-            selectableItem(
-                selected = workspace.commandPaletteVisible,
-                keybinding = setOf("Ctrl", "Shift", "P"),
-                onClick = { controller.setCommandPaletteVisible(true) },
-            ) { Text("Command Palette…") }
-            passiveItem { MenuSeparator() }
-            selectableItem(
-                selected = false,
-                onClick = { controller.openProject(Path.of("").toAbsolutePath()) },
-            ) { Text("Reload Project") }
+        Text(
+            text = document.displayName,
+            fontSize = IdeaMetrics.SmallFontSize,
+            color = shell.mutedText,
+            maxLines = 1,
+        )
+        if (document.isModified) {
+            Text(" *", fontSize = IdeaMetrics.SmallFontSize, color = shell.modified)
         }
     }
 }
 
+/** The hamburger, and the main menu it opens. */
 @Composable
-private fun MenuButton(label: String, menu: MenuScope.() -> Unit) {
-    Dropdown(
-        modifier = Modifier.padding(horizontal = 2.dp),
-        menuContent = menu,
-        content = { Text(label, fontSize = 13.sp) },
-    )
+private fun MainMenuButton(controller: QuillController, workspace: WorkspaceState, onExit: () -> Unit) {
+    var open by remember { mutableStateOf(false) }
+
+    Box {
+        IdeActionButton(
+            onClick = { open = !open },
+            tooltip = "Main Menu",
+            selected = open,
+        ) { tint -> IdeIcons.Hamburger(tint) }
+
+        if (open) {
+            PopupMenu(
+                onDismissRequest = {
+                    open = false
+                    true
+                },
+                horizontalAlignment = Alignment.Start,
+                modifier = Modifier.width(260.dp),
+            ) {
+                mainMenu(controller, workspace, onExit) { open = false }
+            }
+        }
+    }
 }
+
+/**
+ * The whole main menu as one flat list of submenus.
+ *
+ * Every action closes the popup before running, because an action that opens a dialog or changes the
+ * layout behind a menu that is still on screen is the kind of detail that feels broken without being
+ * easy to name.
+ */
+private fun MenuScope.mainMenu(
+    controller: QuillController,
+    workspace: WorkspaceState,
+    onExit: () -> Unit,
+    dismiss: () -> Unit,
+) {
+    val activeId = workspace.activeDocumentId
+
+    submenu(submenu = {
+        selectableItem(
+            selected = false,
+            keybinding = setOf("Ctrl", "N"),
+            onClick = {
+                dismiss()
+                controller.newDocument()
+            },
+        ) { Text("New Document") }
+
+        selectableItem(
+            selected = false,
+            keybinding = setOf("Ctrl", "S"),
+            enabled = activeId != null,
+            onClick = {
+                dismiss()
+                activeId?.let { id -> controller.save(id) { null } }
+            },
+        ) { Text("Save") }
+
+        passiveItem { MenuSeparator() }
+
+        selectableItem(
+            selected = false,
+            enabled = activeId != null,
+            onClick = {
+                dismiss()
+                if (activeId != null) {
+                    controller.exportHtml(activeId, FileService().htmlExportTarget(workspace.activeDocument?.path))
+                }
+            },
+        ) { Text("Export to HTML…") }
+
+        passiveItem { MenuSeparator() }
+
+        selectableItem(
+            selected = false,
+            keybinding = setOf("Ctrl", "W"),
+            enabled = activeId != null,
+            onClick = {
+                dismiss()
+                activeId?.let(controller::closeDocument)
+            },
+        ) { Text("Close Document") }
+
+        selectableItem(
+            selected = false,
+            onClick = {
+                dismiss()
+                onExit()
+            },
+        ) { Text("Exit") }
+    }) { Text("File") }
+
+    submenu(submenu = {
+        selectableItem(
+            selected = workspace.find.visible && !workspace.find.replaceVisible,
+            keybinding = setOf("Ctrl", "F"),
+            onClick = {
+                dismiss()
+                controller.setFindVisible(true)
+            },
+        ) { Text("Find…") }
+
+        selectableItem(
+            selected = workspace.find.replaceVisible,
+            keybinding = setOf("Ctrl", "R"),
+            onClick = {
+                dismiss()
+                controller.setFindVisible(visible = true, withReplace = true)
+            },
+        ) { Text("Replace…") }
+
+        passiveItem { MenuSeparator() }
+
+        selectableItem(
+            selected = false,
+            keybinding = setOf("Ctrl", "G"),
+            enabled = workspace.activeDocument?.matches?.isNotEmpty() == true,
+            onClick = {
+                dismiss()
+                controller.stepMatch(forward = true)
+            },
+        ) { Text("Find Next") }
+    }) { Text("Edit") }
+
+    submenu(submenu = {
+        ViewMode.entries.forEach { mode ->
+            selectableItem(
+                selected = workspace.settings.viewMode == mode,
+                keybinding = setOf("Ctrl", "${mode.ordinal + 1}"),
+                onClick = {
+                    dismiss()
+                    controller.setViewMode(mode)
+                },
+            ) { Text(mode.label) }
+        }
+
+        passiveItem { MenuSeparator() }
+
+        selectableItem(
+            selected = workspace.leftToolWindow != null,
+            onClick = {
+                dismiss()
+                controller.setLeftToolWindow(ToolWindow.PROJECT)
+            },
+        ) { Text("Project") }
+
+        selectableItem(
+            selected = workspace.rightToolWindow != null,
+            onClick = {
+                dismiss()
+                controller.setRightToolWindow(ToolWindow.STRUCTURE)
+            },
+        ) { Text("Structure") }
+
+        passiveItem { MenuSeparator() }
+
+        selectableItem(
+            selected = workspace.settings.showLineNumbers,
+            onClick = {
+                dismiss()
+                controller.updateSettings { it.copy(showLineNumbers = !it.showLineNumbers) }
+            },
+        ) { Text("Line Numbers") }
+
+        selectableItem(
+            selected = workspace.settings.darkTheme,
+            keybinding = setOf("Ctrl", "Shift", "T"),
+            onClick = {
+                dismiss()
+                controller.toggleTheme()
+            },
+        ) { Text("Dark Theme") }
+    }) { Text("View") }
+
+    submenu(submenu = {
+        selectableItem(
+            selected = workspace.commandPaletteVisible,
+            keybinding = setOf("Ctrl", "Shift", "P"),
+            onClick = {
+                dismiss()
+                controller.setCommandPaletteVisible(true)
+            },
+        ) { Text("Search Everywhere…") }
+
+        passiveItem { MenuSeparator() }
+
+        selectableItem(
+            selected = false,
+            onClick = {
+                dismiss()
+                controller.openProject(Path.of("").toAbsolutePath())
+            },
+        ) { Text("Reload Project") }
+    }) { Text("Tools") }
+}
+
+/** Display name for a view mode, shared by the menu and the editor toolbar's tooltips. */
+internal val ViewMode.label: String
+    get() = when (this) {
+        ViewMode.EDITOR -> "Editor Only"
+        ViewMode.SPLIT -> "Editor and Preview"
+        ViewMode.PREVIEW -> "Preview Only"
+    }
 
 /**
  * Shown instead of the editor when the native engine cannot be loaded.
