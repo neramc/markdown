@@ -11,10 +11,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.ProvidableCompositionLocal
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -25,6 +32,34 @@ import dev.starfect.quill.ui.theme.LocalShellPalette
 import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.interactiveSurface
 import org.jetbrains.jewel.ui.component.Text
+
+/**
+ * Whether the tool window a row belongs to currently holds keyboard focus.
+ *
+ * The IDE draws a selected row two ways: solidly while its panel is focused, and in a weaker grey
+ * once focus moves to the editor. That is the whole of §25's "focus" for a tree — no ring, no
+ * outline, just the selection stepping back so the window says where typing will go.
+ *
+ * A composition local rather than a parameter because the answer is a property of the panel, and
+ * threading it through every row and every row's caller is how it ends up wrong in one of them.
+ */
+public val LocalToolWindowFocused: ProvidableCompositionLocal<Boolean> = compositionLocalOf { true }
+
+/**
+ * Marks its content as one focus region and publishes whether focus is inside it.
+ *
+ * `hasFocus` is true when the focused node is this one *or any descendant*, which is exactly the
+ * question a tool window needs answered: rows are individually focusable, and the panel should not
+ * dim its selection just because focus moved from one of its own rows to another.
+ */
+@Composable
+public fun ToolWindowFocusScope(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+
+    Box(modifier.onFocusChanged { focused = it.hasFocus }) {
+        CompositionLocalProvider(LocalToolWindowFocused provides focused, content = content)
+    }
+}
 
 /**
  * One row of a tree, wherever that tree appears.
@@ -58,6 +93,7 @@ public fun TreeRow(
                 onClick = onClick,
                 palette = shell,
                 selected = selected,
+                focused = LocalToolWindowFocused.current,
                 cornerRadius = Tokens.Radius.Row,
                 interactionSource = interaction,
             )

@@ -110,8 +110,13 @@ public object Tokens {
     /** A square button in a toolbar or a tool window header. */
     public val ControlSize: Dp = 24.dp
 
-    /** The smaller button used inside tool window headers. */
-    public val SmallControlSize: Dp = 20.dp
+    /**
+     * The dense button used inside tool window headers, the find bar and the editor toolbar.
+     *
+     * 22dp around a 16dp icon: the icon nearly fills its button, which is what makes a row of them
+     * read as a strip of icons rather than as a row of buttons that happen to contain icons.
+     */
+    public val SmallControlSize: Dp = 22.dp
 
     /** The editor's own toolbar, which carries the view switch and the inspection widget. */
     public val EditorToolbarHeight: Dp = 28.dp
@@ -135,6 +140,14 @@ public object Tokens {
     /** Disclosure triangles, chevrons and badges. */
     public val SmallIconSize: Dp = 12.dp
 
+    /**
+     * The one icon size above 16dp: the welcome window's action tiles.
+     *
+     * It exists so that "bigger than the shell's icons" is a single decision rather than a number
+     * invented at each tile, which is how a 30dp icon ended up next to a 16dp one.
+     */
+    public val LargeIconSize: Dp = 24.dp
+
     // ------------------------------------------------------------------ typography
     /** Primary UI text: tree rows, tabs, toolbar labels, menu items. */
     public val FontSize: TextUnit = 13.sp
@@ -145,6 +158,17 @@ public object Tokens {
     /** Metadata: status bar items, counters, shortcut hints. */
     public val TinyFontSize: TextUnit = 11.sp
 
+    /** A heading over a group of controls: the welcome window's panes, an error screen's title. */
+    public val TitleFontSize: TextUnit = 15.sp
+
+    /**
+     * The only display-sized text in the product, used for the welcome greeting.
+     *
+     * Kept as one token rather than a spread of 18/20/22/26sp headings: a shell whose type scale has
+     * six steps has no scale, and the sizes drift apart every time a screen is added.
+     */
+    public val DisplayFontSize: TextUnit = 22.sp
+
     // ------------------------------------------------------------------ dialogs and popups
     public val DialogTitleHeight: Dp = 36.dp
     public val DialogListWidth: Dp = 220.dp
@@ -153,6 +177,9 @@ public object Tokens {
     public val SearchPopupWidth: Dp = 680.dp
     public val SearchFieldHeight: Dp = 40.dp
     public val SearchRowHeight: Dp = 26.dp
+
+    /** A scope chip ("All", "Files", "Actions") in the search popup's filter row. */
+    public val SearchScopeHeight: Dp = 26.dp
 
     // ------------------------------------------------------------------ welcome window
     public val WelcomeRailWidth: Dp = 240.dp

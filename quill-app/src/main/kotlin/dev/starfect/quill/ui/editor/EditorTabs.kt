@@ -53,6 +53,11 @@ public fun EditorTabs(controller: QuillController, workspace: WorkspaceState) {
     val shell = LocalShellPalette.current
 
     Box(Modifier.fillMaxWidth().height(Tokens.TabHeight).background(shell.tabBarBackground)) {
+        // Drawn before the tabs, so the selected tab's accent line paints over it. In the IDE the
+        // accent *replaces* the strip's bottom border for the width of the active tab; painting the
+        // divider last instead clipped the 2px line to 1px on screen.
+        ShellDivider(Orientation.Horizontal, Modifier.align(Alignment.BottomStart))
+
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             LazyRow(
                 modifier = Modifier.weight(1f),
@@ -78,8 +83,6 @@ public fun EditorTabs(controller: QuillController, workspace: WorkspaceState) {
                 modifier = Modifier.padding(end = Tokens.Spacing.Tiny),
             ) { tint -> IdeIcons.MoreVertical(tint, size = Tokens.SmallIconSize) }
         }
-
-        ShellDivider(Orientation.Horizontal, Modifier.align(Alignment.BottomStart))
     }
 }
 

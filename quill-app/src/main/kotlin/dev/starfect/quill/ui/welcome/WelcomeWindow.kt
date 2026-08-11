@@ -38,6 +38,7 @@ import dev.starfect.quill.io.RecentProject
 import dev.starfect.quill.ui.icons.IdeIcons
 import dev.starfect.quill.ui.shell.IdeActionButton
 import dev.starfect.quill.ui.theme.Tokens
+import dev.starfect.quill.ui.theme.interactiveSurface
 import dev.starfect.quill.ui.theme.LocalShellPalette
 import dev.starfect.quill.ui.theme.ShellDivider
 import dev.starfect.quill.ui.theme.ShellPalette
@@ -143,7 +144,7 @@ private fun WelcomeRail(
                 modifier = Modifier.size(38.dp),
             )
             Column(Modifier.padding(start = 10.dp)) {
-                Text("Quill", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = shell.text)
+                Text("Quill", fontSize = Tokens.TitleFontSize, fontWeight = FontWeight.SemiBold, color = shell.text)
                 Text(version, fontSize = Tokens.SmallFontSize, color = shell.mutedText)
             }
         }
@@ -164,22 +165,16 @@ private fun WelcomeRail(
 @Composable
 private fun RailItem(title: String, selected: Boolean, onClick: () -> Unit) {
     val shell = LocalShellPalette.current
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
 
     Row(
-        modifier = Modifier.fillMaxWidth().height(30.dp)
-            .clip(RoundedCornerShape(6.dp))
-            .background(
-                when {
-                    selected -> shell.selectionBackground
-                    hovered -> shell.hoverBackground
-                    else -> Color.Transparent
-                }
+        modifier = Modifier.fillMaxWidth().height(Tokens.MenuRowHeight)
+            .interactiveSurface(
+                onClick = onClick,
+                palette = shell,
+                selected = selected,
+                cornerRadius = Tokens.Radius.Control,
             )
-            .hoverable(interaction)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(horizontal = 10.dp),
+            .padding(horizontal = Tokens.Spacing.Small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(title, fontSize = Tokens.FontSize, color = shell.text, maxLines = 1)
@@ -201,7 +196,7 @@ private fun EmptyProjects(onNewDocument: () -> Unit, onBrowse: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Text("Welcome to Quill", fontSize = 26.sp, fontWeight = FontWeight.SemiBold, color = shell.text)
+        Text("Welcome to Quill", fontSize = Tokens.DisplayFontSize, fontWeight = FontWeight.SemiBold, color = shell.text)
         Text(
             text = "Create a document to start from scratch.",
             fontSize = Tokens.FontSize,
@@ -217,10 +212,10 @@ private fun EmptyProjects(onNewDocument: () -> Unit, onBrowse: () -> Unit) {
 
         Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             BigAction("New Document", primary = true, onClick = onNewDocument) { tint ->
-                IdeIcons.Plus(tint, size = 30.dp)
+                IdeIcons.Plus(tint, size = Tokens.LargeIconSize)
             }
             BigAction("Open", primary = false, onClick = onBrowse) { tint ->
-                IdeIcons.OpenFolder(tint, size = 30.dp)
+                IdeIcons.OpenFolder(tint, size = Tokens.LargeIconSize)
             }
         }
     }
@@ -248,11 +243,13 @@ private fun BigAction(
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = Modifier.size(Tokens.WelcomeActionSize)
-                .clip(RoundedCornerShape(10.dp))
-                .background(if (hovered) shell.hoverBackground else Color.Transparent)
-                .border(1.dp, borderColor, RoundedCornerShape(10.dp))
-                .hoverable(interaction)
-                .clickable(interactionSource = interaction, indication = null, onClick = onClick),
+                .border(1.dp, borderColor, RoundedCornerShape(Tokens.Radius.Control))
+                .interactiveSurface(
+                    onClick = onClick,
+                    palette = shell,
+                    cornerRadius = Tokens.Radius.Control,
+                    interactionSource = interaction,
+                ),
             contentAlignment = Alignment.Center,
         ) {
             icon(if (primary) shell.accent else shell.icon)
@@ -299,7 +296,7 @@ private fun RecentProjectsPane(
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = { Text("Search projects", color = shell.mutedText) },
                     leadingIcon = {
-                        Box(Modifier.padding(start = 6.dp)) { IdeIcons.Search(shell.mutedText, size = 14.dp) }
+                        Box(Modifier.padding(start = 6.dp)) { IdeIcons.Search(shell.mutedText, size = Tokens.IconSize) }
                     },
                 )
             }
@@ -334,16 +331,18 @@ private fun RecentProjectRow(
 
     Row(
         modifier = Modifier.fillMaxWidth().height(Tokens.WelcomeRecentRowHeight)
-            .clip(RoundedCornerShape(6.dp))
-            .background(if (hovered) shell.hoverBackground else Color.Transparent)
-            .hoverable(interaction)
-            .clickable(interactionSource = interaction, indication = null) { onOpen(project.path) }
-            .padding(horizontal = 10.dp),
+            .interactiveSurface(
+                onClick = { onOpen(project.path) },
+                palette = shell,
+                cornerRadius = Tokens.Radius.Control,
+                interactionSource = interaction,
+            )
+            .padding(horizontal = Tokens.Spacing.Small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            modifier = Modifier.size(32.dp)
-                .clip(RoundedCornerShape(7.dp))
+            modifier = Modifier.size(Tokens.ToolWindowBarWidth)
+                .clip(RoundedCornerShape(Tokens.ProjectBadgeCorner))
                 .background(ShellPalette.badgeColor(project.name)),
             contentAlignment = Alignment.Center,
         ) {
@@ -371,8 +370,8 @@ private fun RecentProjectRow(
             IdeActionButton(
                 onClick = { onForget(project.path) },
                 tooltip = "Remove from Recent Projects",
-                size = 22.dp,
-            ) { tint -> IdeIcons.Close(tint, size = 12.dp) }
+                size = Tokens.SmallControlSize,
+            ) { tint -> IdeIcons.Close(tint, size = Tokens.SmallIconSize) }
         }
     }
 }
@@ -380,17 +379,16 @@ private fun RecentProjectRow(
 @Composable
 private fun WelcomeButton(label: String, onClick: () -> Unit) {
     val shell = LocalShellPalette.current
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
 
     Box(
-        modifier = Modifier.height(28.dp)
-            .clip(RoundedCornerShape(5.dp))
-            .background(if (hovered) shell.hoverBackground else Color.Transparent)
-            .border(1.dp, shell.border, RoundedCornerShape(5.dp))
-            .hoverable(interaction)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(horizontal = 14.dp),
+        modifier = Modifier.height(Tokens.MenuRowHeight)
+            .border(1.dp, shell.border, RoundedCornerShape(Tokens.Radius.Control))
+            .interactiveSurface(
+                onClick = onClick,
+                palette = shell,
+                cornerRadius = Tokens.Radius.Control,
+            )
+            .padding(horizontal = Tokens.Spacing.Medium),
         contentAlignment = Alignment.Center,
     ) {
         Text(label, fontSize = Tokens.SmallFontSize, color = shell.text, maxLines = 1)
@@ -403,7 +401,7 @@ private fun CustomizePane(darkTheme: Boolean, onToggleTheme: () -> Unit) {
     val shell = LocalShellPalette.current
 
     Column(Modifier.fillMaxSize().padding(32.dp)) {
-        Text("Customize", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = shell.text)
+        Text("Customize", fontSize = Tokens.TitleFontSize, fontWeight = FontWeight.SemiBold, color = shell.text)
         Text(
             text = "Colour theme",
             fontSize = Tokens.SmallFontSize,

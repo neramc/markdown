@@ -56,8 +56,8 @@ public fun FindReplaceBar(controller: QuillController, workspace: WorkspaceState
             IdeActionButton(
                 onClick = { controller.setFindVisible(visible = true, withReplace = !find.replaceVisible) },
                 tooltip = if (find.replaceVisible) "Collapse to Find" else "Expand to Replace",
-                size = 22.dp,
-            ) { tint -> IdeIcons.ExpandChevron(tint, find.replaceVisible, size = 14.dp) }
+                size = Tokens.SmallControlSize,
+            ) { tint -> IdeIcons.ExpandChevron(tint, find.replaceVisible, size = Tokens.IconSize) }
 
             TextField(
                 value = TextFieldValue(find.query),
@@ -86,15 +86,15 @@ public fun FindReplaceBar(controller: QuillController, workspace: WorkspaceState
                 onClick = { controller.stepMatch(forward = false) },
                 tooltip = "Previous Occurrence  Shift+F3",
                 enabled = matchCount > 0,
-                size = 22.dp,
-            ) { tint -> IdeIcons.ArrowUp(tint, size = 14.dp) }
+                size = Tokens.SmallControlSize,
+            ) { tint -> IdeIcons.ArrowUp(tint, size = Tokens.IconSize) }
 
             IdeActionButton(
                 onClick = { controller.stepMatch(forward = true) },
                 tooltip = "Next Occurrence  F3",
                 enabled = matchCount > 0,
-                size = 22.dp,
-            ) { tint -> IdeIcons.ArrowDown(tint, size = 14.dp) }
+                size = Tokens.SmallControlSize,
+            ) { tint -> IdeIcons.ArrowDown(tint, size = Tokens.IconSize) }
 
             ShellDivider(Orientation.Vertical, Modifier.height(Tokens.IconSize))
 
@@ -132,8 +132,8 @@ public fun FindReplaceBar(controller: QuillController, workspace: WorkspaceState
             IdeActionButton(
                 onClick = { controller.setFindVisible(false) },
                 tooltip = "Close  Escape",
-                size = 22.dp,
-            ) { tint -> IdeIcons.Close(tint, size = 14.dp) }
+                size = Tokens.SmallControlSize,
+            ) { tint -> IdeIcons.Close(tint, size = Tokens.IconSize) }
         }
 
         if (find.replaceVisible) {
@@ -165,7 +165,7 @@ private fun ReplaceAction(label: String, enabled: Boolean, onClick: () -> Unit) 
         onClick = onClick,
         tooltip = label,
         enabled = enabled,
-        size = 22.dp,
+        size = Tokens.SmallControlSize,
         modifier = Modifier.width(88.dp),
     ) { tint ->
         Text(

@@ -71,14 +71,14 @@ public fun InspectionWidget(
             IdeActionButton(
                 onClick = { controller.goToFinding(document, forward = false) },
                 tooltip = "Previous problem",
-                size = 22.dp,
-            ) { tint -> IdeIcons.ArrowUp(tint, size = 13.dp) }
+                size = Tokens.SmallControlSize,
+            ) { tint -> IdeIcons.ArrowUp(tint, size = Tokens.IconSize) }
 
             IdeActionButton(
                 onClick = { controller.goToFinding(document, forward = true) },
                 tooltip = "Next problem",
-                size = 22.dp,
-            ) { tint -> IdeIcons.ArrowDown(tint, size = 13.dp) }
+                size = Tokens.SmallControlSize,
+            ) { tint -> IdeIcons.ArrowDown(tint, size = Tokens.IconSize) }
         }
     }
 }
@@ -103,7 +103,7 @@ private fun SummaryChip(summary: InspectionSummary, shell: ShellPalette, onClick
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (summary.total == 0) {
-                IdeIcons.SeverityClean(shell.success, size = 13.dp)
+                IdeIcons.SeverityClean(shell.success, size = Tokens.SmallIconSize)
                 return@Row
             }
 
@@ -118,7 +118,7 @@ private fun SummaryChip(summary: InspectionSummary, shell: ShellPalette, onClick
 private fun Count(count: Int, severity: Severity, shell: ShellPalette) {
     if (count == 0) return
 
-    Box(Modifier.padding(end = 3.dp)) { SeverityIcon(severity, shell, size = 13.dp) }
+    Box(Modifier.padding(end = 2.dp)) { SeverityIcon(severity, shell, size = Tokens.SmallIconSize) }
     Text(
         text = count.toString(),
         color = shell.text,

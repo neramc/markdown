@@ -38,6 +38,7 @@ import dev.starfect.quill.model.ViewMode
 import dev.starfect.quill.model.WorkspaceState
 import dev.starfect.quill.ui.icons.IdeIcons
 import dev.starfect.quill.ui.theme.Tokens
+import dev.starfect.quill.ui.theme.interactiveSurface
 import dev.starfect.quill.ui.theme.LocalShellPalette
 import dev.starfect.quill.ui.theme.ShellDivider
 import org.jetbrains.jewel.ui.Orientation
@@ -100,9 +101,9 @@ public fun CommandPalette(controller: QuillController, workspace: WorkspaceState
                 modifier = Modifier.fillMaxWidth().height(Tokens.SearchFieldHeight)
                     .padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.Small),
             ) {
-                IdeIcons.Search(shell.mutedText, size = 18.dp)
+                IdeIcons.Search(shell.mutedText, size = Tokens.IconSize)
                 TextField(
                     value = query,
                     onValueChange = { query = it },
@@ -179,27 +180,21 @@ internal enum class SearchScope(val title: String, val placeholder: String) {
 private fun ScopeTabs(selected: SearchScope, onSelect: (SearchScope) -> Unit) {
     val shell = LocalShellPalette.current
     Row(
-        modifier = Modifier.fillMaxWidth().height(34.dp).padding(horizontal = 6.dp),
+        modifier = Modifier.fillMaxWidth().height(Tokens.TabHeight).padding(horizontal = Tokens.Spacing.Small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         SearchScope.entries.forEach { scope ->
             val isSelected = scope == selected
-            val interaction = remember { MutableInteractionSource() }
-            val hovered by interaction.collectIsHoveredAsState()
 
             Box(
-                modifier = Modifier.height(26.dp)
-                    .clip(RoundedCornerShape(Tokens.Radius.Control))
-                    .background(
-                        when {
-                            isSelected -> shell.pressedBackground
-                            hovered -> shell.hoverBackground
-                            else -> Color.Transparent
-                        }
+                modifier = Modifier.height(Tokens.SearchScopeHeight)
+                    .interactiveSurface(
+                        onClick = { onSelect(scope) },
+                        palette = shell,
+                        selected = isSelected,
+                        cornerRadius = Tokens.Radius.Control,
                     )
-                    .hoverable(interaction)
-                    .clickable(interactionSource = interaction, indication = null) { onSelect(scope) }
-                    .padding(horizontal = 10.dp),
+                    .padding(horizontal = Tokens.Spacing.Small),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -217,7 +212,7 @@ private fun ScopeTabs(selected: SearchScope, onSelect: (SearchScope) -> Unit) {
 private fun CategoryHeader(category: String) {
     val shell = LocalShellPalette.current
     Row(
-        modifier = Modifier.fillMaxWidth().height(22.dp).padding(start = 12.dp),
+        modifier = Modifier.fillMaxWidth().height(Tokens.StatusBarHeight).padding(start = Tokens.Spacing.Medium),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(category, fontSize = Tokens.TinyFontSize, color = shell.mutedText, maxLines = 1)
@@ -227,22 +222,21 @@ private fun CategoryHeader(category: String) {
 @Composable
 private fun CommandRow(command: Command, selected: Boolean, onRun: () -> Unit) {
     val shell = LocalShellPalette.current
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
 
     Row(
         modifier = Modifier.fillMaxWidth().height(Tokens.SearchRowHeight)
-            .background(
-                when {
-                    hovered || selected -> shell.selectionBackground
-                    else -> Color.Transparent
-                }
+            // Keyboard selection and pointer hover are the same state here: the palette is driven by
+            // the arrow keys, and a row the caret is on should look the way a row under the pointer
+            // does rather than inventing a third fill.
+            .interactiveSurface(
+                onClick = onRun,
+                palette = shell,
+                selected = selected,
+                cornerRadius = Tokens.Radius.Panel,
             )
-            .hoverable(interaction)
-            .clickable(interactionSource = interaction, indication = null, onClick = onRun)
-            .padding(horizontal = 12.dp),
+            .padding(horizontal = Tokens.Spacing.Medium),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.Small),
     ) {
         // Each category gets its own glyph. A column of identical icons carries no information and
         // is one of the things that makes a copied Search Everywhere feel like a plain list.
@@ -250,9 +244,9 @@ private fun CommandRow(command: Command, selected: Boolean, onRun: () -> Unit) {
             when (command.category) {
                 "Files" -> IdeIcons.MarkdownFile(shell.icon, shell.accent, size = Tokens.IconSize)
                 "File" -> IdeIcons.MarkdownFile(shell.icon, shell.mutedText, size = Tokens.IconSize)
-                "Edit" -> IdeIcons.Pencil(shell.icon, size = 14.dp)
-                "View" -> IdeIcons.ViewSplit(shell.icon, size = 14.dp)
-                else -> IdeIcons.Action(shell.icon, size = 14.dp)
+                "Edit" -> IdeIcons.Pencil(shell.icon, size = Tokens.IconSize)
+                "View" -> IdeIcons.ViewSplit(shell.icon, size = Tokens.IconSize)
+                else -> IdeIcons.Action(shell.icon, size = Tokens.IconSize)
             }
         }
 

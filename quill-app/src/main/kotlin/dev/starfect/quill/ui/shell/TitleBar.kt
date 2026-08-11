@@ -211,7 +211,7 @@ private fun BranchWidget(workspace: WorkspaceState) {
     val branch = remember(root) { GitStatus.currentBranch(root) } ?: return
 
     IdeWidgetButton(onClick = {}) {
-        IdeIcons.Branch(shell.icon, size = 14.dp)
+        IdeIcons.Branch(shell.icon, size = Tokens.IconSize)
         Text(
             text = branch,
             fontSize = Tokens.FontSize,
@@ -481,7 +481,12 @@ public fun ApplicationScope.StartupFailureWindow(failure: QuillNativeLibraryExce
         QuillTheme(dark = true) {
             Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("Quill could not start", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = "Quill could not start",
+                        fontSize = Tokens.TitleFontSize,
+                        fontWeight = FontWeight.SemiBold,
+                        color = LocalShellPalette.current.text,
+                    )
                     Text(failure.message ?: "The native core engine could not be loaded.")
                     Text(
                         "Build the engine with ./gradlew :quill-bridge:cargoBuild, or point " +

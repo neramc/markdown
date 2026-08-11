@@ -244,7 +244,7 @@ private fun AboutDialog(controller: QuillController) {
             Text(
                 text = "Quill",
                 color = shell.text,
-                fontSize = 22.sp,
+                fontSize = Tokens.DisplayFontSize,
                 fontWeight = FontWeight.SemiBold,
             )
             // The packaged launcher passes -Dquill.version; a Gradle run does not, and saying so is

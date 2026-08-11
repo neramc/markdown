@@ -48,27 +48,29 @@ public fun ProjectTree(controller: QuillController, workspace: WorkspaceState) {
             return@Column
         }
 
-        VerticallyScrollableContainer(scrollState = listState, modifier = Modifier.fillMaxSize()) {
-            LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-                // The project root sits at the top of the tree with its location beside it, exactly
-                // as the IDE shows it. It scrolls with the rest rather than being pinned, which is
-                // also what the IDE does.
-                workspace.projectRoot?.let { root ->
-                    item(key = "\u0000root") { ProjectRootRow(root) }
-                }
+        ToolWindowFocusScope(Modifier.fillMaxSize()) {
+            VerticallyScrollableContainer(scrollState = listState, modifier = Modifier.fillMaxSize()) {
+                LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+                    // The project root sits at the top of the tree with its location beside it,
+                    // exactly as the IDE shows it. It scrolls with the rest rather than being
+                    // pinned, which is also what the IDE does.
+                    workspace.projectRoot?.let { root ->
+                        item(key = "\u0000root") { ProjectRootRow(root) }
+                    }
 
-                items(rows.size, key = { rows[it].path.toString() }) { index ->
-                    val node = rows[index]
-                    val isOpen = workspace.documents.any { it.path == node.path }
-                    FileRow(
-                        node = node,
-                        selected = isOpen && workspace.activeDocument?.path == node.path,
-                        open = isOpen,
-                        onClick = {
-                            if (node.isDirectory) controller.toggleDirectory(node.path)
-                            else controller.openFile(node.path)
-                        },
-                    )
+                    items(rows.size, key = { rows[it].path.toString() }) { index ->
+                        val node = rows[index]
+                        val isOpen = workspace.documents.any { it.path == node.path }
+                        FileRow(
+                            node = node,
+                            selected = isOpen && workspace.activeDocument?.path == node.path,
+                            open = isOpen,
+                            onClick = {
+                                if (node.isDirectory) controller.toggleDirectory(node.path)
+                                else controller.openFile(node.path)
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -159,15 +161,17 @@ public fun OutlinePanel(controller: QuillController, workspace: WorkspaceState) 
             return@Column
         }
 
-        VerticallyScrollableContainer(scrollState = listState, modifier = Modifier.fillMaxSize()) {
-            LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-                items(outline.size, key = { "${outline[it].line}-$it" }) { index ->
-                    val entry = outline[index]
-                    OutlineRow(
-                        level = entry.level,
-                        title = entry.title,
-                        onClick = { documentId?.let { controller.moveCaret(it, entry.offset) } },
-                    )
+        ToolWindowFocusScope(Modifier.fillMaxSize()) {
+            VerticallyScrollableContainer(scrollState = listState, modifier = Modifier.fillMaxSize()) {
+                LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+                    items(outline.size, key = { "${outline[it].line}-$it" }) { index ->
+                        val entry = outline[index]
+                        OutlineRow(
+                            level = entry.level,
+                            title = entry.title,
+                            onClick = { documentId?.let { controller.moveCaret(it, entry.offset) } },
+                        )
+                    }
                 }
             }
         }
