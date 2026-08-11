@@ -239,7 +239,9 @@ private fun CommandRow(command: Command, selected: Boolean, onRun: () -> Unit) {
             )
             .padding(horizontal = Tokens.Spacing.Medium),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.Small),
+        // The same icon-to-label gap as a tree row and a tab, so a glyph sits the same distance from
+        // its text everywhere in the shell.
+        horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.Tiny),
     ) {
         // Each category gets its own glyph. A column of identical icons carries no information and
         // is one of the things that makes a copied Search Everywhere feel like a plain list.
