@@ -2,7 +2,9 @@ package dev.starfect.quill.model
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.text.input.TextFieldValue
+import dev.starfect.quill.bridge.MarkdownFlavour
 import dev.starfect.quill.bridge.wire.DocumentStats
+import dev.starfect.quill.bridge.wire.HtmlNode
 import dev.starfect.quill.bridge.wire.MarkdownBlockIr
 import dev.starfect.quill.bridge.wire.OutlineEntry
 import dev.starfect.quill.bridge.wire.SearchMatch
@@ -47,7 +49,9 @@ public data class DocumentSession(
     val savedText: String = "",
     val engineVersion: Long = 0,
     val derivedVersion: Long = -1,
+    val flavour: MarkdownFlavour = MarkdownFlavour.GFM,
     val blocks: List<MarkdownBlockIr> = emptyList(),
+    val html: List<HtmlNode> = emptyList(),
     val outline: List<OutlineEntry> = emptyList(),
     val stats: DocumentStats = DocumentStats.EMPTY,
     val spans: List<StyleSpan> = emptyList(),

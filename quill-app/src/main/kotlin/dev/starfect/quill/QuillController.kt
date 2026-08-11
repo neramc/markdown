@@ -5,12 +5,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import dev.starfect.quill.bridge.ExportOptions
+import dev.starfect.quill.bridge.MarkdownFlavour
 import dev.starfect.quill.bridge.QuillDocument
 import dev.starfect.quill.bridge.QuillEngine
 import dev.starfect.quill.bridge.QuillEngineException
 import dev.starfect.quill.bridge.SearchFlags
 import dev.starfect.quill.bridge.wire.ColorSpan
 import dev.starfect.quill.bridge.wire.DocumentStats
+import dev.starfect.quill.bridge.wire.HtmlNode
 import dev.starfect.quill.bridge.wire.MarkdownBlockIr
 import dev.starfect.quill.bridge.wire.OutlineEntry
 import dev.starfect.quill.bridge.wire.StyleSpan
@@ -121,7 +123,14 @@ public class QuillController(
             withContext(Dispatchers.IO) { runCatching { fileService.read(path) } }
                 .onSuccess { text ->
                     val id = nextId.getAndIncrement()
-                    handles[id] = engine.openDocument(text)
+                    val handle = engine.openDocument(text)
+                    handles[id] = handle
+
+                    // The extension decides the dialect: a .mdx file has to parse as MDX from the
+                    // first render, not after the user finds the setting.
+                    val flavour = MarkdownFlavour.forFileName(path.fileName.toString())
+                    runCatching { handle.flavour = flavour }
+
                     update { workspace ->
                         workspace.copy(
                             documents = workspace.documents + DocumentSession(
@@ -129,6 +138,7 @@ public class QuillController(
                                 path = path,
                                 text = TextFieldValue(text),
                                 savedText = text,
+                                flavour = flavour,
                             ),
                             activeDocumentId = id,
                         )
@@ -196,11 +206,30 @@ public class QuillController(
         derive(id, immediate = false)
     }
 
+    /**
+     * Switches the dialect [id] is parsed as.
+     *
+     * The engine drops its cached derivations, so this re-derives immediately rather than waiting
+     * for the debounce: the user picked a dialect and expects to see it, not to have to type first.
+     */
+    public fun setFlavour(id: Long, flavour: MarkdownFlavour) {
+        val handle = handles[id] ?: return
+        runCatching { handle.flavour = flavour }
+            .onSuccess {
+                updateDocument(id) { it.copy(flavour = flavour) }
+                derive(id, immediate = true)
+            }
+            .onFailure { failure ->
+                update { it.copy(notification = "Could not switch to ${flavour.displayName}: ${failure.message}") }
+            }
+    }
+
     // ---------------------------------------------------------------- derivation
 
     private data class Derived(
         val version: Long,
         val blocks: List<MarkdownBlockIr>,
+        val html: List<HtmlNode>,
         val outline: List<OutlineEntry>,
         val stats: DocumentStats,
         val spans: List<StyleSpan>,
@@ -224,6 +253,7 @@ public class QuillController(
                     Derived(
                         version = version,
                         blocks = handle.blocks(),
+                        html = handle.htmlDom(),
                         outline = handle.outline(),
                         stats = handle.stats(),
                         spans = handle.spans(0, lineCount.coerceAtMost(HIGHLIGHT_LINE_BUDGET)),
@@ -239,6 +269,7 @@ public class QuillController(
                             session.copy(
                                 derivedVersion = result.version,
                                 blocks = result.blocks,
+                                html = result.html,
                                 outline = result.outline,
                                 stats = result.stats,
                                 spans = result.spans,
