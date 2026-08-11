@@ -154,6 +154,3 @@ private fun summaryTooltip(summary: InspectionSummary): String {
 }
 
 private fun plural(count: Int, noun: String): String = if (count == 1) "1 $noun" else "$count ${noun}s"
-
-/** Findings sorted for stepping, which is source order — the order the widget's arrows walk. */
-internal fun DocumentSession.orderedFindings(): List<Finding> = findings.sortedBy { it.start }

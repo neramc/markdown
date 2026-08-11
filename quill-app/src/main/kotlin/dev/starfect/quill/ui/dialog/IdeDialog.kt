@@ -205,7 +205,5 @@ public fun ListToolbar(
                 IdeIcons.Copy(tint, size = 14.dp)
             }
         }
-        Spacer(Modifier.weight(1f))
-        Box(Modifier.height(1.dp).fillMaxWidth(0f).background(shell.border))
     }
 }

@@ -73,10 +73,14 @@ public fun ProblemsPanel(
 
             else -> VerticallyScrollableContainer(scrollState = listState, modifier = Modifier.fillMaxSize()) {
                 LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-                    items(findings.size, key = { findings[it].let { f -> f.start * 31L + f.severity.ordinal } }) {
+                    // Keyed by index. Two inspections legitimately fire on the same span with the
+                    // same severity — an image written `![]()` has both no source and no alt text —
+                    // so any key derived from a finding's contents can collide, and a duplicate key
+                    // is a hard failure in LazyColumn rather than a cosmetic one.
+                    items(findings.size) { index ->
                         FindingRow(
-                            finding = findings[it],
-                            onClick = { controller.goToFinding(document.id, findings[it]) },
+                            finding = findings[index],
+                            onClick = { controller.goToFinding(document.id, findings[index]) },
                         )
                     }
                 }

@@ -248,6 +248,29 @@ class ShellRenderTest {
     }
 
     @Test
+    fun `the problems list renders two findings that share a position`() {
+        // `![]()` reports both "no source" and "no alternative text" on the same span, with the same
+        // severity. Any LazyColumn key derived from a finding's contents collides on that, and a
+        // duplicate key is a hard failure rather than a cosmetic one — the panel throws instead of
+        // drawing. This is the smallest document that produces it.
+        renderShell(
+            "problems-duplicate-span.png",
+            dark = true,
+            viewMode = ViewMode.EDITOR,
+            source = "# Title\n\n![]()\n",
+        ) {
+            controller.openProblems()
+        }
+
+        val findings = assertNotNull(controller.state.value.activeDocument, "no document").findings
+        val collisions = findings.groupBy { it.start to it.severity }.filterValues { it.size > 1 }
+        assertTrue(
+            collisions.isNotEmpty(),
+            "the fixture no longer produces two findings on one span, so this test guards nothing",
+        )
+    }
+
+    @Test
     fun `the inspection widget reflects what the engine found`() {
         renderShell("inspection-widget.png", dark = true, viewMode = ViewMode.EDITOR, source = FLAWED)
 
