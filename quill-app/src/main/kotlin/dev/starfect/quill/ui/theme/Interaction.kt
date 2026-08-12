@@ -1,5 +1,16 @@
 package dev.starfect.quill.ui.theme
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.gestures.Orientation as DragOrientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.platform.LocalDensity
+import java.awt.Cursor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
@@ -150,9 +161,18 @@ public fun Modifier.interactiveSurface(
         )
     }
 
+    // One animation, inherited by every hoverable thing in the shell. Animating here rather than at
+    // each component is what keeps a tree row and a toolbar button from fading at different rates —
+    // which is far more noticeable than either rate on its own.
+    val fill by animateColorAsState(
+        targetValue = state.background(palette),
+        animationSpec = Motion.state(),
+        label = "surfaceFill",
+    )
+
     return this
         .clip(RoundedCornerShape(cornerRadius))
-        .background(state.background(palette))
+        .background(fill)
         .hoverable(interactionSource, enabled = enabled)
         .clickable(
             interactionSource = interactionSource,
@@ -191,3 +211,54 @@ public fun ShellDivider(
             .background(color)
     )
 }
+
+/**
+ * The draggable edge of a docked tool window.
+ *
+ * A panel whose width cannot be changed is one of the clearest signs that a window is a mock-up
+ * rather than a tool: the first thing anyone does with a side panel is drag it. The handle is wider
+ * than it looks — a 1px line is drawn but 5px respond to the pointer, because a splitter you have to
+ * aim at is worse than no splitter.
+ *
+ * It draws nothing of its own until pointed at, at which point it takes the splitter colour, the
+ * same way the editor's own split handle behaves.
+ */
+@Composable
+public fun ToolWindowResizeHandle(
+    onDrag: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val palette = LocalShellPalette.current
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val dragged by interaction.collectIsDraggedAsState()
+    val density = LocalDensity.current
+
+    val line by animateColorAsState(
+        targetValue = if (hovered || dragged) palette.splitter else Color.Transparent,
+        animationSpec = Motion.state(),
+        label = "resizeHandle",
+    )
+
+    Box(
+        modifier
+            .fillMaxHeight()
+            .width(ResizeHandleWidth)
+            .pointerHoverIcon(PointerIcon(Cursor(Cursor.E_RESIZE_CURSOR)))
+            .hoverable(interaction)
+            .draggable(
+                orientation = DragOrientation.Horizontal,
+                interactionSource = interaction,
+                state = rememberDraggableState { delta -> onDrag(with(density) { delta.toDp().value }) },
+            )
+            .drawBehind {
+                // Painted down the middle of the wider hit area, so the visible line does not move
+                // when the pointer finds it.
+                val x = size.width / 2f
+                drawLine(line, Offset(x, 0f), Offset(x, size.height), strokeWidth = 1.dp.toPx())
+            }
+    )
+}
+
+/** Hit width of a resize handle. Wider than the line it draws, on purpose. */
+private val ResizeHandleWidth = 5.dp

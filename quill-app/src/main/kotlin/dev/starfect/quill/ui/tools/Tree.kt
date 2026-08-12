@@ -1,5 +1,7 @@
 package dev.starfect.quill.ui.tools
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,7 +23,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -54,10 +63,41 @@ public val LocalToolWindowFocused: ProvidableCompositionLocal<Boolean> = composi
  * dim its selection just because focus moved from one of its own rows to another.
  */
 @Composable
-public fun ToolWindowFocusScope(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+public fun ToolWindowFocusScope(
+    modifier: Modifier = Modifier,
+    /** Moves the selection by one row. Wired to the arrow keys. */
+    onMove: (Int) -> Unit = {},
+    /** Activates the selected row. Wired to Enter and Space. */
+    onActivate: () -> Unit = {},
+    content: @Composable () -> Unit,
+) {
     var focused by remember { mutableStateOf(false) }
+    val requester = remember { FocusRequester() }
 
-    Box(modifier.onFocusChanged { focused = it.hasFocus }) {
+    Box(
+        modifier
+            .onFocusChanged { focused = it.hasFocus }
+            .focusRequester(requester)
+            // Focusable itself, not only through its rows: a panel the user has tabbed to has to be
+            // able to receive an arrow key before anything inside it has been clicked.
+            .focusable()
+            // The platform's keyboard contract for a list: arrows move, Space and Enter activate,
+            // and Escape hands focus back. Without it a tool window is reachable only by pointer,
+            // which fails the accessibility guideline outright.
+            .onPreviewKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                when (event.key) {
+                    Key.DirectionDown -> { onMove(1); true }
+                    Key.DirectionUp -> { onMove(-1); true }
+                    Key.Enter, Key.Spacebar -> { onActivate(); true }
+                    else -> false
+                }
+            }
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+            ) { requester.requestFocus() }
+    ) {
         CompositionLocalProvider(LocalToolWindowFocused provides focused, content = content)
     }
 }

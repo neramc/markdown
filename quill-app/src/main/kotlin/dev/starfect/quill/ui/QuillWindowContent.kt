@@ -1,5 +1,6 @@
 package dev.starfect.quill.ui
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -37,6 +38,8 @@ import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalEditorPalette
 import dev.starfect.quill.ui.theme.LocalSurfaceStyle
 import dev.starfect.quill.ui.theme.regionSurface
+import dev.starfect.quill.ui.theme.Motion
+import dev.starfect.quill.ui.theme.ToolWindowResizeHandle
 import dev.starfect.quill.ui.theme.LocalShellPalette
 import dev.starfect.quill.ui.theme.ShellDivider
 import dev.starfect.quill.ui.tools.FindReplaceBar
@@ -77,6 +80,12 @@ public fun QuillWindowContent(
                     bottomTools = ToolWindow.on(Dock.BOTTOM),
                     bottomActive = workspace.bottomToolWindow,
                     onSelectBottom = controller::setBottomToolWindow,
+                    // Problems carries its count, so a document with errors says so from the rail
+                    // whether or not the panel is open.
+                    badges = buildMap {
+                        val problems = workspace.activeDocument?.findings?.size ?: 0
+                        if (problems > 0) put(ToolWindow.PROBLEMS, problems)
+                    },
                 )
                 // The rail and the panel beside it share a tone, so a line is what divides them —
                 // except in Islands, where the panel is a separate rounded surface and the gap does
@@ -86,10 +95,16 @@ public fun QuillWindowContent(
                 if (workspace.leftToolWindow == ToolWindow.PROJECT) {
                     // No separator between panel and editor: they are twelve points apart, and in
                     // the real window that tone step is the whole boundary. A line here would be the
-                    // first thing anyone saw.
-                    Box(Modifier.width(260.dp).fillMaxHeight().regionSurface(shell.toolWindowBackground)) {
+                    // first thing anyone saw. The resize handle sits in that boundary instead, and
+                    // shows nothing until it is pointed at.
+                    Box(
+                        Modifier.width(workspace.leftToolWindowWidth.dp)
+                            .fillMaxHeight()
+                            .regionSurface(shell.toolWindowBackground)
+                    ) {
                         ProjectTree(controller, workspace)
                     }
+                    ToolWindowResizeHandle(onDrag = { controller.resizeToolWindow(Dock.LEFT, it) })
                 }
 
                 Column(Modifier.weight(1f).fillMaxHeight().regionSurface(shell.tabBarBackground)) {
@@ -98,7 +113,14 @@ public fun QuillWindowContent(
                     // The find bar sits directly under the tabs and above the document, which is
                     // where IntelliJ docks it. A find bar at the bottom of the window is a text
                     // editor's convention, not an IDE's.
-                    if (workspace.find.visible) {
+                    //
+                    // It expands from its top edge rather than sliding over the document, so the
+                    // editor is pushed down exactly as it would be without the animation.
+                    AnimatedVisibility(
+                        visible = workspace.find.visible,
+                        enter = Motion.barEnter,
+                        exit = Motion.barExit,
+                    ) {
                         FindReplaceBar(controller, workspace)
                     }
 
@@ -137,7 +159,12 @@ private fun RightDock(controller: QuillController, workspace: WorkspaceState) {
     val tool = workspace.rightToolWindow ?: return
     val shell = LocalShellPalette.current
 
-    Box(Modifier.width(280.dp).fillMaxHeight().regionSurface(shell.toolWindowBackground)) {
+    ToolWindowResizeHandle(onDrag = { controller.resizeToolWindow(Dock.RIGHT, -it) })
+    Box(
+        Modifier.width(workspace.rightToolWindowWidth.dp)
+            .fillMaxHeight()
+            .regionSurface(shell.toolWindowBackground)
+    ) {
         when (tool) {
             ToolWindow.STRUCTURE -> OutlinePanel(controller, workspace)
             ToolWindow.NOTIFICATIONS -> NotificationsPanel(controller, workspace)

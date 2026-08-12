@@ -1,18 +1,25 @@
 package dev.starfect.quill.ui.tools
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import dev.starfect.quill.QuillController
 import dev.starfect.quill.model.FileNode
 import dev.starfect.quill.model.ToolWindow
@@ -23,6 +30,7 @@ import dev.starfect.quill.ui.theme.LocalTypeScale
 import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalShellPalette
 import java.nio.file.Path
+import org.jetbrains.jewel.ui.component.Link
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.VerticallyScrollableContainer
 
@@ -46,11 +54,34 @@ public fun ProjectTree(controller: QuillController, workspace: WorkspaceState) {
         )
 
         if (rows.isEmpty()) {
-            EmptyPanelMessage("Nothing to show")
+            EmptyPanelMessage(
+                message = if (workspace.projectRoot == null) {
+                    "No project is open."
+                } else {
+                    "This folder has no documents Quill can open."
+                },
+                actionLabel = "New document",
+                onAction = controller::newDocument,
+            )
             return@Column
         }
 
-        ToolWindowFocusScope(Modifier.fillMaxSize()) {
+        // Where the arrow keys are, which is not the same thing as which document is open. A tree
+        // you can only reach with the pointer is the accessibility guideline's headline failure.
+        var cursor by remember(rows) { mutableStateOf(-1) }
+        val activate: (FileNode) -> Unit = { node ->
+            if (node.isDirectory) controller.toggleDirectory(node.path) else controller.openFile(node.path)
+        }
+
+        LaunchedEffect(cursor) {
+            if (cursor in rows.indices) listState.animateScrollToItem(cursor)
+        }
+
+        ToolWindowFocusScope(
+            modifier = Modifier.fillMaxSize(),
+            onMove = { step -> cursor = (cursor + step).coerceIn(0, rows.lastIndex.coerceAtLeast(0)) },
+            onActivate = { rows.getOrNull(cursor)?.let(activate) },
+        ) {
             VerticallyScrollableContainer(scrollState = listState, modifier = Modifier.fillMaxSize()) {
                 LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
                     // The project root sits at the top of the tree with its location beside it,
@@ -65,11 +96,18 @@ public fun ProjectTree(controller: QuillController, workspace: WorkspaceState) {
                         val isOpen = workspace.documents.any { it.path == node.path }
                         FileRow(
                             node = node,
-                            selected = isOpen && workspace.activeDocument?.path == node.path,
+                            // The keyboard cursor wins when it is somewhere: it is what Enter will
+                            // act on, and a row that says "selected" without being the one Enter
+                            // opens is worse than no selection at all.
+                            selected = if (cursor >= 0) {
+                                index == cursor
+                            } else {
+                                isOpen && workspace.activeDocument?.path == node.path
+                            },
                             open = isOpen,
                             onClick = {
-                                if (node.isDirectory) controller.toggleDirectory(node.path)
-                                else controller.openFile(node.path)
+                                cursor = index
+                                activate(node)
                             },
                         )
                     }
@@ -159,7 +197,13 @@ public fun OutlinePanel(controller: QuillController, workspace: WorkspaceState) 
         )
 
         if (outline.isEmpty()) {
-            EmptyPanelMessage(if (document == null) "No document" else "No headings")
+            EmptyPanelMessage(
+                message = if (document == null) {
+                    "No document is open."
+                } else {
+                    "This document has no headings yet. Structure lists them as you add them."
+                },
+            )
             return@Column
         }
 
@@ -171,7 +215,22 @@ public fun OutlinePanel(controller: QuillController, workspace: WorkspaceState) 
             outline.indexOfLast { it.offset <= caret }.takeIf { it >= 0 }
         }
 
-        ToolWindowFocusScope(Modifier.fillMaxSize()) {
+        // Arrow keys walk the outline from wherever the caret currently is, so the first press
+        // continues from the reader's position rather than jumping to the top.
+        var cursor by remember(outline) { mutableStateOf<Int?>(null) }
+        val active = cursor ?: current
+
+        ToolWindowFocusScope(
+            modifier = Modifier.fillMaxSize(),
+            onMove = { step ->
+                cursor = ((active ?: 0) + step).coerceIn(0, outline.lastIndex.coerceAtLeast(0))
+            },
+            onActivate = {
+                outline.getOrNull(active ?: -1)?.let { entry ->
+                    documentId?.let { controller.moveCaret(it, entry.offset) }
+                }
+            },
+        ) {
             VerticallyScrollableContainer(scrollState = listState, modifier = Modifier.fillMaxSize()) {
                 LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
                     items(outline.size, key = { "${outline[it].line}-$it" }) { index ->
@@ -179,8 +238,11 @@ public fun OutlinePanel(controller: QuillController, workspace: WorkspaceState) 
                         OutlineRow(
                             level = entry.level,
                             title = entry.title,
-                            selected = index == current,
-                            onClick = { documentId?.let { controller.moveCaret(it, entry.offset) } },
+                            selected = index == active,
+                            onClick = {
+                                cursor = index
+                                documentId?.let { controller.moveCaret(it, entry.offset) }
+                            },
                         )
                     }
                 }
@@ -209,10 +271,40 @@ private fun OutlineRow(level: Int, title: String, selected: Boolean, onClick: ()
     }
 }
 
-/** The centred, muted placeholder the IDE shows in an empty tool window. */
+/**
+ * The empty state of a tool window.
+ *
+ * The platform's rule is that an empty tool window gets an empty *state*, not an empty panel — and
+ * the difference is whether there is a way out of it. A centred "Nothing to show" tells the reader
+ * what they can already see; what they need is the action that would put something there.
+ *
+ * So: one line saying what is missing, and — where there is something sensible to do about it — a
+ * link that does it. Set in the muted step, because an empty panel should not compete with the
+ * document.
+ */
 @Composable
-private fun EmptyPanelMessage(message: String) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(message, color = LocalShellPalette.current.mutedText, fontSize = LocalTypeScale.current.medium)
+private fun EmptyPanelMessage(
+    message: String,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
+    val shell = LocalShellPalette.current
+    val scale = LocalTypeScale.current
+
+    Box(Modifier.fillMaxSize().padding(Tokens.Spacing.XLarge), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(Tokens.Spacing.Small),
+        ) {
+            Text(
+                text = message,
+                color = shell.mutedText,
+                fontSize = scale.medium,
+                textAlign = TextAlign.Center,
+            )
+            if (actionLabel != null && onAction != null) {
+                Link(text = actionLabel, onClick = onAction)
+            }
+        }
     }
 }

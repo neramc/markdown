@@ -223,6 +223,15 @@ public data class WorkspaceState(
     val leftToolWindow: ToolWindow? = ToolWindow.PROJECT,
     val rightToolWindow: ToolWindow? = ToolWindow.STRUCTURE,
     val bottomToolWindow: ToolWindow? = null,
+    /**
+     * Docked tool window widths, in dp, as the user has dragged them.
+     *
+     * Here rather than in a `remember` inside the layout, because a width the user chose is state
+     * they own: it has to survive switching to another tool window and back, which a local would
+     * not. Held as Float to keep this model free of a Compose dependency.
+     */
+    val leftToolWindowWidth: Float = 260f,
+    val rightToolWindowWidth: Float = 280f,
     val dialog: Dialog? = null,
     val runConfigurations: List<RunConfiguration> = emptyList(),
     val selectedRunConfigurationId: Long? = null,

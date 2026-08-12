@@ -1,5 +1,6 @@
 package dev.starfect.quill.ui.shell
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -23,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.starfect.quill.ui.theme.LocalTypeScale
+import dev.starfect.quill.ui.theme.Motion
 import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalShellPalette
 import dev.starfect.quill.ui.theme.SurfaceState
@@ -62,11 +64,14 @@ public fun IdeActionButton(
         enabled = enabled,
     )
 
+    val fill by animateColorAsState(state.background(shell), Motion.state(), label = "buttonFill")
+    val tint by animateColorAsState(state.iconTint(shell), Motion.state(), label = "buttonTint")
+
     Tooltip(tooltip = { ActionTooltip(tooltip, shortcut) }) {
         Box(
             modifier = modifier.size(size)
                 .clip(RoundedCornerShape(Tokens.Radius.Control))
-                .background(state.background(shell))
+                .background(fill)
                 .hoverable(interaction, enabled = enabled)
                 .clickable(
                     interactionSource = interaction,
@@ -77,7 +82,7 @@ public fun IdeActionButton(
             contentAlignment = Alignment.Center,
         ) {
             // A disabled action recedes rather than disappearing, so the row does not shift.
-            content(state.iconTint(shell))
+            content(tint)
         }
     }
 }
@@ -102,11 +107,12 @@ public fun IdeWidgetButton(
     val pressed by interaction.collectIsPressedAsState()
 
     val state = SurfaceState.ofToggle(hovered = hovered, pressed = pressed, on = selected)
+    val fill by animateColorAsState(state.background(shell), Motion.state(), label = "widgetFill")
 
     Row(
         modifier = modifier.height(Tokens.ControlSize)
             .clip(RoundedCornerShape(Tokens.Radius.Control))
-            .background(state.background(shell))
+            .background(fill)
             .hoverable(interaction)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
             .padding(horizontal = Tokens.Spacing.Small),

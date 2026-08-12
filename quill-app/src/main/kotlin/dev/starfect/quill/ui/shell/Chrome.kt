@@ -6,17 +6,22 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.starfect.quill.QuillController
@@ -52,6 +57,8 @@ public fun ToolWindowStripe(
     bottomTools: List<ToolWindow> = emptyList(),
     bottomActive: ToolWindow? = null,
     onSelectBottom: (ToolWindow) -> Unit = {},
+    /** Counts to show on a stripe button, keyed by tool window. */
+    badges: Map<ToolWindow, Int> = emptyMap(),
 ) {
     val shell = LocalShellPalette.current
     Column(
@@ -64,7 +71,7 @@ public fun ToolWindowStripe(
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         tools.forEach { tool ->
-            StripeButton(tool, selected = tool == active) { onSelect(tool) }
+            StripeButton(tool, selected = tool == active, badge = badges[tool]) { onSelect(tool) }
         }
 
         if (bottomTools.isEmpty()) return@Column
@@ -73,22 +80,59 @@ public fun ToolWindowStripe(
         // giving them a rail of their own, which is what keeps the window's edges to three stripes.
         Spacer(Modifier.weight(1f))
         bottomTools.forEach { tool ->
-            StripeButton(tool, selected = tool == bottomActive) { onSelectBottom(tool) }
+            StripeButton(tool, selected = tool == bottomActive, badge = badges[tool]) { onSelectBottom(tool) }
         }
     }
 }
 
 @Composable
-private fun StripeButton(tool: ToolWindow, selected: Boolean, onClick: () -> Unit) {
+private fun StripeButton(tool: ToolWindow, selected: Boolean, badge: Int?, onClick: () -> Unit) {
     IdeActionButton(
         onClick = onClick,
         tooltip = tool.label,
         selected = selected,
         size = Tokens.ToolWindowBarButton,
     ) { tint ->
-        ToolWindowIcon(tool, tint)
+        Box(contentAlignment = Alignment.Center) {
+            ToolWindowIcon(tool, tint)
+            // A count rather than a different icon. The platform's rule for a tool window with
+            // something waiting in it is a badge, because swapping the glyph costs the reader the
+            // one thing they had learned to aim at.
+            if (badge != null && badge > 0) StripeBadge(badge)
+        }
     }
 }
+
+/**
+ * The count on a stripe button.
+ *
+ * Sits on the icon's top-right corner and is drawn in the accent so it reads as *new* rather than as
+ * part of the glyph. Above nine it becomes "9+": the badge's job is to say there is something there,
+ * and a three-digit number in a 20dp icon says nothing legibly.
+ */
+@Composable
+private fun StripeBadge(count: Int) {
+    val shell = LocalShellPalette.current
+
+    Box(
+        modifier = Modifier.offset(x = Tokens.Spacing.Small, y = -Tokens.Spacing.Small)
+            .defaultMinSize(minWidth = BadgeSize, minHeight = BadgeSize)
+            .clip(CircleShape)
+            .background(shell.accent)
+            .padding(horizontal = 3.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = if (count > 9) "9+" else count.toString(),
+            fontSize = LocalTypeScale.current.medium,
+            fontWeight = FontWeight.SemiBold,
+            color = Color.White,
+            maxLines = 1,
+        )
+    }
+}
+
+private val BadgeSize = 14.dp
 
 /** The stripe glyph for a tool window, at the platform's 20dp New UI size. */
 @Composable

@@ -20,6 +20,7 @@ import dev.starfect.quill.bridge.QuillEngine
 import dev.starfect.quill.bridge.QuillNativeLibraryException
 import dev.starfect.quill.io.RecentProject
 import dev.starfect.quill.io.RecentProjects
+import dev.starfect.quill.io.SettingsStore
 import dev.starfect.quill.model.WorkspaceState
 import dev.starfect.quill.ui.QuillWindowContent
 import dev.starfect.quill.ui.shell.QuillTitleBar
@@ -65,7 +66,17 @@ public fun main(arguments: Array<String>) {
         val scope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Default) }
         val controller = remember { QuillController(scope, engine) }
         val recentProjects = remember { RecentProjects() }
+        val settingsStore = remember { SettingsStore() }
+
         val workspace by controller.state
+
+        // Restore before the first frame, so the window opens in the theme it was closed in rather
+        // than opening in the default and then visibly correcting itself.
+        LaunchedEffect(Unit) { controller.applySettings(settingsStore.load()) }
+
+        // Persist on change rather than on exit: a window closed by the OS, or a crash, should not
+        // cost the reader their preferences.
+        LaunchedEffect(workspace.settings) { settingsStore.save(workspace.settings) }
 
         // A project is "open" once something is on screen to edit; until then the welcome window
         // stands in for the main window, exactly as the IDE's does.
@@ -80,7 +91,14 @@ public fun main(arguments: Array<String>) {
         }
 
         LaunchedEffect(Unit) {
-            requested.firstOrNull { it.isDirectory() }?.let { directory ->
+            // A file argument opens its directory as the project, which is what the IDE does: open
+            // one file and you get the folder around it in the project view. Without this, launching
+            // with a path to a document left the project tool window permanently empty — the tree
+            // had no root to scan, so the panel showed its "nothing here" state beside a document
+            // that plainly came from somewhere.
+            val project = requested.firstOrNull { it.isDirectory() }
+                ?: requested.firstOrNull { it.isRegularFile() }?.parent
+            project?.let { directory ->
                 controller.openProject(directory)
                 recentProjects.remember(directory)
             }

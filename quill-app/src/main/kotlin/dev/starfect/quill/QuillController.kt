@@ -75,6 +75,12 @@ public class QuillController(
     public val state: State<WorkspaceState> = _state
 
     private companion object {
+        /** Narrowest a docked tool window can be dragged before it stops being useful. */
+        private const val MIN_TOOL_WINDOW_WIDTH = 150f
+
+        /** Widest, so a side panel cannot take the window. */
+        private const val MAX_TOOL_WINDOW_WIDTH = 640f
+
         /**
          * Debounce before re-deriving. Long enough that a burst of keystrokes coalesces into one
          * parse, short enough that the preview still feels live.
@@ -598,6 +604,29 @@ public class QuillController(
 
     public fun setBottomToolWindow(tool: ToolWindow?) {
         update { it.copy(bottomToolWindow = if (it.bottomToolWindow == tool) null else tool) }
+    }
+
+    /**
+     * Widens or narrows a docked tool window by [delta] dp.
+     *
+     * Clamped rather than free: a panel dragged to nothing is indistinguishable from one that was
+     * closed, except that it cannot be got back, and one dragged past half the window has stopped
+     * being a side panel.
+     */
+    public fun resizeToolWindow(dock: Dock, delta: Float) {
+        update { workspace ->
+            when (dock) {
+                Dock.LEFT -> workspace.copy(
+                    leftToolWindowWidth = (workspace.leftToolWindowWidth + delta)
+                        .coerceIn(MIN_TOOL_WINDOW_WIDTH, MAX_TOOL_WINDOW_WIDTH),
+                )
+                Dock.RIGHT -> workspace.copy(
+                    rightToolWindowWidth = (workspace.rightToolWindowWidth + delta)
+                        .coerceIn(MIN_TOOL_WINDOW_WIDTH, MAX_TOOL_WINDOW_WIDTH),
+                )
+                Dock.BOTTOM -> workspace
+            }
+        }
     }
 
     /** Toggles a tool window on whichever dock it belongs to. */
