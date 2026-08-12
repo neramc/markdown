@@ -117,6 +117,29 @@ Both sides carry tests using Korean text and astral-plane emoji specifically to 
   the bytes onto the JVM heap and frees the buffer in a `finally`, so a decode failure cannot leak
   native memory.
 - Passing a null handle returns a null-pointer status rather than dereferencing it. This is tested.
+- **Closing waits for calls in flight.** Each facade holds a read-write lock over its handle: every
+  downcall takes it for read, `close` takes it for write. A call that starts after the close throws
+  `IllegalStateException`; one already running finishes first, and only then is the handle freed.
+
+  A `closed` flag alone is not enough, and the gap between it and the free is not theoretical. The
+  flag check and the downcall are two steps; a close landing between them frees the document while
+  another thread is inside the engine. That reached CI once as
+
+  ```
+  malloc(): unaligned tcache chunk detected
+  Process 'Gradle Test Executor 1' finished with non-zero exit value 134
+  ```
+
+  with no stack trace pointing at the cause — the abort happens in glibc, arbitrarily far from the
+  code responsible. It also shows up as a `QuillWireException: bad magic`, when the payload read back
+  came from memory that had already been reused. `HandleLifetimeTest` reproduces both.
+
+  The rule this imposes on callers: never call `close` from inside one of the facade's own calls.
+  Read locks do not upgrade to write locks, so that self-deadlocks.
+
+  A caller with its own workers has to co-operate too. `QuillController` cancels its derivation jobs
+  and then *joins* them before closing any handle: cancellation is only a request, and a coroutine
+  inside a native call has no suspension point at which to honour it.
 
 ## Why the downcall layer is Java
 

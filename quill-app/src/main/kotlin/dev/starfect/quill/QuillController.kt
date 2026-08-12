@@ -41,6 +41,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 
 /**
@@ -165,7 +166,11 @@ public class QuillController(
 
     /** Closes a document, releasing its engine handle. */
     public fun closeDocument(id: Long) {
-        derivationJobs.remove(id)?.cancel()
+        // Same ordering as [close]: the document's derivation has to have finished before its handle
+        // is released, or the worker is left reading freed memory.
+        val running = derivationJobs.remove(id)
+        running?.cancel()
+        if (running != null) runBlocking { running.join() }
         handles.remove(id)?.close()
         update { workspace ->
             val remaining = workspace.documents.filterNot { it.id == id }
@@ -826,8 +831,15 @@ public class QuillController(
         runCatching { engine.highlightCode(code, language) }.getOrDefault(emptyList())
 
     override fun close() {
-        derivationJobs.values.forEach(Job::cancel)
+        // Cancel, then wait. `cancel` is a request, and a derivation sitting in a native call has no
+        // suspension point at which to honour it — returning from here with one still running would
+        // free the document it is reading. The handles guard themselves as well, so this is belt and
+        // braces; what it buys is that shutdown does not block on a lock inside a parse.
+        val running = derivationJobs.values.toList()
         derivationJobs.clear()
+        running.forEach(Job::cancel)
+        runBlocking { running.forEach { it.join() } }
+
         handles.values.forEach(QuillDocument::close)
         handles.clear()
         engine.close()

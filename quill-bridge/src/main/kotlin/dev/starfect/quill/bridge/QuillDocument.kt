@@ -19,6 +19,9 @@ import dev.starfect.quill.bridge.wire.decodeText
 import java.lang.foreign.MemorySegment
 import java.lang.ref.Cleaner
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.locks.ReentrantReadWriteLock
+import kotlin.concurrent.read
+import kotlin.concurrent.write
 
 /** Search behaviour flags, mirroring `search::flags` in the engine. */
 public object SearchFlags {
@@ -51,6 +54,9 @@ public object ExportOptions {
  *
  * Instances are safe to use from multiple threads — the engine locks the document per call — but the
  * calls block while parsing, so they belong off the UI thread.
+ *
+ * That includes [close]: closing while another thread is inside a call is safe, and closing *waits*
+ * for that call to return before the native document is freed.
  */
 public class QuillDocument internal constructor(
     private val handle: MemorySegment,
@@ -59,21 +65,39 @@ public class QuillDocument internal constructor(
     private val closed = AtomicBoolean(false)
     private val cleanable = CLEANER.register(this, DocumentReleaser(handle, closed))
 
+    /**
+     * Guards the handle's lifetime: every call holds it for read, [close] takes it for write.
+     *
+     * A plain `closed` flag is not enough, and the difference is a crash rather than an exception.
+     * Checking the flag and then making the downcall are two steps, and a `close` landing between
+     * them frees the document while the other thread is inside the engine — the process aborts in
+     * glibc with a corrupted heap, some distance from the code that caused it.
+     *
+     * The write lock is what makes closing *wait* rather than race. A worker deriving a preview has
+     * no suspension point inside a native call at which to be cancelled, so waiting is the only
+     * thing that can be true here.
+     *
+     * The one rule this imposes: never call [close] from inside one of these calls. Read locks do
+     * not upgrade, so that self-deadlocks.
+     */
+    private val lifetime = ReentrantReadWriteLock()
+
     private companion object {
         val CLEANER: Cleaner = Cleaner.create { runnable ->
             Thread(runnable, "quill-document-cleaner").apply { isDaemon = true }
         }
     }
 
-    private fun requireOpen(): MemorySegment {
+    /** Runs [block] with the native handle, holding it open for the duration. */
+    private inline fun <T> withHandle(block: (MemorySegment) -> T): T = lifetime.read {
         check(!closed.get()) { "this QuillDocument has been closed" }
-        return handle
+        block(handle)
     }
 
     /** Monotonic version, incremented on every mutation. */
     public val version: Long
         get() {
-            val value = QuillBindings.docVersion(requireOpen())
+            val value = withHandle { QuillBindings.docVersion(it) }
             if (value < 0) throw QuillEngineException(value.toInt(), "version", lastEngineError())
             return value
         }
@@ -81,13 +105,13 @@ public class QuillDocument internal constructor(
     /** Length in UTF-16 code units. */
     public val length: Int
         get() {
-            val value = QuillBindings.docLenUtf16(requireOpen())
+            val value = withHandle { QuillBindings.docLenUtf16(it) }
             if (value < 0) throw QuillEngineException(value.toInt(), "length", lastEngineError())
             return value.toInt()
         }
 
     /** The full document text. */
-    public fun text(): String = decodeText(QuillBindings.docText(requireOpen()).require("text"))
+    public fun text(): String = decodeText(withHandle { QuillBindings.docText(it) }.require("text"))
 
     /**
      * Replaces the UTF-16 range `[start, end)` with [replacement].
@@ -96,12 +120,12 @@ public class QuillDocument internal constructor(
      * from a fresh string, which is what keeps typing cheap in a large document.
      */
     public fun replace(start: Int, end: Int, replacement: String) {
-        checkStatus(QuillBindings.docReplace(requireOpen(), start, end, replacement), "replace")
+        checkStatus(withHandle { QuillBindings.docReplace(it, start, end, replacement) }, "replace")
     }
 
     /** Replaces the entire contents. */
     public fun setText(text: String) {
-        checkStatus(QuillBindings.docSetText(requireOpen(), text), "setText")
+        checkStatus(withHandle { QuillBindings.docSetText(it, text) }, "setText")
     }
 
     /**
@@ -112,17 +136,17 @@ public class QuillDocument internal constructor(
      */
     public var flavour: MarkdownFlavour
         get() {
-            val value = QuillBindings.docFlavour(requireOpen())
+            val value = withHandle { QuillBindings.docFlavour(it) }
             if (value < 0) throw QuillEngineException(value, "flavour", lastEngineError())
             return MarkdownFlavour.fromId(value)
         }
         set(value) {
-            checkStatus(QuillBindings.docSetFlavour(requireOpen(), value.id), "setFlavour")
+            checkStatus(withHandle { QuillBindings.docSetFlavour(it, value.id) }, "setFlavour")
         }
 
     /** Parses the document into the block IR that drives the outline and the editor. */
     public fun blocks(): List<MarkdownBlockIr> =
-        decodeBlocks(QuillBindings.docBlocks(requireOpen()).require("blocks"))
+        decodeBlocks(withHandle { QuillBindings.docBlocks(it) }.require("blocks"))
 
     /**
      * Renders the document to HTML and returns the parsed result.
@@ -132,7 +156,7 @@ public class QuillDocument internal constructor(
      * which raw HTML in the source and the flavour extensions render as markup instead of as text.
      */
     public fun htmlDom(): List<HtmlNode> =
-        decodeHtmlDom(QuillBindings.docHtmlDom(requireOpen()).require("htmlDom"))
+        decodeHtmlDom(withHandle { QuillBindings.docHtmlDom(it) }.require("htmlDom"))
 
     /**
      * Syntax spans for the Markdown source, limited to lines `[firstLine, lastLine]` (zero-based,
@@ -145,12 +169,12 @@ public class QuillDocument internal constructor(
     public fun spans(firstLine: Int, lastLine: Int): List<StyleSpan> {
         require(firstLine >= 0) { "firstLine must not be negative, was $firstLine" }
         require(lastLine >= firstLine) { "lastLine ($lastLine) must not precede firstLine ($firstLine)" }
-        return decodeSpans(QuillBindings.docSpans(requireOpen(), firstLine, lastLine).require("spans"))
+        return decodeSpans(withHandle { QuillBindings.docSpans(it, firstLine, lastLine) }.require("spans"))
     }
 
     /** The heading outline. */
     public fun outline(): List<OutlineEntry> =
-        decodeOutline(QuillBindings.docOutline(requireOpen()).require("outline"))
+        decodeOutline(withHandle { QuillBindings.docOutline(it) }.require("outline"))
 
     /**
      * Problems found in the document, in source order.
@@ -159,10 +183,10 @@ public class QuillDocument internal constructor(
      * jumping around it in severity order makes it useless for working through.
      */
     public fun inspections(): List<Finding> =
-        decodeInspections(QuillBindings.docInspections(requireOpen()).require("inspections"))
+        decodeInspections(withHandle { QuillBindings.docInspections(it) }.require("inspections"))
 
     /** Word, character and reading-time statistics. */
-    public fun stats(): DocumentStats = decodeStats(QuillBindings.docStats(requireOpen()).require("stats"))
+    public fun stats(): DocumentStats = decodeStats(withHandle { QuillBindings.docStats(it) }.require("stats"))
 
     /**
      * Finds every occurrence of [query]. See [SearchFlags].
@@ -171,22 +195,26 @@ public class QuillDocument internal constructor(
      */
     public fun search(query: String, flags: Int = SearchFlags.NONE): List<SearchMatch> {
         if (query.isEmpty()) return emptyList()
-        return decodeSearch(QuillBindings.docSearch(requireOpen(), query, flags).require("search"))
+        return decodeSearch(withHandle { QuillBindings.docSearch(it, query, flags) }.require("search"))
     }
 
     /** Replaces every match of [query] with [replacement], mutating the document. */
     public fun replaceAll(query: String, replacement: String, flags: Int = SearchFlags.NONE) {
         if (query.isEmpty()) return
-        checkStatus(QuillBindings.docReplaceAll(requireOpen(), query, replacement, flags), "replaceAll")
+        checkStatus(withHandle { QuillBindings.docReplaceAll(it, query, replacement, flags) }, "replaceAll")
     }
 
     /** Renders the document to HTML. See [ExportOptions]. */
     public fun exportHtml(title: String, options: Int = ExportOptions.STANDALONE): String =
-        decodeText(QuillBindings.docExportHtml(requireOpen(), title, options).require("exportHtml"))
+        decodeText(withHandle { QuillBindings.docExportHtml(it, title, options) }.require("exportHtml"))
 
     override fun close() {
-        if (closed.compareAndSet(false, true)) {
-            cleanable.clean()
+        // Blocks until every in-flight call has returned. Freeing under a call is what corrupts the
+        // heap, and it does not report itself where it happened.
+        lifetime.write {
+            if (closed.compareAndSet(false, true)) {
+                cleanable.clean()
+            }
         }
     }
 

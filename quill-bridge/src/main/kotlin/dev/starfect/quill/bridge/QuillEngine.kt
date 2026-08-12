@@ -6,6 +6,9 @@ import dev.starfect.quill.bridge.wire.decodeColorSpans
 import java.lang.foreign.MemorySegment
 import java.lang.ref.Cleaner
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.locks.ReentrantReadWriteLock
+import kotlin.concurrent.read
+import kotlin.concurrent.write
 
 /**
  * The Quill core engine.
@@ -66,19 +69,27 @@ public class QuillEngine private constructor(
         }
     }
 
-    private fun requireOpen(): MemorySegment {
+    /**
+     * Guards the handle's lifetime. See the same field on [QuillDocument] for why a flag alone is
+     * not enough: the flag check and the downcall are two steps, and a close between them frees the
+     * engine out from under a thread that is inside it.
+     */
+    private val lifetime = ReentrantReadWriteLock()
+
+    /** Runs [block] with the native handle, holding it open for the duration. */
+    private inline fun <T> withHandle(block: (MemorySegment) -> T): T = lifetime.read {
         check(!closed.get()) { "this QuillEngine has been closed" }
-        return handle
+        block(handle)
     }
 
     /** Switches the palette used for fenced code-block highlighting. */
     public fun setDarkTheme(dark: Boolean) {
-        checkStatus(QuillBindings.engineSetDark(requireOpen(), dark), "setDarkTheme")
+        checkStatus(withHandle { QuillBindings.engineSetDark(it, dark) }, "setDarkTheme")
     }
 
     /** Opens a document. The caller owns the result and must close it. */
     public fun openDocument(text: String = ""): QuillDocument {
-        val handle = QuillBindings.docOpen(requireOpen(), text)
+        val handle = withHandle { QuillBindings.docOpen(it, text) }
         if (handle == MemorySegment.NULL) {
             throw QuillEngineException(QuillStatus.INVALID_ARGUMENT, "openDocument", lastEngineError())
         }
@@ -93,12 +104,15 @@ public class QuillEngine private constructor(
      */
     public fun highlightCode(code: String, language: String): List<ColorSpan> {
         if (code.isEmpty()) return emptyList()
-        return decodeColorSpans(QuillBindings.highlightCode(requireOpen(), code, language).require("highlightCode"))
+        return decodeColorSpans(withHandle { QuillBindings.highlightCode(it, code, language) }.require("highlightCode"))
     }
 
     override fun close() {
-        if (closed.compareAndSet(false, true)) {
-            cleanable.clean()
+        // Waits for in-flight calls, so the engine is never freed under one.
+        lifetime.write {
+            if (closed.compareAndSet(false, true)) {
+                cleanable.clean()
+            }
         }
     }
 
