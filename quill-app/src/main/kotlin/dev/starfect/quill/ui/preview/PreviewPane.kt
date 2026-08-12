@@ -258,7 +258,12 @@ private fun TaskCheckbox(checked: Boolean, shell: ShellPalette, editor: EditorPa
             .size(13.dp)
             .clip(RoundedCornerShape(3.dp))
             .background(if (checked) shell.accent else editor.background)
-            .border(1.dp, if (checked) shell.accent else shell.border, RoundedCornerShape(3.dp)),
+            // `splitter`, not `border`. Border is the shell's *dark* separator — the line drawn
+            // between two panels of the same tone — and it is the editor's own colour, so an
+            // unchecked box outlined with it was invisible against the page it sat on: the task
+            // list rendered as indented prose with no boxes at all. A control outline needs the
+            // colour that shows against a surface.
+            .border(1.dp, if (checked) shell.accent else shell.splitter, RoundedCornerShape(3.dp)),
         contentAlignment = Alignment.Center,
     ) {
         if (checked) {

@@ -71,8 +71,21 @@ public object Elevation {
      * strongest under the thing it identifies and gone by the middle of the window. Returns the
      * colour Jewel's own `TitleBar` takes as its gradient start, so this rides the platform's
      * implementation rather than painting over it.
+     *
+     * Pre-blended against [ground] and returned **opaque**. A translucent colour was the obvious
+     * thing to hand over and it came out wrong on screen: Jewel takes the value as the gradient's
+     * start colour rather than as a wash to composite, so a badge hue at ten percent alpha painted
+     * at full strength — measured at `#E0E8E0` over a `#1A1B1E` title bar, which is a white band
+     * across the top of the window. Doing the mixing here means the colour handed over is already
+     * the two or three points off the ground that it is supposed to be, whatever the consumer does
+     * with it.
      */
-    public fun projectTint(projectColor: Color): Color = projectColor.copy(alpha = IDENTITY_ALPHA)
+    public fun projectTint(projectColor: Color, ground: Color): Color = Color(
+        red = ground.red + (projectColor.red - ground.red) * IDENTITY_ALPHA,
+        green = ground.green + (projectColor.green - ground.green) * IDENTITY_ALPHA,
+        blue = ground.blue + (projectColor.blue - ground.blue) * IDENTITY_ALPHA,
+        alpha = 1f,
+    )
 
     /**
      * A soft shadow under a floating surface.

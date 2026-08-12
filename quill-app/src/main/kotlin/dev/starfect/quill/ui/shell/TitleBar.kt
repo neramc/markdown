@@ -39,6 +39,7 @@ import dev.starfect.quill.model.WorkspaceState
 import dev.starfect.quill.ui.icons.IdeIcons
 import dev.starfect.quill.ui.theme.LocalTypeScale
 import dev.starfect.quill.ui.theme.Elevation
+import dev.starfect.quill.ui.theme.LocalSurfaceStyle
 import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalShellPalette
 import dev.starfect.quill.ui.theme.ShellDivider
@@ -75,9 +76,10 @@ public fun DecoratedWindowScope.QuillTitleBar(
     // left where the project widget sits and gone by the middle. It is what makes one project's
     // window recognisable in a row of them, and Jewel exposes it directly rather than needing an
     // overlay painted across the title bar.
+    val ground = LocalSurfaceStyle.current.windowBackground
     val projectTint = workspace.projectRoot
         ?.fileName?.toString()
-        ?.let { Elevation.projectTint(ShellPalette.badgeColor(it)) }
+        ?.let { Elevation.projectTint(ShellPalette.badgeColor(it), ground) }
         ?: Color.Unspecified
 
     TitleBar(
