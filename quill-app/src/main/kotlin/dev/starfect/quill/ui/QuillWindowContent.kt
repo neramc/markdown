@@ -32,6 +32,7 @@ import dev.starfect.quill.ui.editor.SourceEditor
 import dev.starfect.quill.ui.palette.CommandPalette
 import dev.starfect.quill.ui.preview.PreviewPane
 import dev.starfect.quill.ui.shell.StatusBar
+import dev.starfect.quill.ui.shell.StripeCount
 import dev.starfect.quill.ui.shell.ToolWindowStripe
 import dev.starfect.quill.ui.theme.LocalTypeScale
 import dev.starfect.quill.ui.theme.Tokens
@@ -83,8 +84,10 @@ public fun QuillWindowContent(
                     // Problems carries its count, so a document with errors says so from the rail
                     // whether or not the panel is open.
                     badges = buildMap {
-                        val problems = workspace.activeDocument?.findings?.size ?: 0
-                        if (problems > 0) put(ToolWindow.PROBLEMS, problems)
+                        val summary = workspace.activeDocument?.inspectionSummary
+                        if (summary != null && summary.total > 0) {
+                            put(ToolWindow.PROBLEMS, StripeCount(summary.total, severe = summary.errors > 0))
+                        }
                     },
                 )
                 // The rail and the panel beside it share a tone, so a line is what divides them —

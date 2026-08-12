@@ -122,16 +122,24 @@ public fun ProjectTree(controller: QuillController, workspace: WorkspaceState) {
 private fun ProjectRootRow(root: Path) {
     val shell = LocalShellPalette.current
     val home = remember { System.getProperty("user.home").orEmpty() }
+    // The *containing* folder, not the project's own path. Showing the full path put the project's
+    // name on the row twice — "demo  demo" — because the name is the last segment of it.
     val location = remember(root, home) {
-        val absolute = root.toString()
-        if (home.isNotEmpty() && absolute.startsWith(home)) "~" + absolute.removePrefix(home) else absolute
+        val parent = root.toAbsolutePath().normalize().parent?.toString().orEmpty()
+        when {
+            parent.isEmpty() -> ""
+            home.isNotEmpty() && parent == home -> "~"
+            home.isNotEmpty() && parent.startsWith("$home/") -> "~" + parent.removePrefix(home)
+            else -> parent
+        }
     }
 
     TreeRow(depth = 0, onClick = {}, expandable = true, expanded = true) {
         IdeIcons.Module(shell.sourceFolderIcon, size = Tokens.IconSize)
         TreeLabel(root.fileName?.toString() ?: root.toString())
-        // The location is clipped from the right so a deep path never pushes the name out.
-        TreeMetadata(location, Modifier.weight(1f))
+        // Clipped from the right so a deep path never pushes the name out, and omitted entirely
+        // when there is nothing useful to say.
+        if (location.isNotEmpty()) TreeMetadata(location, Modifier.weight(1f))
     }
 }
 

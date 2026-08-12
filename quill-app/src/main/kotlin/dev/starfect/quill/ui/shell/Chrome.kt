@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.starfect.quill.QuillController
 import dev.starfect.quill.model.DocumentSession
 import dev.starfect.quill.model.ToolWindow
@@ -58,7 +59,7 @@ public fun ToolWindowStripe(
     bottomActive: ToolWindow? = null,
     onSelectBottom: (ToolWindow) -> Unit = {},
     /** Counts to show on a stripe button, keyed by tool window. */
-    badges: Map<ToolWindow, Int> = emptyMap(),
+    badges: Map<ToolWindow, StripeCount> = emptyMap(),
 ) {
     val shell = LocalShellPalette.current
     Column(
@@ -86,7 +87,7 @@ public fun ToolWindowStripe(
 }
 
 @Composable
-private fun StripeButton(tool: ToolWindow, selected: Boolean, badge: Int?, onClick: () -> Unit) {
+private fun StripeButton(tool: ToolWindow, selected: Boolean, badge: StripeCount?, onClick: () -> Unit) {
     IdeActionButton(
         onClick = onClick,
         tooltip = tool.label,
@@ -98,7 +99,7 @@ private fun StripeButton(tool: ToolWindow, selected: Boolean, badge: Int?, onCli
             // A count rather than a different icon. The platform's rule for a tool window with
             // something waiting in it is a badge, because swapping the glyph costs the reader the
             // one thing they had learned to aim at.
-            if (badge != null && badge > 0) StripeBadge(badge)
+            if (badge != null && badge.count > 0) StripeBadge(badge.count, badge.severe)
         }
     }
 }
@@ -106,33 +107,48 @@ private fun StripeButton(tool: ToolWindow, selected: Boolean, badge: Int?, onCli
 /**
  * The count on a stripe button.
  *
- * Sits on the icon's top-right corner and is drawn in the accent so it reads as *new* rather than as
- * part of the glyph. Above nine it becomes "9+": the badge's job is to say there is something there,
- * and a three-digit number in a 20dp icon says nothing legibly.
+ * Sits on the icon's top-right corner, tucked inside the button rather than hanging off it. The
+ * first attempt used the accent at 14dp with body-sized text, which on a 20dp glyph came out nearly
+ * as large as the icon and read as a notification bubble rather than as a count.
+ *
+ * Coloured by what it is counting, not by "something is new": red when anything is an error, amber
+ * otherwise. A badge that is always accent-blue tells the reader there is a number; one that is red
+ * tells them why they should look.
+ *
+ * Above nine it becomes "9+". The badge's job is to say there is something there, and three digits
+ * inside a 20dp icon say nothing legibly.
  */
 @Composable
-private fun StripeBadge(count: Int) {
+private fun StripeBadge(count: Int, severe: Boolean) {
     val shell = LocalShellPalette.current
 
     Box(
-        modifier = Modifier.offset(x = Tokens.Spacing.Small, y = -Tokens.Spacing.Small)
+        modifier = Modifier.offset(x = BadgeOffset, y = -BadgeOffset)
             .defaultMinSize(minWidth = BadgeSize, minHeight = BadgeSize)
             .clip(CircleShape)
-            .background(shell.accent)
-            .padding(horizontal = 3.dp),
+            .background(if (severe) shell.error else shell.warning)
+            .padding(horizontal = 2.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = if (count > 9) "9+" else count.toString(),
-            fontSize = LocalTypeScale.current.medium,
+            // Not on the UI type scale on purpose: this is a graphic label sized to a glyph, and the
+            // scale's smallest step is body text that would not fit inside it.
+            fontSize = BadgeFontSize,
             fontWeight = FontWeight.SemiBold,
             color = Color.White,
+            lineHeight = BadgeFontSize,
             maxLines = 1,
         )
     }
 }
 
-private val BadgeSize = 14.dp
+private val BadgeSize = 12.dp
+private val BadgeOffset = 6.dp
+private val BadgeFontSize = 9.sp
+
+/** What a stripe button's badge should say, and how loudly. */
+public data class StripeCount(val count: Int, val severe: Boolean)
 
 /** The stripe glyph for a tool window, at the platform's 20dp New UI size. */
 @Composable
