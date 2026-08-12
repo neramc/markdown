@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
@@ -196,7 +197,12 @@ private fun OutlineRow(level: Int, title: String, selected: Boolean, onClick: ()
     TreeRow(depth = (level - 1).coerceAtLeast(0), onClick = onClick, selected = selected) {
         // The structure view badges each symbol with its kind; for a document that is the heading
         // level, which is also the only thing distinguishing two identically-named rows.
-        Box(Modifier.width(Tokens.IconSize), contentAlignment = Alignment.Center) {
+        //
+        // `widthIn`, not `width`. The badge sits where a file row's icon sits, so it needs the icon
+        // column's width as a floor — but the UI font is proportional, and a hard 16dp box clipped
+        // "H2" and "H3" to nothing the moment the shell moved to Inter, where the digit 1 is
+        // narrower than the rest. Text in a box sized for an icon has to be allowed to grow.
+        Box(Modifier.widthIn(min = Tokens.IconSize), contentAlignment = Alignment.Center) {
             TreeMetadata("H$level")
         }
         TreeLabel(title, color = shell.text)
