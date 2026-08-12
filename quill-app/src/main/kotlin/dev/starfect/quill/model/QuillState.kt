@@ -137,9 +137,26 @@ public data class FileNode(
 @Immutable
 public data class QuillSettings(
     val darkTheme: Boolean = true,
+    /**
+     * The Islands surface style: rounded, separated panels on a recessed window background.
+     *
+     * A second axis rather than a value of [darkTheme], because the two answer different questions.
+     * Light-versus-dark reaches the *engine* — it picks the palette for fenced-code highlighting and
+     * for exported HTML — while this reaches only the shell's geometry. Folding them into one enum
+     * would send a surface-style change across the FFI boundary for no reason.
+     */
+    val islands: Boolean = false,
     val viewMode: ViewMode = ViewMode.SPLIT,
     val showLineNumbers: Boolean = true,
     val editorFontSize: Int = 14,
+    /**
+     * The UI font size, which the whole type scale is derived from.
+     *
+     * The platform's default is 13 and its scale is expressed relative to it — a header is "default
+     * +3", help text is "default −1" — so raising this moves every size in the shell together rather
+     * than leaving the headers behind.
+     */
+    val uiFontSize: Int = 13,
     val wordWrap: Boolean = true,
     /** Highlight the line the caret is on. */
     val highlightCaretRow: Boolean = true,

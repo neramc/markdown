@@ -29,6 +29,7 @@ import dev.starfect.quill.model.DocumentSession
 import dev.starfect.quill.model.ToolWindow
 import dev.starfect.quill.ui.icons.IdeIcons
 import dev.starfect.quill.ui.shell.IdeActionButton
+import dev.starfect.quill.ui.theme.LocalTypeScale
 import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalShellPalette
 import dev.starfect.quill.ui.theme.interactiveSurface
@@ -122,7 +123,7 @@ private fun Count(count: Int, severity: Severity, shell: ShellPalette) {
     Text(
         text = count.toString(),
         color = shell.text,
-        fontSize = Tokens.TinyFontSize,
+        fontSize = LocalTypeScale.current.medium,
     )
     Spacer(Modifier.width(6.dp))
 }

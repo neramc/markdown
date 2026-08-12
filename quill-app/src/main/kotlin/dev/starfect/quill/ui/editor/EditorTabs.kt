@@ -25,6 +25,7 @@ import dev.starfect.quill.QuillController
 import dev.starfect.quill.model.DocumentSession
 import dev.starfect.quill.model.WorkspaceState
 import dev.starfect.quill.ui.icons.IdeIcons
+import dev.starfect.quill.ui.theme.LocalTypeScale
 import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.shell.IdeActionButton
 import dev.starfect.quill.ui.theme.LocalShellPalette
@@ -136,7 +137,7 @@ private fun EditorTab(
 
             Text(
                 text = session.displayName,
-                fontSize = Tokens.FontSize,
+                fontSize = LocalTypeScale.current.default,
                 // An unsaved tab is tinted rather than marked with an asterisk. An inactive tab
                 // recedes to secondary, so the strip says which file you are in without an outline.
                 color = when {

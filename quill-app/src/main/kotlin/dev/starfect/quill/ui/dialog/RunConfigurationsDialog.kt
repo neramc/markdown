@@ -35,6 +35,7 @@ import dev.starfect.quill.model.RunConfiguration
 import dev.starfect.quill.model.RunTask
 import dev.starfect.quill.model.WorkspaceState
 import dev.starfect.quill.ui.icons.IdeIcons
+import dev.starfect.quill.ui.theme.LocalTypeScale
 import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalShellPalette
 import dev.starfect.quill.ui.theme.ShellDivider
@@ -137,7 +138,7 @@ public fun RunConfigurationsDialog(controller: QuillController, workspace: Works
                         Text(
                             "Add a configuration with +",
                             color = shell.mutedText,
-                            fontSize = Tokens.SmallFontSize,
+                            fontSize = LocalTypeScale.current.medium,
                         )
                     }
                 } else {
@@ -179,7 +180,7 @@ private fun ConfigurationList(
                 Text(
                     text = configuration.name,
                     color = shell.text,
-                    fontSize = Tokens.FontSize,
+                    fontSize = LocalTypeScale.current.default,
                     maxLines = 1,
                 )
             }
@@ -217,7 +218,7 @@ private fun ConfigurationForm(configuration: RunConfiguration, onChange: (RunCon
             )
         }
         FormIndent {
-            Text(configuration.task.description, color = shell.mutedText, fontSize = Tokens.SmallFontSize)
+            Text(configuration.task.description, color = shell.mutedText, fontSize = LocalTypeScale.current.medium)
         }
 
         Spacer(Modifier.height(10.dp))
@@ -233,7 +234,7 @@ private fun ConfigurationForm(configuration: RunConfiguration, onChange: (RunCon
                     onChange(configuration.copy(targetPath = value.text.toPathOrNull()))
                 },
                 placeholder = {
-                    Text("The focused document", color = shell.mutedText, fontSize = Tokens.SmallFontSize)
+                    Text("The focused document", color = shell.mutedText, fontSize = LocalTypeScale.current.medium)
                 },
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -254,7 +255,7 @@ private fun ConfigurationForm(configuration: RunConfiguration, onChange: (RunCon
                         Text(
                             "Beside the document, with an .html extension",
                             color = shell.mutedText,
-                            fontSize = Tokens.SmallFontSize,
+                            fontSize = LocalTypeScale.current.medium,
                         )
                     },
                     modifier = Modifier.fillMaxWidth(),
@@ -311,7 +312,7 @@ private fun RunButton(label: String, onClick: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.Tiny),
     ) {
         IdeIcons.Run(shell.success, size = Tokens.IconSize)
-        Text(label, color = shell.text, fontSize = Tokens.FontSize)
+        Text(label, color = shell.text, fontSize = LocalTypeScale.current.default)
     }
 }
 

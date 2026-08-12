@@ -126,7 +126,11 @@ public fun main(arguments: Array<String>) {
         val windowState = rememberWindowState(size = DpSize(1440.dp, 900.dp))
         val title = windowTitle(workspace)
 
-        QuillTheme(dark = workspace.settings.darkTheme) {
+        QuillTheme(
+            dark = workspace.settings.darkTheme,
+            uiFontSize = workspace.settings.uiFontSize,
+            islands = workspace.settings.islands,
+        ) {
             if (isJetBrainsRuntime()) {
                 DecoratedWindow(
                     onCloseRequest = ::exitApplication,

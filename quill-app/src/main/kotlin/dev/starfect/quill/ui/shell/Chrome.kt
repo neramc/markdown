@@ -17,13 +17,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.starfect.quill.QuillController
 import dev.starfect.quill.model.DocumentSession
 import dev.starfect.quill.model.ToolWindow
 import dev.starfect.quill.model.WorkspaceState
 import dev.starfect.quill.ui.icons.IdeIcons
+import dev.starfect.quill.ui.theme.LocalTypeScale
 import dev.starfect.quill.ui.theme.Tokens
+import dev.starfect.quill.ui.theme.LocalSurfaceStyle
 import dev.starfect.quill.ui.theme.LocalShellPalette
 import dev.starfect.quill.ui.theme.ShellDivider
 import java.nio.file.Path
@@ -53,7 +56,9 @@ public fun ToolWindowStripe(
     val shell = LocalShellPalette.current
     Column(
         modifier = modifier.width(Tokens.ToolWindowBarWidth).fillMaxHeight()
-            .background(shell.toolWindowBackground)
+            // The rail is chrome, not a region: in Islands it stays on the window ground so the
+            // panels beside it read as floating above it.
+            .background(if (LocalSurfaceStyle.current.separated) Color.Transparent else shell.toolWindowBackground)
             .padding(vertical = Tokens.Spacing.Tiny),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(0.dp),
@@ -85,16 +90,16 @@ private fun StripeButton(tool: ToolWindow, selected: Boolean, onClick: () -> Uni
     }
 }
 
-/** The stripe glyph for a tool window. */
+/** The stripe glyph for a tool window, at the platform's 20dp New UI size. */
 @Composable
-public fun ToolWindowIcon(tool: ToolWindow, tint: Color) {
+public fun ToolWindowIcon(tool: ToolWindow, tint: Color, size: Dp = Tokens.ToolWindowIconSize) {
     when (tool) {
-        ToolWindow.PROJECT -> IdeIcons.ProjectStripe(tint)
-        ToolWindow.STRUCTURE -> IdeIcons.StructureStripe(tint)
-        ToolWindow.PROBLEMS -> IdeIcons.ProblemsStripe(tint)
-        ToolWindow.NOTIFICATIONS -> IdeIcons.NotificationsStripe(tint)
-        ToolWindow.DATABASE -> IdeIcons.DatabaseStripe(tint)
-        ToolWindow.TERMINAL -> IdeIcons.TerminalStripe(tint)
+        ToolWindow.PROJECT -> IdeIcons.ProjectStripe(tint, size = size)
+        ToolWindow.STRUCTURE -> IdeIcons.StructureStripe(tint, size = size)
+        ToolWindow.PROBLEMS -> IdeIcons.ProblemsStripe(tint, size = size)
+        ToolWindow.NOTIFICATIONS -> IdeIcons.NotificationsStripe(tint, size = size)
+        ToolWindow.DATABASE -> IdeIcons.DatabaseStripe(tint, size = size)
+        ToolWindow.TERMINAL -> IdeIcons.TerminalStripe(tint, size = size)
     }
 }
 
@@ -121,9 +126,13 @@ public fun ToolWindowHeader(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                // A tool window header is the default size in semibold, not a larger size. That is
+                // what keeps it from reading as a heading in a document: it matches the rows beneath
+                // it and differs only in weight.
                 Text(
                     text = title,
-                    fontSize = Tokens.FontSize,
+                    fontSize = LocalTypeScale.current.default,
+                    fontWeight = LocalTypeScale.current.headerWeight,
                     color = shell.text,
                     maxLines = 1,
                 )
@@ -161,11 +170,13 @@ public fun StatusBar(controller: QuillController, workspace: WorkspaceState) {
     val shell = LocalShellPalette.current
     val document = workspace.activeDocument
 
+    val surfaces = LocalSurfaceStyle.current
+
     Column {
-        ShellDivider(Orientation.Horizontal)
+        if (!surfaces.separated) ShellDivider(Orientation.Horizontal)
         Row(
             modifier = Modifier.fillMaxWidth().height(Tokens.StatusBarHeight)
-                .background(shell.statusBarBackground)
+                .background(if (surfaces.separated) surfaces.windowBackground else shell.statusBarBackground)
                 .padding(start = Tokens.Spacing.Small, end = Tokens.Spacing.Small),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -237,7 +248,7 @@ private fun Breadcrumbs(controller: QuillController, workspace: WorkspaceState) 
                 }
                 Text(
                     text = crumb.label,
-                    fontSize = Tokens.TinyFontSize,
+                    fontSize = LocalTypeScale.current.medium,
                     color = shell.mutedText,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -286,7 +297,7 @@ private fun buildCrumbs(projectRoot: Path?, document: DocumentSession): List<Cru
 @Composable
 private fun StatusMessage(message: String, color: Color, onDismiss: () -> Unit) {
     IdeWidgetButton(onClick = onDismiss) {
-        Text(message, fontSize = Tokens.TinyFontSize, color = color, maxLines = 1)
+        Text(message, fontSize = LocalTypeScale.current.medium, color = color, maxLines = 1)
     }
 }
 
@@ -297,7 +308,7 @@ private fun StatusItem(label: String, tooltip: String, modifier: Modifier = Modi
         IdeWidgetButton(onClick = {}, modifier = modifier) {
             Text(
                 label,
-                fontSize = Tokens.TinyFontSize,
+                fontSize = LocalTypeScale.current.medium,
                 color = LocalShellPalette.current.mutedText,
                 maxLines = 1,
             )

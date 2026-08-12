@@ -29,6 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.starfect.quill.ui.icons.IdeIcons
 import dev.starfect.quill.ui.theme.LocalShellPalette
+import dev.starfect.quill.ui.theme.LocalTypeScale
 import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.interactiveSurface
 import org.jetbrains.jewel.ui.component.Text
@@ -142,7 +143,7 @@ public fun TreeLabel(
     Text(
         text = text,
         modifier = modifier,
-        fontSize = Tokens.FontSize,
+        fontSize = LocalTypeScale.current.default,
         fontWeight = weight,
         color = color,
         maxLines = 1,
@@ -156,7 +157,7 @@ public fun TreeMetadata(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text,
         modifier = modifier,
-        fontSize = Tokens.TinyFontSize,
+        fontSize = LocalTypeScale.current.medium,
         color = LocalShellPalette.current.mutedText,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,

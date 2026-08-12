@@ -31,6 +31,7 @@ import dev.starfect.quill.model.ToolWindow
 import dev.starfect.quill.model.WorkspaceState
 import dev.starfect.quill.ui.editor.SeverityIcon
 import dev.starfect.quill.ui.shell.ToolWindowHeader
+import dev.starfect.quill.ui.theme.LocalTypeScale
 import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalShellPalette
 import dev.starfect.quill.ui.theme.interactiveSurface
@@ -114,7 +115,7 @@ private fun FindingRow(finding: Finding, onClick: () -> Unit) {
         Text(
             text = finding.message,
             color = shell.text,
-            fontSize = Tokens.FontSize,
+            fontSize = LocalTypeScale.current.default,
             maxLines = 1,
             modifier = Modifier.weight(1f),
         )
@@ -124,7 +125,7 @@ private fun FindingRow(finding: Finding, onClick: () -> Unit) {
             Text(
                 text = inspection.title,
                 color = shell.mutedText,
-                fontSize = Tokens.TinyFontSize,
+                fontSize = LocalTypeScale.current.medium,
                 maxLines = 1,
             )
         }
@@ -132,7 +133,7 @@ private fun FindingRow(finding: Finding, onClick: () -> Unit) {
         Text(
             text = ":${finding.line + 1}",
             color = shell.mutedText,
-            fontSize = Tokens.TinyFontSize,
+            fontSize = LocalTypeScale.current.medium,
             modifier = Modifier.padding(start = Tokens.Spacing.Small),
         )
     }
@@ -141,7 +142,7 @@ private fun FindingRow(finding: Finding, onClick: () -> Unit) {
 @Composable
 private fun EmptyState(message: String) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(message, color = LocalShellPalette.current.mutedText, fontSize = Tokens.SmallFontSize)
+        Text(message, color = LocalShellPalette.current.mutedText, fontSize = LocalTypeScale.current.medium)
     }
 }
 
@@ -188,12 +189,12 @@ public fun NotificationsPanel(
                         Text(
                             text = entry.title,
                             color = notificationColour(entry.severity, shell),
-                            fontSize = Tokens.SmallFontSize,
+                            fontSize = LocalTypeScale.current.medium,
                         )
                         Text(
                             text = entry.body,
                             color = shell.mutedText,
-                            fontSize = Tokens.TinyFontSize,
+                            fontSize = LocalTypeScale.current.medium,
                         )
                     }
                 }
@@ -234,7 +235,7 @@ public fun PlaceholderPanel(
             Text(
                 text = placeholderMessage(tool),
                 color = shell.mutedText,
-                fontSize = Tokens.SmallFontSize,
+                fontSize = LocalTypeScale.current.medium,
             )
         }
     }

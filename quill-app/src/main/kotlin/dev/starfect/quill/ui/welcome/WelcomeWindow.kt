@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.sp
 import dev.starfect.quill.io.RecentProject
 import dev.starfect.quill.ui.icons.IdeIcons
 import dev.starfect.quill.ui.shell.IdeActionButton
+import dev.starfect.quill.ui.theme.LocalTypeScale
 import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.interactiveSurface
 import dev.starfect.quill.ui.theme.LocalShellPalette
@@ -144,8 +145,8 @@ private fun WelcomeRail(
                 modifier = Modifier.size(38.dp),
             )
             Column(Modifier.padding(start = 10.dp)) {
-                Text("Quill", fontSize = Tokens.TitleFontSize, fontWeight = FontWeight.SemiBold, color = shell.text)
-                Text(version, fontSize = Tokens.SmallFontSize, color = shell.mutedText)
+                Text("Quill", fontSize = LocalTypeScale.current.h2, fontWeight = FontWeight.SemiBold, color = shell.text)
+                Text(version, fontSize = LocalTypeScale.current.medium, color = shell.mutedText)
             }
         }
 
@@ -177,7 +178,7 @@ private fun RailItem(title: String, selected: Boolean, onClick: () -> Unit) {
             .padding(horizontal = Tokens.Spacing.Small),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, fontSize = Tokens.FontSize, color = shell.text, maxLines = 1)
+        Text(title, fontSize = LocalTypeScale.current.default, color = shell.text, maxLines = 1)
     }
 }
 
@@ -196,16 +197,16 @@ private fun EmptyProjects(onNewDocument: () -> Unit, onBrowse: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Text("Welcome to Quill", fontSize = Tokens.DisplayFontSize, fontWeight = FontWeight.SemiBold, color = shell.text)
+        Text("Welcome to Quill", fontSize = LocalTypeScale.current.h1, fontWeight = FontWeight.SemiBold, color = shell.text)
         Text(
             text = "Create a document to start from scratch.",
-            fontSize = Tokens.FontSize,
+            fontSize = LocalTypeScale.current.default,
             color = shell.mutedText,
             modifier = Modifier.padding(top = 12.dp),
         )
         Text(
             text = "Open a folder from disk to work on an existing set of notes.",
-            fontSize = Tokens.FontSize,
+            fontSize = LocalTypeScale.current.default,
             color = shell.mutedText,
             modifier = Modifier.padding(top = 2.dp, bottom = 32.dp),
         )
@@ -256,7 +257,7 @@ private fun BigAction(
         }
         Text(
             text = label,
-            fontSize = Tokens.FontSize,
+            fontSize = LocalTypeScale.current.default,
             color = shell.text,
             modifier = Modifier.padding(top = 10.dp),
         )
@@ -306,7 +307,7 @@ private fun RecentProjectsPane(
 
         if (projects.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("No projects match", color = shell.mutedText, fontSize = Tokens.SmallFontSize)
+                Text("No projects match", color = shell.mutedText, fontSize = LocalTypeScale.current.medium)
             }
             return@Column
         }
@@ -348,7 +349,7 @@ private fun RecentProjectRow(
         ) {
             Text(
                 text = project.name.take(2).uppercase(),
-                fontSize = Tokens.SmallFontSize,
+                fontSize = LocalTypeScale.current.medium,
                 fontWeight = FontWeight.SemiBold,
                 color = Color.White,
                 maxLines = 1,
@@ -356,10 +357,10 @@ private fun RecentProjectRow(
         }
 
         Column(Modifier.weight(1f).padding(start = 12.dp)) {
-            Text(project.name, fontSize = Tokens.FontSize, color = shell.text, maxLines = 1)
+            Text(project.name, fontSize = LocalTypeScale.current.default, color = shell.text, maxLines = 1)
             Text(
                 text = project.displayPath,
-                fontSize = Tokens.TinyFontSize,
+                fontSize = LocalTypeScale.current.medium,
                 color = shell.mutedText,
                 maxLines = 1,
             )
@@ -391,7 +392,7 @@ private fun WelcomeButton(label: String, onClick: () -> Unit) {
             .padding(horizontal = Tokens.Spacing.Medium),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, fontSize = Tokens.SmallFontSize, color = shell.text, maxLines = 1)
+        Text(label, fontSize = LocalTypeScale.current.medium, color = shell.text, maxLines = 1)
     }
 }
 
@@ -401,10 +402,10 @@ private fun CustomizePane(darkTheme: Boolean, onToggleTheme: () -> Unit) {
     val shell = LocalShellPalette.current
 
     Column(Modifier.fillMaxSize().padding(32.dp)) {
-        Text("Customize", fontSize = Tokens.TitleFontSize, fontWeight = FontWeight.SemiBold, color = shell.text)
+        Text("Customize", fontSize = LocalTypeScale.current.h2, fontWeight = FontWeight.SemiBold, color = shell.text)
         Text(
             text = "Colour theme",
-            fontSize = Tokens.SmallFontSize,
+            fontSize = LocalTypeScale.current.medium,
             color = shell.mutedText,
             modifier = Modifier.padding(top = 20.dp, bottom = 8.dp),
         )
@@ -431,6 +432,6 @@ private fun ThemeChoice(label: String, selected: Boolean, onClick: () -> Unit) {
             .padding(horizontal = 16.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, fontSize = Tokens.FontSize, color = shell.text, maxLines = 1)
+        Text(label, fontSize = LocalTypeScale.current.default, color = shell.text, maxLines = 1)
     }
 }

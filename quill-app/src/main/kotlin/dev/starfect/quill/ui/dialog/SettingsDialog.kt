@@ -31,6 +31,9 @@ import dev.starfect.quill.QuillController
 import dev.starfect.quill.model.QuillSettings
 import dev.starfect.quill.model.ViewMode
 import dev.starfect.quill.model.WorkspaceState
+import dev.starfect.quill.ui.theme.LocalTypeScale
+import dev.starfect.quill.ui.theme.UiFonts
+import dev.starfect.quill.ui.theme.UiTypeScale
 import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalShellPalette
 import dev.starfect.quill.ui.theme.ShellDivider
@@ -116,7 +119,7 @@ private fun CategoryList(selected: SettingsPage, onSelect: (SettingsPage) -> Uni
                     .padding(horizontal = Tokens.Spacing.Medium),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(entry.title, color = shell.text, fontSize = Tokens.FontSize)
+                Text(entry.title, color = shell.text, fontSize = LocalTypeScale.current.default)
             }
         }
     }
@@ -126,12 +129,48 @@ private fun CategoryList(selected: SettingsPage, onSelect: (SettingsPage) -> Uni
 private fun AppearancePage(settings: QuillSettings, onChange: (QuillSettings) -> Unit) {
     GroupHeader("Theme")
     FormRow("Colour scheme") {
-        val themes = remember { listOf("Dark", "Light") }
+        // Two axes, four names — the same shape the platform's own theme list has. Islands is the
+        // rounded, separated surface style; the plain names are the flat one.
+        val themes = remember {
+            listOf(
+                Triple("Islands Dark", true, true),
+                Triple("Islands Light", false, true),
+                Triple("Dark", true, false),
+                Triple("Light", false, false),
+            )
+        }
+        val current = themes.indexOfFirst { it.second == settings.darkTheme && it.third == settings.islands }
         ListComboBox(
-            items = themes,
-            selectedIndex = if (settings.darkTheme) 0 else 1,
-            onSelectedItemChange = { index -> onChange(settings.copy(darkTheme = index == 0)) },
+            items = themes.map { it.first },
+            selectedIndex = current.coerceAtLeast(0),
+            onSelectedItemChange = { index ->
+                val (_, dark, islands) = themes[index]
+                onChange(settings.copy(darkTheme = dark, islands = islands))
+            },
             modifier = Modifier.width(200.dp),
+        )
+    }
+
+    // The whole UI scale is derived from this one number: a header is "default +3" and help text is
+    // "default −1", so raising it moves every size in the shell together.
+    FormRow("UI font size") {
+        val sizes = remember { UiTypeScale.SIZES.map { it.toString() } }
+        ListComboBox(
+            items = sizes,
+            selectedIndex = sizes.indexOf(settings.uiFontSize.toString()).coerceAtLeast(0),
+            onSelectedItemChange = { index -> onChange(settings.copy(uiFontSize = sizes[index].toInt())) },
+            modifier = Modifier.width(200.dp),
+        )
+    }
+    FormIndent {
+        Text(
+            text = if (UiFonts.bundled) {
+                "Inter, bundled with the runtime. Headers, help text and metadata scale with this."
+            } else {
+                "The runtime does not bundle Inter, so the platform default is used."
+            },
+            color = LocalShellPalette.current.mutedText,
+            fontSize = LocalTypeScale.current.medium,
         )
     }
 
@@ -235,7 +274,7 @@ private fun InspectionsPage(settings: QuillSettings, onChange: (QuillSettings) -
             "a language. They are worth having on a document you are writing and worth turning " +
             "off on one you have imported.",
         color = shell.mutedText,
-        fontSize = Tokens.SmallFontSize,
+        fontSize = LocalTypeScale.current.medium,
     )
 
     Spacer(Modifier.height(12.dp))
@@ -243,8 +282,8 @@ private fun InspectionsPage(settings: QuillSettings, onChange: (QuillSettings) -
     Column(Modifier.padding(top = 4.dp)) {
         INSPECTION_DESCRIPTIONS.forEach { (title, description) ->
             Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
-                Text(title, color = shell.text, fontSize = Tokens.SmallFontSize, modifier = Modifier.width(230.dp))
-                Text(description, color = shell.mutedText, fontSize = Tokens.SmallFontSize)
+                Text(title, color = shell.text, fontSize = LocalTypeScale.current.medium, modifier = Modifier.width(230.dp))
+                Text(description, color = shell.mutedText, fontSize = LocalTypeScale.current.medium)
             }
         }
     }

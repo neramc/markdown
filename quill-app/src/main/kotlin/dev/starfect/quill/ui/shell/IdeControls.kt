@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.starfect.quill.ui.theme.LocalTypeScale
 import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalShellPalette
 import dev.starfect.quill.ui.theme.SurfaceState
@@ -135,7 +136,7 @@ public fun IdeToggleChip(
     ) { tint ->
         Text(
             text = label,
-            fontSize = Tokens.TinyFontSize,
+            fontSize = LocalTypeScale.current.medium,
             color = if (checked) shell.text else tint,
             maxLines = 1,
         )

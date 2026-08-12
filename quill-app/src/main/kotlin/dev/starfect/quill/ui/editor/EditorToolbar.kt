@@ -31,6 +31,7 @@ import dev.starfect.quill.model.WorkspaceState
 import dev.starfect.quill.ui.icons.IdeIcons
 import dev.starfect.quill.ui.shell.IdeActionButton
 import dev.starfect.quill.ui.shell.label
+import dev.starfect.quill.ui.theme.LocalTypeScale
 import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalEditorPalette
 import dev.starfect.quill.ui.theme.LocalShellPalette
@@ -133,7 +134,7 @@ private fun FlavourPicker(controller: QuillController, document: DocumentSession
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.Tiny),
         ) {
-            Text(document.flavour.displayName, color = shell.secondaryText, fontSize = Tokens.TinyFontSize)
+            Text(document.flavour.displayName, color = shell.secondaryText, fontSize = LocalTypeScale.current.medium)
             IdeIcons.WidgetChevron(shell.mutedIcon, size = Tokens.SmallIconSize)
         }
 

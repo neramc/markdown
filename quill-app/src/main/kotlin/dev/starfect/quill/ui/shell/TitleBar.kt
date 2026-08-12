@@ -37,6 +37,7 @@ import dev.starfect.quill.model.ToolWindow
 import dev.starfect.quill.model.ViewMode
 import dev.starfect.quill.model.WorkspaceState
 import dev.starfect.quill.ui.icons.IdeIcons
+import dev.starfect.quill.ui.theme.LocalTypeScale
 import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalShellPalette
 import dev.starfect.quill.ui.theme.ShellDivider
@@ -177,7 +178,7 @@ private fun ProjectWidget(workspace: WorkspaceState) {
         ) {
             Text(
                 text = project.firstOrNull()?.uppercase() ?: "Q",
-                fontSize = Tokens.TinyFontSize,
+                fontSize = LocalTypeScale.current.medium,
                 fontWeight = FontWeight.SemiBold,
                 color = Color.White,
                 maxLines = 1,
@@ -186,7 +187,7 @@ private fun ProjectWidget(workspace: WorkspaceState) {
 
         Text(
             text = project,
-            fontSize = Tokens.FontSize,
+            fontSize = LocalTypeScale.current.default,
             color = shell.text,
             maxLines = 1,
             modifier = Modifier.padding(start = Tokens.Spacing.Tiny),
@@ -214,7 +215,7 @@ private fun BranchWidget(workspace: WorkspaceState) {
         IdeIcons.Branch(shell.icon, size = Tokens.IconSize)
         Text(
             text = branch,
-            fontSize = Tokens.FontSize,
+            fontSize = LocalTypeScale.current.default,
             color = shell.text,
             maxLines = 1,
             modifier = Modifier.padding(start = 5.dp),
@@ -483,7 +484,7 @@ public fun ApplicationScope.StartupFailureWindow(failure: QuillNativeLibraryExce
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
                         text = "Quill could not start",
-                        fontSize = Tokens.TitleFontSize,
+                        fontSize = LocalTypeScale.current.h2,
                         fontWeight = FontWeight.SemiBold,
                         color = LocalShellPalette.current.text,
                     )

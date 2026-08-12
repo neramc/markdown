@@ -32,8 +32,11 @@ import dev.starfect.quill.ui.palette.CommandPalette
 import dev.starfect.quill.ui.preview.PreviewPane
 import dev.starfect.quill.ui.shell.StatusBar
 import dev.starfect.quill.ui.shell.ToolWindowStripe
+import dev.starfect.quill.ui.theme.LocalTypeScale
 import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalEditorPalette
+import dev.starfect.quill.ui.theme.LocalSurfaceStyle
+import dev.starfect.quill.ui.theme.regionSurface
 import dev.starfect.quill.ui.theme.LocalShellPalette
 import dev.starfect.quill.ui.theme.ShellDivider
 import dev.starfect.quill.ui.tools.FindReplaceBar
@@ -62,7 +65,9 @@ public fun QuillWindowContent(
 ) {
     val shell = LocalShellPalette.current
 
-    Box(modifier) {
+    val surfaces = LocalSurfaceStyle.current
+
+    Box(modifier.background(surfaces.windowBackground)) {
         Column(Modifier.fillMaxSize()) {
             Row(Modifier.weight(1f).fillMaxWidth()) {
                 ToolWindowStripe(
@@ -73,18 +78,21 @@ public fun QuillWindowContent(
                     bottomActive = workspace.bottomToolWindow,
                     onSelectBottom = controller::setBottomToolWindow,
                 )
-                ShellDivider(Orientation.Vertical)
+                // The rail and the panel beside it share a tone, so a line is what divides them —
+                // except in Islands, where the panel is a separate rounded surface and the gap does
+                // it instead.
+                if (!surfaces.separated) ShellDivider(Orientation.Vertical)
 
                 if (workspace.leftToolWindow == ToolWindow.PROJECT) {
-                    // No separator: the panel and the editor are twelve points apart, and in the
-                    // real window that tone step is the whole boundary. A line here would be the
+                    // No separator between panel and editor: they are twelve points apart, and in
+                    // the real window that tone step is the whole boundary. A line here would be the
                     // first thing anyone saw.
-                    Box(Modifier.width(260.dp).fillMaxHeight().background(shell.toolWindowBackground)) {
+                    Box(Modifier.width(260.dp).fillMaxHeight().regionSurface(shell.toolWindowBackground)) {
                         ProjectTree(controller, workspace)
                     }
                 }
 
-                Column(Modifier.weight(1f).fillMaxHeight()) {
+                Column(Modifier.weight(1f).fillMaxHeight().regionSurface(shell.tabBarBackground)) {
                     EditorTabs(controller, workspace)
 
                     // The find bar sits directly under the tabs and above the document, which is
@@ -99,7 +107,7 @@ public fun QuillWindowContent(
 
                 RightDock(controller, workspace)
 
-                ShellDivider(Orientation.Vertical)
+                if (!surfaces.separated) ShellDivider(Orientation.Vertical)
                 ToolWindowStripe(
                     tools = ToolWindow.on(Dock.RIGHT),
                     active = workspace.rightToolWindow,
@@ -129,7 +137,7 @@ private fun RightDock(controller: QuillController, workspace: WorkspaceState) {
     val tool = workspace.rightToolWindow ?: return
     val shell = LocalShellPalette.current
 
-    Box(Modifier.width(280.dp).fillMaxHeight().background(shell.toolWindowBackground)) {
+    Box(Modifier.width(280.dp).fillMaxHeight().regionSurface(shell.toolWindowBackground)) {
         when (tool) {
             ToolWindow.STRUCTURE -> OutlinePanel(controller, workspace)
             ToolWindow.NOTIFICATIONS -> NotificationsPanel(controller, workspace)
@@ -244,7 +252,7 @@ private fun AboutDialog(controller: QuillController) {
             Text(
                 text = "Quill",
                 color = shell.text,
-                fontSize = Tokens.DisplayFontSize,
+                fontSize = LocalTypeScale.current.h1,
                 fontWeight = FontWeight.SemiBold,
             )
             // The packaged launcher passes -Dquill.version; a Gradle run does not, and saying so is
@@ -252,24 +260,24 @@ private fun AboutDialog(controller: QuillController) {
             Text(
                 text = System.getProperty("quill.version")?.let { "Version $it" } ?: "Development build",
                 color = shell.mutedText,
-                fontSize = Tokens.SmallFontSize,
+                fontSize = LocalTypeScale.current.medium,
             )
             Box(Modifier.height(6.dp))
             Text(
                 "A Markdown editor with a Rust engine.",
                 color = shell.mutedText,
-                fontSize = Tokens.SmallFontSize,
+                fontSize = LocalTypeScale.current.medium,
             )
             Box(Modifier.height(8.dp))
             Text(
                 "Runtime: ${System.getProperty("java.vm.name")} ${System.getProperty("java.version")}",
                 color = shell.mutedText,
-                fontSize = Tokens.TinyFontSize,
+                fontSize = LocalTypeScale.current.medium,
             )
             Text(
                 "Renderer: Skia via Compose Multiplatform",
                 color = shell.mutedText,
-                fontSize = Tokens.TinyFontSize,
+                fontSize = LocalTypeScale.current.medium,
             )
         }
     }

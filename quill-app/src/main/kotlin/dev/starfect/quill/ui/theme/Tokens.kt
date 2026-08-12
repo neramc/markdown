@@ -1,9 +1,7 @@
 package dev.starfect.quill.ui.theme
 
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 
 /**
  * Every size, space, radius and type step the IDE shell is built from.
@@ -141,6 +139,15 @@ public object Tokens {
     public val SmallIconSize: Dp = 12.dp
 
     /**
+     * A tool window's stripe glyph.
+     *
+     * The platform sizes these at 20 in the New UI and drops to 16 only in Compact Mode. It is the
+     * one place the shell deliberately goes above 16: the rail is the window's primary navigation
+     * and its icons are the only thing in it, so they carry the whole affordance.
+     */
+    public val ToolWindowIconSize: Dp = 20.dp
+
+    /**
      * The one icon size above 16dp: the welcome window's action tiles.
      *
      * It exists so that "bigger than the shell's icons" is a single decision rather than a number
@@ -149,25 +156,9 @@ public object Tokens {
     public val LargeIconSize: Dp = 24.dp
 
     // ------------------------------------------------------------------ typography
-    /** Primary UI text: tree rows, tabs, toolbar labels, menu items. */
-    public val FontSize: TextUnit = 13.sp
-
-    /** Secondary UI text: tool window headers, descriptions. */
-    public val SmallFontSize: TextUnit = 12.sp
-
-    /** Metadata: status bar items, counters, shortcut hints. */
-    public val TinyFontSize: TextUnit = 11.sp
-
-    /** A heading over a group of controls: the welcome window's panes, an error screen's title. */
-    public val TitleFontSize: TextUnit = 15.sp
-
-    /**
-     * The only display-sized text in the product, used for the welcome greeting.
-     *
-     * Kept as one token rather than a spread of 18/20/22/26sp headings: a shell whose type scale has
-     * six steps has no scale, and the sizes drift apart every time a screen is added.
-     */
-    public val DisplayFontSize: TextUnit = 22.sp
+    // Type does not live here. The platform's scale is relative to a user-settable base size, and a
+    // fixed 13/12/11 in a token file cannot express "default +3". See [UiTypeScale], and read sizes
+    // from `LocalTypeScale.current`.
 
     // ------------------------------------------------------------------ dialogs and popups
     public val DialogTitleHeight: Dp = 36.dp

@@ -328,7 +328,7 @@ public object IdeIcons {
 
     /** The Project tool window's stripe icon. */
     @Composable
-    public fun ProjectStripe(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
+    public fun ProjectStripe(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.ToolWindowIconSize) {
         IdeIcon(size, modifier) { unit ->
             rect(2f, 3f, 14f, 13.5f, tint, unit)
             line(6.5f, 3f, 6.5f, 13.5f, tint, unit)
@@ -337,7 +337,7 @@ public object IdeIcons {
 
     /** The Structure tool window's stripe icon: nested, staggered rows. */
     @Composable
-    public fun StructureStripe(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
+    public fun StructureStripe(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.ToolWindowIconSize) {
         IdeIcon(size, modifier) { unit ->
             line(3f, 4f, 13f, 4f, tint, unit)
             line(6f, 8f, 13f, 8f, tint, unit)
@@ -349,7 +349,7 @@ public object IdeIcons {
 
     /** The Problems tool window's stripe icon: a triangle with a bang. */
     @Composable
-    public fun ProblemsStripe(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
+    public fun ProblemsStripe(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.ToolWindowIconSize) {
         IdeIcon(size, modifier) { unit ->
             polyline(listOf(8f to 2.5f, 14f to 13f, 2f to 13f, 8f to 2.5f), tint, unit)
             line(8f, 6.5f, 8f, 9.5f, tint, unit)
@@ -359,7 +359,7 @@ public object IdeIcons {
 
     /** The Notifications tool window's stripe icon: a bell. */
     @Composable
-    public fun NotificationsStripe(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
+    public fun NotificationsStripe(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.ToolWindowIconSize) {
         IdeIcon(size, modifier) { unit ->
             polyline(
                 listOf(
@@ -381,7 +381,7 @@ public object IdeIcons {
 
     /** The Database tool window's stripe icon: the stacked-cylinder glyph. */
     @Composable
-    public fun DatabaseStripe(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
+    public fun DatabaseStripe(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.ToolWindowIconSize) {
         IdeIcon(size, modifier) { unit ->
             // Three ellipses stacked, with the sides joining the top and bottom ones.
             ellipse(8f, 4f, 5f, 2f, tint, unit)
@@ -394,7 +394,7 @@ public object IdeIcons {
 
     /** The Terminal tool window's stripe icon: a prompt caret. */
     @Composable
-    public fun TerminalStripe(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
+    public fun TerminalStripe(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.ToolWindowIconSize) {
         IdeIcon(size, modifier) { unit ->
             rect(2f, 3f, 14f, 13f, tint, unit)
             polyline(listOf(4.5f to 6.5f, 7f to 8.5f, 4.5f to 10.5f), tint, unit)

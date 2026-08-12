@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.starfect.quill.ui.icons.IdeIcons
 import dev.starfect.quill.ui.shell.IdeActionButton
+import dev.starfect.quill.ui.theme.LocalTypeScale
 import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalShellPalette
 import dev.starfect.quill.ui.theme.ShellDivider
@@ -127,7 +128,12 @@ private fun DialogTitleBar(title: String, onDismiss: () -> Unit) {
         Modifier.fillMaxWidth().height(Tokens.DialogTitleHeight).padding(start = Tokens.Spacing.Medium, end = Tokens.Spacing.Tiny),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, color = shell.text, fontSize = Tokens.FontSize, fontWeight = FontWeight.SemiBold)
+        Text(
+            text = title,
+            color = shell.text,
+            fontSize = LocalTypeScale.current.default,
+            fontWeight = LocalTypeScale.current.headerWeight,
+        )
         Spacer(Modifier.weight(1f))
         IdeActionButton(onClick = onDismiss, tooltip = "Close", size = Tokens.ControlSize) { tint ->
             IdeIcons.Close(tint, size = Tokens.IconSize)
@@ -157,7 +163,7 @@ public fun FormRow(
         Text(
             text = label,
             color = shell.secondaryText,
-            fontSize = Tokens.FontSize,
+            fontSize = LocalTypeScale.current.default,
             modifier = Modifier.width(labelWidth),
         )
         Box(Modifier.weight(1f)) { content() }

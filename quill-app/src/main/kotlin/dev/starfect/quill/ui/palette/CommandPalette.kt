@@ -37,6 +37,7 @@ import dev.starfect.quill.model.ToolWindow
 import dev.starfect.quill.model.ViewMode
 import dev.starfect.quill.model.WorkspaceState
 import dev.starfect.quill.ui.icons.IdeIcons
+import dev.starfect.quill.ui.theme.LocalTypeScale
 import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.interactiveSurface
 import dev.starfect.quill.ui.theme.LocalShellPalette
@@ -117,7 +118,7 @@ public fun CommandPalette(controller: QuillController, workspace: WorkspaceState
 
             if (filtered.isEmpty()) {
                 Box(Modifier.fillMaxWidth().height(72.dp), contentAlignment = Alignment.Center) {
-                    Text("Nothing found", color = shell.mutedText, fontSize = Tokens.SmallFontSize)
+                    Text("Nothing found", color = shell.mutedText, fontSize = LocalTypeScale.current.medium)
                 }
             } else {
                 LazyColumn(state = listState, modifier = Modifier.heightIn(max = 380.dp).padding(vertical = 4.dp)) {
@@ -152,11 +153,11 @@ public fun CommandPalette(controller: QuillController, workspace: WorkspaceState
             ) {
                 Text(
                     text = "${filtered.size} result${if (filtered.size == 1) "" else "s"}",
-                    fontSize = Tokens.TinyFontSize,
+                    fontSize = LocalTypeScale.current.medium,
                     color = shell.mutedText,
                     modifier = Modifier.weight(1f),
                 )
-                Text("Enter to run  ·  Esc to close", fontSize = Tokens.TinyFontSize, color = shell.mutedText)
+                Text("Enter to run  ·  Esc to close", fontSize = LocalTypeScale.current.medium, color = shell.mutedText)
             }
         }
     }
@@ -202,7 +203,7 @@ private fun ScopeTabs(selected: SearchScope, onSelect: (SearchScope) -> Unit) {
             ) {
                 Text(
                     text = scope.title,
-                    fontSize = Tokens.SmallFontSize,
+                    fontSize = LocalTypeScale.current.medium,
                     color = if (isSelected) shell.text else shell.mutedText,
                     maxLines = 1,
                 )
@@ -218,7 +219,7 @@ private fun CategoryHeader(category: String) {
         modifier = Modifier.fillMaxWidth().height(Tokens.StatusBarHeight).padding(start = Tokens.Spacing.Medium),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(category, fontSize = Tokens.TinyFontSize, color = shell.mutedText, maxLines = 1)
+        Text(category, fontSize = LocalTypeScale.current.medium, color = shell.mutedText, maxLines = 1)
     }
 }
 
@@ -257,14 +258,14 @@ private fun CommandRow(command: Command, selected: Boolean, onRun: () -> Unit) {
 
         Text(
             text = command.title,
-            fontSize = Tokens.FontSize,
+            fontSize = LocalTypeScale.current.default,
             color = shell.text,
             modifier = Modifier.weight(1f),
             maxLines = 1,
         )
 
         command.shortcut?.let {
-            Text(it, fontSize = Tokens.TinyFontSize, color = shell.mutedText, maxLines = 1)
+            Text(it, fontSize = LocalTypeScale.current.medium, color = shell.mutedText, maxLines = 1)
         }
     }
 }

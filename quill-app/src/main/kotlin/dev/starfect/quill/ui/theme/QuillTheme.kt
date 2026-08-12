@@ -4,8 +4,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ProvidableCompositionLocal
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -238,7 +241,14 @@ public class ShellPalette(
     public val secondaryText: Color,
     /** Muted text: metadata, counters, inactive states. */
     public val mutedText: Color,
-    /** Default icon tint. */
+    /**
+     * Default icon tint.
+     *
+     * `#CED0D6` dark and `#6C707E` light: the platform states these as the New UI's icon *content*
+     * colour, which is why they are not simply the text colour reused. An icon carries less ink than
+     * a glyph of the same size, so matching the text colour makes it read lighter than the label
+     * beside it.
+     */
     public val icon: Color,
     /** Icon tint for something disabled or inactive. */
     public val mutedIcon: Color,
@@ -289,7 +299,7 @@ public class ShellPalette(
             text = Color(0xFFD7D9DC),
             secondaryText = Color(0xFFA6A8AD),
             mutedText = Color(0xFF777A80),
-            icon = Color(0xFFA6A8AD),
+            icon = Color(0xFFCED0D6),
             mutedIcon = Color(0xFF777A80),
             hoverBackground = Color(0xFF35373B),
             pressedBackground = Color(0xFF43454A),
@@ -322,7 +332,7 @@ public class ShellPalette(
             text = Color(0xFF25272B),
             secondaryText = Color(0xFF5A5D63),
             mutedText = Color(0xFF8C8F96),
-            icon = Color(0xFF5A5D63),
+            icon = Color(0xFF6C707E),
             mutedIcon = Color(0xFF8C8F96),
             hoverBackground = Color(0xFFEBECF0),
             pressedBackground = Color(0xFFD3D5DB),
@@ -385,6 +395,15 @@ public val LocalShellPalette: ProvidableCompositionLocal<ShellPalette> =
     staticCompositionLocalOf { ShellPalette.Dark }
 
 /**
+ * The type scale in force, derived from the user's UI font size.
+ *
+ * Not `static`: raising the base size has to recompose every piece of text in the window, which is
+ * the whole point of a scale expressed relative to a base.
+ */
+public val LocalTypeScale: ProvidableCompositionLocal<UiTypeScale> =
+    compositionLocalOf { UiTypeScale.Default }
+
+/**
  * Applies the IntelliJ theme and Quill's derived palettes.
  *
  * `decoratedWindow()` is what supplies the window and title-bar styling. Without it `IntUiTheme`
@@ -393,15 +412,35 @@ public val LocalShellPalette: ProvidableCompositionLocal<ShellPalette> =
  * module from the base theme.
  */
 @Composable
-public fun QuillTheme(dark: Boolean, content: @Composable () -> Unit) {
-    val themeDefinition = if (dark) JewelTheme.darkThemeDefinition() else JewelTheme.lightThemeDefinition()
+public fun QuillTheme(
+    dark: Boolean,
+    uiFontSize: Int = UiTypeScale.DEFAULT_BASE.value.toInt(),
+    islands: Boolean = false,
+    content: @Composable () -> Unit,
+) {
+    val scale = remember(uiFontSize) { UiTypeScale(uiFontSize.sp) }
+
+    // Inter for the UI and JetBrains Mono for the editor are the platform's own choices, and both
+    // ship inside the JetBrains Runtime this application is packaged from — see [UiFonts]. Setting
+    // them on the theme definition rather than at each Text is what makes Jewel's own components
+    // (fields, combo boxes, checkboxes, menus) pick them up too.
+    val themeDefinition = remember(dark, scale) {
+        val ui = TextStyle(fontFamily = UiFonts.Ui, fontSize = scale.default)
+        val editor = TextStyle(fontFamily = UiFonts.Editor, fontSize = scale.default)
+        if (dark) {
+            JewelTheme.darkThemeDefinition(defaultTextStyle = ui, editorTextStyle = editor, consoleTextStyle = editor)
+        } else {
+            JewelTheme.lightThemeDefinition(defaultTextStyle = ui, editorTextStyle = editor, consoleTextStyle = editor)
+        }
+    }
 
     val shell = remember(dark) { ShellPalette.of(dark) }
+    val surfaces = remember(shell, dark, islands) { SurfaceStyle.of(shell, dark, islands) }
 
     IntUiTheme(
         theme = themeDefinition,
         styling = ComponentStyling.default()
-            .decoratedWindow(titleBarStyle = shellTitleBarStyle(dark, shell))
+            .decoratedWindow(titleBarStyle = shellTitleBarStyle(dark, shell, surfaces))
             .provide {
                 arrayOf(
                     LocalScrollbarStyle provides quietScrollbarStyle(dark),
@@ -414,6 +453,8 @@ public fun QuillTheme(dark: Boolean, content: @Composable () -> Unit) {
         CompositionLocalProvider(
             LocalEditorPalette provides editor,
             LocalShellPalette provides shell,
+            LocalSurfaceStyle provides surfaces,
+            LocalTypeScale provides scale,
             content = content,
         )
     }
@@ -483,18 +524,21 @@ private fun shellMenuStyle(dark: Boolean, shell: ShellPalette): MenuStyle {
  * default supplies is already right.
  */
 @Composable
-private fun shellTitleBarStyle(dark: Boolean, shell: ShellPalette): TitleBarStyle {
+private fun shellTitleBarStyle(dark: Boolean, shell: ShellPalette, surfaces: SurfaceStyle): TitleBarStyle {
+    // In Islands the toolbar is the ground the panels float on, so it takes the recessed window
+    // colour. Flat has no recess and the toolbar is simply another panel.
+    val background = surfaces.windowBackground
     val colors = if (dark) {
         TitleBarColors.dark(
-            backgroundColor = shell.toolWindowBackground,
-            inactiveBackground = shell.toolWindowBackground,
-            borderColor = shell.border,
+            backgroundColor = background,
+            inactiveBackground = background,
+            borderColor = if (surfaces.separated) background else shell.border,
         )
     } else {
         TitleBarColors.light(
-            backgroundColor = shell.toolWindowBackground,
-            inactiveBackground = shell.toolWindowBackground,
-            borderColor = shell.border,
+            backgroundColor = background,
+            inactiveBackground = background,
+            borderColor = if (surfaces.separated) background else shell.border,
         )
     }
     return if (dark) TitleBarStyle.dark(colors = colors) else TitleBarStyle.light(colors = colors)

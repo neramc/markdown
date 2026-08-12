@@ -19,6 +19,7 @@ import dev.starfect.quill.model.WorkspaceState
 import dev.starfect.quill.ui.icons.IdeIcons
 import dev.starfect.quill.ui.shell.IdeActionButton
 import dev.starfect.quill.ui.shell.IdeToggleChip
+import dev.starfect.quill.ui.theme.LocalTypeScale
 import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalShellPalette
 import dev.starfect.quill.ui.theme.ShellDivider
@@ -74,7 +75,7 @@ public fun FindReplaceBar(controller: QuillController, workspace: WorkspaceState
                             matchCount == 0 -> "No results"
                             else -> "${currentMatch + 1}/$matchCount"
                         },
-                        fontSize = Tokens.TinyFontSize,
+                        fontSize = LocalTypeScale.current.medium,
                         color = if (matchCount == 0 && find.query.isNotEmpty()) shell.error else shell.mutedText,
                         modifier = Modifier.padding(end = 6.dp),
                         maxLines = 1,
@@ -120,7 +121,7 @@ public fun FindReplaceBar(controller: QuillController, workspace: WorkspaceState
             find.error?.let { message ->
                 Text(
                     text = message,
-                    fontSize = Tokens.TinyFontSize,
+                    fontSize = LocalTypeScale.current.medium,
                     color = shell.error,
                     maxLines = 1,
                     modifier = Modifier.padding(start = 4.dp),
@@ -170,7 +171,7 @@ private fun ReplaceAction(label: String, enabled: Boolean, onClick: () -> Unit) 
     ) { tint ->
         Text(
             text = label,
-            fontSize = Tokens.SmallFontSize,
+            fontSize = LocalTypeScale.current.medium,
             color = if (enabled) shell.text else tint,
             maxLines = 1,
         )

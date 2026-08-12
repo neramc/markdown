@@ -18,6 +18,7 @@ import dev.starfect.quill.model.ToolWindow
 import dev.starfect.quill.model.WorkspaceState
 import dev.starfect.quill.ui.icons.IdeIcons
 import dev.starfect.quill.ui.shell.ToolWindowHeader
+import dev.starfect.quill.ui.theme.LocalTypeScale
 import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalShellPalette
 import java.nio.file.Path
@@ -206,6 +207,6 @@ private fun OutlineRow(level: Int, title: String, selected: Boolean, onClick: ()
 @Composable
 private fun EmptyPanelMessage(message: String) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(message, color = LocalShellPalette.current.mutedText, fontSize = Tokens.SmallFontSize)
+        Text(message, color = LocalShellPalette.current.mutedText, fontSize = LocalTypeScale.current.medium)
     }
 }
