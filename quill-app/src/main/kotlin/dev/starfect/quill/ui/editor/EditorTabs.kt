@@ -5,10 +5,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -28,9 +30,11 @@ import dev.starfect.quill.ui.icons.IdeIcons
 import dev.starfect.quill.ui.theme.LocalTypeScale
 import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.shell.IdeActionButton
+import dev.starfect.quill.ui.theme.LocalSurfaceStyle
 import dev.starfect.quill.ui.theme.LocalShellPalette
 import dev.starfect.quill.ui.theme.interactiveSurface
 import org.jetbrains.jewel.ui.component.Text
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -87,6 +91,7 @@ private fun EditorTab(
     onClose: () -> Unit,
 ) {
     val shell = LocalShellPalette.current
+    val surfaces = LocalSurfaceStyle.current
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
 
@@ -95,10 +100,17 @@ private fun EditorTab(
     val underlineColor = shell.tabUnderline
     val underlineThickness = Tokens.TabUnderlineThickness
 
-    // The active tab is marked by the accent line beneath it and by taking the editor's own
-    // background, not by a filled panel. A tab with a strong fill reads as a browser tab sitting on
-    // top of the editor; one that shares the editor's colour reads as part of it.
+    // The two surface styles mark the active tab differently, and the difference is the point.
+    //
+    // Flat: the tab takes the editor's own background and an accent line beneath it. A strong fill
+    // there would read as a browser tab sitting on top of the editor rather than part of it.
+    //
+    // Islands: the editor is already a separate rounded surface, so an underline against its edge
+    // has nothing to sit on. The tab becomes a filled, rounded shape instead — which is what the
+    // style means by making the active tab more recognisable.
+    val filledSelection = surfaces.separated
     val background = when {
+        selected && filledSelection -> shell.hoverBackground
         selected -> shell.tabSelectedBackground
         hovered -> shell.hoverBackground
         else -> Color.Transparent
@@ -106,13 +118,21 @@ private fun EditorTab(
 
     Box(
         Modifier.height(Tokens.TabHeight)
+            .then(
+                if (filledSelection) {
+                    Modifier.padding(vertical = Tokens.Spacing.Tiny)
+                        .clip(RoundedCornerShape(Tokens.Radius.Control))
+                } else {
+                    Modifier
+                }
+            )
             .background(background)
             // The underline is drawn rather than laid out. As a child Box it used `fillMaxWidth`,
             // and inside a horizontally-scrolling LazyRow the width constraint is unbounded, so
             // "fill the available width" resolved to zero and the accent line was never on screen
             // in any build. Drawing it reads the tab's resolved width at paint time instead.
             .drawBehind {
-                if (!selected) return@drawBehind
+                if (!selected || filledSelection) return@drawBehind
                 val thickness = underlineThickness.toPx()
                 drawRect(
                     color = underlineColor,
@@ -124,7 +144,7 @@ private fun EditorTab(
             .clickable(interactionSource = interaction, indication = null, onClick = onSelect),
     ) {
         Row(
-            modifier = Modifier.height(Tokens.TabHeight)
+            modifier = Modifier.fillMaxHeight()
                 .padding(start = Tokens.Spacing.Small, end = Tokens.Spacing.Tiny),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.Tiny),

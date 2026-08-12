@@ -63,7 +63,12 @@ public class SurfaceStyle(
         public fun islands(palette: ShellPalette, dark: Boolean): SurfaceStyle = SurfaceStyle(
             regionRadius = 10.dp,
             regionGap = 6.dp,
-            regionBorder = palette.border,
+            // Deliberately not the flat style's border. That one is *darker* than the panels it
+            // divides, because in the flat style a separator's job is to be nearly invisible.
+            // Islands states the opposite intent — a stronger tool window boundary — and a border
+            // four points off the ground it sits on does not draw one. Measured against the running
+            // window: `border` came out at #1E1F22 on a #1A1B1E ground, which is no edge at all.
+            regionBorder = palette.splitter,
             windowBackground = if (dark) Color(0xFF1A1B1E) else Color(0xFFEDEFF2),
             separated = true,
         )
