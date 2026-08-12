@@ -176,6 +176,15 @@ public data class QuillSettings(
     val visualGuideColumn: Int = 0,
     /** Tab width in spaces. */
     val tabWidth: Int = 4,
+    /**
+     * Docked tool window widths, in dp, as the user has dragged them.
+     *
+     * A preference rather than window state: a panel width the user chose is exactly the kind of
+     * thing that has to survive a restart, and having dragged it once is a stronger statement of
+     * intent than most of the checkboxes above.
+     */
+    val leftToolWindowWidth: Float = 260f,
+    val rightToolWindowWidth: Float = 280f,
 )
 
 /**
@@ -223,15 +232,6 @@ public data class WorkspaceState(
     val leftToolWindow: ToolWindow? = ToolWindow.PROJECT,
     val rightToolWindow: ToolWindow? = ToolWindow.STRUCTURE,
     val bottomToolWindow: ToolWindow? = null,
-    /**
-     * Docked tool window widths, in dp, as the user has dragged them.
-     *
-     * Here rather than in a `remember` inside the layout, because a width the user chose is state
-     * they own: it has to survive switching to another tool window and back, which a local would
-     * not. Held as Float to keep this model free of a Compose dependency.
-     */
-    val leftToolWindowWidth: Float = 260f,
-    val rightToolWindowWidth: Float = 280f,
     val dialog: Dialog? = null,
     val runConfigurations: List<RunConfiguration> = emptyList(),
     val selectedRunConfigurationId: Long? = null,

@@ -56,6 +56,9 @@ public class SettingsStore(private val storePath: Path = defaultStorePath()) {
         fun int(key: String, fallback: Int, range: IntRange) =
             properties.getProperty(key)?.toIntOrNull()?.takeIf { it in range } ?: fallback
 
+        fun width(key: String, fallback: Float) =
+            properties.getProperty(key)?.toFloatOrNull()?.takeIf { it in 150f..640f } ?: fallback
+
         return QuillSettings(
             darkTheme = bool("darkTheme", defaults.darkTheme),
             islands = bool("islands", defaults.islands),
@@ -76,6 +79,8 @@ public class SettingsStore(private val storePath: Path = defaultStorePath()) {
             ensureNewlineOnSave = bool("ensureNewlineOnSave", defaults.ensureNewlineOnSave),
             visualGuideColumn = int("visualGuideColumn", defaults.visualGuideColumn, 0..300),
             tabWidth = int("tabWidth", defaults.tabWidth, 1..16),
+            leftToolWindowWidth = width("leftToolWindowWidth", defaults.leftToolWindowWidth),
+            rightToolWindowWidth = width("rightToolWindowWidth", defaults.rightToolWindowWidth),
         )
     }
 
@@ -98,6 +103,8 @@ public class SettingsStore(private val storePath: Path = defaultStorePath()) {
             setProperty("ensureNewlineOnSave", settings.ensureNewlineOnSave.toString())
             setProperty("visualGuideColumn", settings.visualGuideColumn.toString())
             setProperty("tabWidth", settings.tabWidth.toString())
+            setProperty("leftToolWindowWidth", settings.leftToolWindowWidth.toString())
+            setProperty("rightToolWindowWidth", settings.rightToolWindowWidth.toString())
         }
 
         try {

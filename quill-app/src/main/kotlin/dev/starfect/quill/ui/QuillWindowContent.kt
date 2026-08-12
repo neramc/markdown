@@ -101,7 +101,7 @@ public fun QuillWindowContent(
                     // first thing anyone saw. The resize handle sits in that boundary instead, and
                     // shows nothing until it is pointed at.
                     Box(
-                        Modifier.width(workspace.leftToolWindowWidth.dp)
+                        Modifier.width(workspace.settings.leftToolWindowWidth.dp)
                             .fillMaxHeight()
                             .regionSurface(shell.toolWindowBackground)
                     ) {
@@ -164,7 +164,7 @@ private fun RightDock(controller: QuillController, workspace: WorkspaceState) {
 
     ToolWindowResizeHandle(onDrag = { controller.resizeToolWindow(Dock.RIGHT, -it) })
     Box(
-        Modifier.width(workspace.rightToolWindowWidth.dp)
+        Modifier.width(workspace.settings.rightToolWindowWidth.dp)
             .fillMaxHeight()
             .regionSurface(shell.toolWindowBackground)
     ) {

@@ -614,17 +614,17 @@ public class QuillController(
      * being a side panel.
      */
     public fun resizeToolWindow(dock: Dock, delta: Float) {
-        update { workspace ->
+        updateSettings { settings ->
             when (dock) {
-                Dock.LEFT -> workspace.copy(
-                    leftToolWindowWidth = (workspace.leftToolWindowWidth + delta)
+                Dock.LEFT -> settings.copy(
+                    leftToolWindowWidth = (settings.leftToolWindowWidth + delta)
                         .coerceIn(MIN_TOOL_WINDOW_WIDTH, MAX_TOOL_WINDOW_WIDTH),
                 )
-                Dock.RIGHT -> workspace.copy(
-                    rightToolWindowWidth = (workspace.rightToolWindowWidth + delta)
+                Dock.RIGHT -> settings.copy(
+                    rightToolWindowWidth = (settings.rightToolWindowWidth + delta)
                         .coerceIn(MIN_TOOL_WINDOW_WIDTH, MAX_TOOL_WINDOW_WIDTH),
                 )
-                Dock.BOTTOM -> workspace
+                Dock.BOTTOM -> settings
             }
         }
     }
