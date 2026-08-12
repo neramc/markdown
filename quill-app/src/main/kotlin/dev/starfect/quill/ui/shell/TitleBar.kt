@@ -38,6 +38,7 @@ import dev.starfect.quill.model.ViewMode
 import dev.starfect.quill.model.WorkspaceState
 import dev.starfect.quill.ui.icons.IdeIcons
 import dev.starfect.quill.ui.theme.LocalTypeScale
+import dev.starfect.quill.ui.theme.Elevation
 import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalShellPalette
 import dev.starfect.quill.ui.theme.ShellDivider
@@ -70,7 +71,19 @@ public fun DecoratedWindowScope.QuillTitleBar(
     workspace: WorkspaceState,
     onExit: () -> Unit,
 ) {
-    TitleBar(Modifier.fillMaxWidth().height(Tokens.ToolbarHeight)) {
+    // The one gradient the platform itself uses: a wash of the project's colour, strongest at the
+    // left where the project widget sits and gone by the middle. It is what makes one project's
+    // window recognisable in a row of them, and Jewel exposes it directly rather than needing an
+    // overlay painted across the title bar.
+    val projectTint = workspace.projectRoot
+        ?.fileName?.toString()
+        ?.let { Elevation.projectTint(ShellPalette.badgeColor(it)) }
+        ?: Color.Unspecified
+
+    TitleBar(
+        modifier = Modifier.fillMaxWidth().height(Tokens.ToolbarHeight),
+        gradientStartColor = projectTint,
+    ) {
         Row(
             Modifier.align(Alignment.Start).padding(start = Tokens.Spacing.Small),
             verticalAlignment = Alignment.CenterVertically,

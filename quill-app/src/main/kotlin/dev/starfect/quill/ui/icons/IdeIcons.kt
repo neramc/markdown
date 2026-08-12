@@ -555,6 +555,119 @@ public object IdeIcons {
      * The lambda receives the pixels-per-grid-unit factor, so paths are written in design units and
      * scale exactly with the requested size.
      */
+    // ---------------------------------------------------------------- writing actions
+
+    // Drawn as marks rather than as letters. A "B" and an "I" are what a word processor uses, and
+    // they only work in a Latin alphabet; the shapes below say bold and italic to a reader of any
+    // script, and hold together at 16px where a glyph would not.
+
+    /** Bold: a stroke of doubled weight. */
+    @Composable
+    public fun Bold(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
+        IdeIcon(size, modifier) { unit ->
+            drawLine(
+                color = tint,
+                start = Offset(4.5f * unit, 4f * unit),
+                end = Offset(4.5f * unit, 12f * unit),
+                strokeWidth = STROKE * 2.2f * unit,
+                cap = StrokeCap.Round,
+            )
+            line(4.5f, 4f, 9.5f, 4f, tint, unit)
+            line(4.5f, 8f, 9.5f, 8f, tint, unit)
+            line(4.5f, 12f, 9.5f, 12f, tint, unit)
+            line(9.5f, 4f, 11.5f, 6f, tint, unit)
+            line(11.5f, 6f, 9.5f, 8f, tint, unit)
+            line(9.5f, 8f, 11.8f, 10f, tint, unit)
+            line(11.8f, 10f, 9.5f, 12f, tint, unit)
+        }
+    }
+
+    /** Italic: a slanted stroke between two serifs. */
+    @Composable
+    public fun Italic(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
+        IdeIcon(size, modifier) { unit ->
+            line(6f, 4f, 11.5f, 4f, tint, unit)
+            line(4.5f, 12f, 10f, 12f, tint, unit)
+            line(9f, 4f, 7f, 12f, tint, unit)
+        }
+    }
+
+    /** Inline code: the angle brackets, tighter than the fenced-block glyph. */
+    @Composable
+    public fun InlineCode(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
+        IdeIcon(size, modifier) { unit ->
+            line(6f, 5f, 3f, 8f, tint, unit)
+            line(3f, 8f, 6f, 11f, tint, unit)
+            line(10f, 5f, 13f, 8f, tint, unit)
+            line(13f, 8f, 10f, 11f, tint, unit)
+        }
+    }
+
+    /** Link: two chain segments meeting on the diagonal. */
+    @Composable
+    public fun Link(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
+        IdeIcon(size, modifier) { unit ->
+            val path = Path().apply {
+                moveTo(7f * unit, 9.5f * unit)
+                lineTo(5f * unit, 11.5f * unit)
+                moveTo(9f * unit, 6.5f * unit)
+                lineTo(11f * unit, 4.5f * unit)
+            }
+            drawPath(path, tint, style = stroke(unit))
+            line(6.2f, 6.2f, 4.2f, 8.2f, tint, unit)
+            line(4.2f, 8.2f, 5.6f, 9.6f, tint, unit)
+            line(9.8f, 9.8f, 11.8f, 7.8f, tint, unit)
+            line(11.8f, 7.8f, 10.4f, 6.4f, tint, unit)
+            line(6.5f, 9.5f, 9.5f, 6.5f, tint, unit)
+        }
+    }
+
+    /** A bulleted list: three dots and three rules. */
+    @Composable
+    public fun BulletList(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
+        IdeIcon(size, modifier) { unit ->
+            for (y in intArrayOf(4, 8, 12)) {
+                drawCircle(tint, 0.9f * unit, Offset(3.5f * unit, y * unit))
+                line(6.5f, y.toFloat(), 13f, y.toFloat(), tint, unit)
+            }
+        }
+    }
+
+    /** A task list: a ticked box over two rules. */
+    @Composable
+    public fun TaskList(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
+        IdeIcon(size, modifier) { unit ->
+            rect(2.5f, 3f, 6.5f, 7f, tint, unit)
+            line(3.4f, 5.1f, 4.4f, 6.1f, tint, unit)
+            line(4.4f, 6.1f, 6f, 3.8f, tint, unit)
+            line(8.5f, 5f, 13.5f, 5f, tint, unit)
+            line(2.5f, 10.5f, 13.5f, 10.5f, tint, unit)
+            line(2.5f, 13.5f, 10f, 13.5f, tint, unit)
+        }
+    }
+
+    /** A table: a grid with a heavier header row. */
+    @Composable
+    public fun Table(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
+        IdeIcon(size, modifier) { unit ->
+            rect(2.5f, 3.5f, 13.5f, 12.5f, tint, unit)
+            line(2.5f, 6.5f, 13.5f, 6.5f, tint, unit)
+            line(2.5f, 9.5f, 13.5f, 9.5f, tint, unit)
+            line(8f, 3.5f, 8f, 12.5f, tint, unit)
+        }
+    }
+
+    /** A table of contents: indented rules, the shape of an outline. */
+    @Composable
+    public fun Contents(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
+        IdeIcon(size, modifier) { unit ->
+            line(2.5f, 3.5f, 13.5f, 3.5f, tint, unit)
+            line(5f, 6.5f, 13.5f, 6.5f, tint, unit)
+            line(5f, 9.5f, 13.5f, 9.5f, tint, unit)
+            line(7.5f, 12.5f, 13.5f, 12.5f, tint, unit)
+        }
+    }
+
     @Composable
     private fun IdeIcon(size: Dp, modifier: Modifier, draw: DrawScope.(Float) -> Unit) {
         Canvas(modifier.size(size)) { draw(this.size.minDimension / 16f) }

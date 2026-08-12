@@ -38,6 +38,8 @@ import dev.starfect.quill.model.ViewMode
 import dev.starfect.quill.model.WorkspaceState
 import dev.starfect.quill.ui.icons.IdeIcons
 import dev.starfect.quill.ui.theme.LocalTypeScale
+import dev.starfect.quill.ui.theme.Elevation.dropShadow
+import dev.starfect.quill.ui.theme.floatingFill
 import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.interactiveSurface
 import dev.starfect.quill.ui.theme.LocalShellPalette
@@ -86,7 +88,8 @@ public fun CommandPalette(controller: QuillController, workspace: WorkspaceState
         Column(
             modifier = Modifier.padding(top = 100.dp).width(Tokens.SearchPopupWidth)
                 .clip(RoundedCornerShape(10.dp))
-                .background(shell.popupBackground)
+                .dropShadow(RoundedCornerShape(Tokens.Radius.Popup))
+                .floatingFill(shell.popupBackground)
                 .border(1.dp, shell.popupBorder, RoundedCornerShape(10.dp))
                 // Swallow clicks so they do not reach the dismissing scrim behind.
                 .clickable(

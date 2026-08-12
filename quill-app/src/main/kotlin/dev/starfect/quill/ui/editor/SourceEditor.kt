@@ -24,6 +24,9 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.AnnotatedString
@@ -44,6 +47,7 @@ import dev.starfect.quill.bridge.wire.StyleSpan
 import dev.starfect.quill.model.DocumentSession
 import dev.starfect.quill.model.WorkspaceState
 import dev.starfect.quill.ui.theme.EditorPalette
+import dev.starfect.quill.editing.MarkdownEdits
 import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalEditorPalette
 import org.jetbrains.jewel.foundation.theme.JewelTheme
@@ -164,18 +168,35 @@ private fun Modifier.insertSpacesForTab(
     val latestOnChange by rememberUpdatedState(onChange)
 
     return onPreviewKeyEvent { event ->
-        if (event.type != KeyEventType.KeyDown || event.key != Key.Tab) return@onPreviewKeyEvent false
+        if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
 
-        val spaces = " ".repeat(width.coerceIn(1, 16))
-        val current = latestValue
-        val start = current.selection.min.coerceIn(0, current.text.length)
-        val end = current.selection.max.coerceIn(start, current.text.length)
+        when (event.key) {
+            Key.Tab -> {
+                val spaces = " ".repeat(width.coerceIn(1, 16))
+                val current = latestValue
+                val start = current.selection.min.coerceIn(0, current.text.length)
+                val end = current.selection.max.coerceIn(start, current.text.length)
 
-        val updated = current.text.replaceRange(start, end, spaces)
-        latestOnChange(
-            current.copy(text = updated, selection = TextRange(start + spaces.length)),
-        )
-        true
+                val updated = current.text.replaceRange(start, end, spaces)
+                latestOnChange(current.copy(text = updated, selection = TextRange(start + spaces.length)))
+                true
+            }
+
+            // Enter continues a list, task or quote — and clears the marker when its line is
+            // otherwise empty, which is how a writer ends a list by pressing Enter twice. A plain
+            // paragraph produces no continuation, and the event falls through to the text field
+            // rather than this reimplementing what a newline already does.
+            Key.Enter -> {
+                if (event.isShiftPressed || event.isCtrlPressed || event.isAltPressed) {
+                    false
+                } else {
+                    MarkdownEdits.continueBlock(latestValue)
+                        ?.also(latestOnChange) != null
+                }
+            }
+
+            else -> false
+        }
     }
 }
 

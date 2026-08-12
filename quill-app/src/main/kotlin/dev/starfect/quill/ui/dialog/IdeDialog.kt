@@ -33,6 +33,8 @@ import androidx.compose.ui.unit.dp
 import dev.starfect.quill.ui.icons.IdeIcons
 import dev.starfect.quill.ui.shell.IdeActionButton
 import dev.starfect.quill.ui.theme.LocalTypeScale
+import dev.starfect.quill.ui.theme.Elevation.dropShadow
+import dev.starfect.quill.ui.theme.floatingFill
 import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalShellPalette
 import dev.starfect.quill.ui.theme.ShellDivider
@@ -94,7 +96,8 @@ public fun IdeDialog(
         Column(
             Modifier.width(width).height(height)
                 .clip(RoundedCornerShape(Tokens.Radius.Popup))
-                .background(shell.popupBackground)
+                .dropShadow(RoundedCornerShape(Tokens.Radius.Dialog))
+                .floatingFill(shell.popupBackground)
                 .border(1.dp, shell.popupBorder, RoundedCornerShape(Tokens.Radius.Popup))
                 // Swallow clicks so they do not reach the scrim and dismiss the dialog.
                 .clickable(interactionSource = panelInteraction, indication = null) {}

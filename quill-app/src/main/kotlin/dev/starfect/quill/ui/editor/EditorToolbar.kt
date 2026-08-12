@@ -32,6 +32,7 @@ import dev.starfect.quill.ui.icons.IdeIcons
 import dev.starfect.quill.ui.shell.IdeActionButton
 import dev.starfect.quill.ui.shell.label
 import dev.starfect.quill.ui.theme.LocalTypeScale
+import dev.starfect.quill.editing.MarkdownEdits
 import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalEditorPalette
 import dev.starfect.quill.ui.theme.LocalShellPalette
@@ -65,6 +66,15 @@ public fun MarkdownEditorToolbar(controller: QuillController, workspace: Workspa
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 FlavourPicker(controller, document)
+
+                Box(
+                    Modifier.padding(horizontal = Tokens.Spacing.Small)
+                        .width(1.dp)
+                        .height(Tokens.SmallIconSize)
+                        .background(shell.border),
+                )
+
+                FormattingActions(controller)
             }
         }
 
@@ -156,5 +166,76 @@ private fun FlavourPicker(controller: QuillController, document: DocumentSession
                 }
             }
         }
+    }
+}
+
+/**
+ * The writing actions, as buttons.
+ *
+ * Every one of these has a keyboard shortcut, and every one of those shortcuts is faster. The
+ * buttons exist because a shortcut nobody knows about is a feature nobody has: this row is how a
+ * writer finds out that bold, links, tables and a contents list are here at all, and the tooltip
+ * teaches the shortcut so the row stops being needed.
+ *
+ * Ordered by how often a writer reaches for them, not by category — emphasis, then links, then the
+ * structural actions.
+ */
+@Composable
+private fun FormattingActions(controller: QuillController) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(0.dp)) {
+        IdeActionButton(
+            onClick = { controller.edit { MarkdownEdits.toggleEmphasis(it, "**") } },
+            tooltip = "Bold",
+            shortcut = "Ctrl+B",
+            size = Tokens.SmallControlSize,
+        ) { tint -> IdeIcons.Bold(tint, size = Tokens.IconSize) }
+
+        IdeActionButton(
+            onClick = { controller.edit { MarkdownEdits.toggleEmphasis(it, "*") } },
+            tooltip = "Italic",
+            shortcut = "Ctrl+I",
+            size = Tokens.SmallControlSize,
+        ) { tint -> IdeIcons.Italic(tint, size = Tokens.IconSize) }
+
+        IdeActionButton(
+            onClick = { controller.edit { MarkdownEdits.toggleEmphasis(it, "`") } },
+            tooltip = "Inline code",
+            shortcut = "Ctrl+Shift+C",
+            size = Tokens.SmallControlSize,
+        ) { tint -> IdeIcons.InlineCode(tint, size = Tokens.IconSize) }
+
+        IdeActionButton(
+            onClick = { controller.edit { MarkdownEdits.insertLink(it) } },
+            tooltip = "Link",
+            shortcut = "Ctrl+K",
+            size = Tokens.SmallControlSize,
+        ) { tint -> IdeIcons.Link(tint, size = Tokens.IconSize) }
+
+        IdeActionButton(
+            onClick = { controller.edit { MarkdownEdits.toggleBullet(it) } },
+            tooltip = "Bulleted list",
+            shortcut = "Ctrl+Shift+L",
+            size = Tokens.SmallControlSize,
+        ) { tint -> IdeIcons.BulletList(tint, size = Tokens.IconSize) }
+
+        IdeActionButton(
+            onClick = { controller.edit { MarkdownEdits.toggleTask(it) } },
+            tooltip = "Task",
+            shortcut = "Ctrl+Shift+T",
+            size = Tokens.SmallControlSize,
+        ) { tint -> IdeIcons.TaskList(tint, size = Tokens.IconSize) }
+
+        IdeActionButton(
+            onClick = { controller.edit { MarkdownEdits.formatTable(it) } },
+            tooltip = "Format table",
+            shortcut = "Ctrl+Alt+L",
+            size = Tokens.SmallControlSize,
+        ) { tint -> IdeIcons.Table(tint, size = Tokens.IconSize) }
+
+        IdeActionButton(
+            onClick = controller::insertTableOfContents,
+            tooltip = "Insert table of contents",
+            size = Tokens.SmallControlSize,
+        ) { tint -> IdeIcons.Contents(tint, size = Tokens.IconSize) }
     }
 }

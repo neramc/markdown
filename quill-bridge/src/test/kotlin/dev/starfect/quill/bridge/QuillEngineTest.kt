@@ -43,6 +43,24 @@ class QuillEngineTest {
         engine.openDocument(text).use(body)
 
     @Test
+    fun `a span window past the end of the document is the same as one that fits`() {
+        // The controller asks for its whole highlight budget rather than counting the document's
+        // lines first, because counting meant copying the document across the boundary on every
+        // keystroke. That is only correct if an over-long window is harmless, which is what this
+        // pins: the highlighter walks lines and emits inside the window, so a window that outruns
+        // the document simply ends with it.
+        val source = "# One\n\nSome `code` and **bold**.\n\n```rust\nfn main() {}\n```\n"
+        engine.openDocument(source).use { document ->
+            val lines = source.count { it == '\n' } + 1
+            val exact = document.spans(0, lines)
+            val generous = document.spans(0, 5_000)
+
+            assertContentEquals(exact, generous, "an over-long window changed the spans")
+            assertTrue(exact.isNotEmpty(), "the fixture should highlight something")
+        }
+    }
+
+    @Test
     fun `opens and reads a document`() = withDocument("# Hello\n") { document ->
         assertEquals("# Hello\n", document.text())
         assertEquals(8, document.length)

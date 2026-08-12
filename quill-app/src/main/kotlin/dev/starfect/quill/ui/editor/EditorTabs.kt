@@ -28,6 +28,7 @@ import dev.starfect.quill.model.DocumentSession
 import dev.starfect.quill.model.WorkspaceState
 import dev.starfect.quill.ui.icons.IdeIcons
 import dev.starfect.quill.ui.theme.LocalTypeScale
+import dev.starfect.quill.ui.theme.Elevation
 import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.shell.IdeActionButton
 import dev.starfect.quill.ui.theme.LocalSurfaceStyle
@@ -126,7 +127,15 @@ private fun EditorTab(
                     Modifier
                 }
             )
-            .background(background)
+            .then(
+                // A filled tab is a surface of its own and takes the same top-edge lift as any
+                // other. An underlined tab is part of the editor and gets nothing.
+                if (filledSelection && selected) {
+                    Modifier.background(Elevation.activeTab(background))
+                } else {
+                    Modifier.background(background)
+                }
+            )
             // The underline is drawn rather than laid out. As a child Box it used `fillMaxWidth`,
             // and inside a horizontally-scrolling LazyRow the width constraint is unbounded, so
             // "fill the available width" resolved to zero and the accent line was never on screen

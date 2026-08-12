@@ -9,6 +9,7 @@ import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
+import dev.starfect.quill.editing.MarkdownEdits
 import dev.starfect.quill.model.Dialog
 import dev.starfect.quill.model.ToolWindow
 import dev.starfect.quill.model.ViewMode
@@ -68,6 +69,70 @@ internal fun handleShortcut(event: KeyEvent, controller: QuillController): Boole
     }
 
     val activeId = controller.state.value.activeDocumentId
+
+    // The writing actions. Bindings follow the ones a writer already has in their fingers from every
+    // other editor — Ctrl+B, Ctrl+I — and the IDE's own for the structural ones.
+    if (activeId != null) {
+        val handled = when {
+            event.key == Key.B && !event.isShiftPressed && !event.isAltPressed -> {
+                controller.edit { MarkdownEdits.toggleEmphasis(it, "**") }
+                true
+            }
+            event.key == Key.I && !event.isShiftPressed && !event.isAltPressed -> {
+                controller.edit { MarkdownEdits.toggleEmphasis(it, "*") }
+                true
+            }
+            // Ctrl+Shift+C rather than Ctrl+C, which is copy and always will be.
+            event.key == Key.C && event.isShiftPressed -> {
+                controller.edit { MarkdownEdits.toggleEmphasis(it, "`") }
+                true
+            }
+            event.key == Key.K && !event.isShiftPressed -> {
+                controller.edit { MarkdownEdits.insertLink(it) }
+                true
+            }
+            // Alt+Shift+arrow moves lines, as it does in the IDE.
+            event.isAltPressed && event.isShiftPressed && event.key == Key.DirectionUp -> {
+                controller.edit { MarkdownEdits.moveLines(it, -1) }
+                true
+            }
+            event.isAltPressed && event.isShiftPressed && event.key == Key.DirectionDown -> {
+                controller.edit { MarkdownEdits.moveLines(it, 1) }
+                true
+            }
+            event.key == Key.D && !event.isShiftPressed -> {
+                controller.edit { MarkdownEdits.duplicateLines(it) }
+                true
+            }
+            // Ctrl+Alt+L formats, matching the IDE's reformat binding.
+            event.isAltPressed && event.key == Key.L -> {
+                controller.edit { MarkdownEdits.formatTable(it) }
+                true
+            }
+            event.isShiftPressed && event.key == Key.Period -> {
+                controller.edit { MarkdownEdits.shiftHeading(it, 1) }
+                true
+            }
+            event.isShiftPressed && event.key == Key.Comma -> {
+                controller.edit { MarkdownEdits.shiftHeading(it, -1) }
+                true
+            }
+            event.isShiftPressed && event.key == Key.L -> {
+                controller.edit { MarkdownEdits.toggleBullet(it) }
+                true
+            }
+            event.isShiftPressed && event.key == Key.T -> {
+                controller.edit { MarkdownEdits.toggleTask(it) }
+                true
+            }
+            event.isShiftPressed && event.key == Key.Q -> {
+                controller.edit { MarkdownEdits.toggleQuote(it) }
+                true
+            }
+            else -> false
+        }
+        if (handled) return true
+    }
 
     return when {
         event.key == Key.N && !event.isShiftPressed -> {
