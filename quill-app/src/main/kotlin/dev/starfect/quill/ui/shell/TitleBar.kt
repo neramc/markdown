@@ -135,7 +135,8 @@ public fun QuillToolBar(controller: QuillController, workspace: WorkspaceState, 
 private fun TitleBarActions(controller: QuillController, workspace: WorkspaceState) {
     IdeActionButton(
         onClick = { controller.setCommandPaletteVisible(true) },
-        tooltip = "Search Everywhere  Ctrl+Shift+P",
+        tooltip = "Search Everywhere",
+        shortcut = "Ctrl+Shift+P",
         selected = workspace.commandPaletteVisible,
     ) { tint -> IdeIcons.Search(tint) }
 
@@ -152,7 +153,8 @@ private fun TitleBarActions(controller: QuillController, workspace: WorkspaceSta
 
     IdeActionButton(
         onClick = { controller.showDialog(Dialog.SETTINGS) },
-        tooltip = "Settings  Ctrl+Alt+S",
+        tooltip = "Settings",
+        shortcut = "Ctrl+Alt+S",
         selected = workspace.dialog == Dialog.SETTINGS,
     ) { tint -> IdeIcons.Gear(tint) }
 }

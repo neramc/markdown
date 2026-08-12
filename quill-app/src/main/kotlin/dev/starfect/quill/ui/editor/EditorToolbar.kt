@@ -87,21 +87,24 @@ public fun MarkdownEditorToolbar(controller: QuillController, workspace: Workspa
 
             IdeActionButton(
                 onClick = { controller.setViewMode(ViewMode.EDITOR) },
-                tooltip = "${ViewMode.EDITOR.label}  Ctrl+1",
+                tooltip = ViewMode.EDITOR.label,
+                shortcut = "Ctrl+1",
                 selected = current == ViewMode.EDITOR,
                 size = Tokens.ControlSize,
             ) { tint -> IdeIcons.ViewEditorOnly(tint, size = Tokens.IconSize) }
 
             IdeActionButton(
                 onClick = { controller.setViewMode(ViewMode.SPLIT) },
-                tooltip = "${ViewMode.SPLIT.label}  Ctrl+2",
+                tooltip = ViewMode.SPLIT.label,
+                shortcut = "Ctrl+2",
                 selected = current == ViewMode.SPLIT,
                 size = Tokens.ControlSize,
             ) { tint -> IdeIcons.ViewSplit(tint, size = Tokens.IconSize) }
 
             IdeActionButton(
                 onClick = { controller.setViewMode(ViewMode.PREVIEW) },
-                tooltip = "${ViewMode.PREVIEW.label}  Ctrl+3",
+                tooltip = ViewMode.PREVIEW.label,
+                shortcut = "Ctrl+3",
                 selected = current == ViewMode.PREVIEW,
                 size = Tokens.ControlSize,
             ) { tint -> IdeIcons.ViewPreviewOnly(tint, size = Tokens.IconSize) }

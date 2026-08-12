@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
@@ -40,6 +41,8 @@ public fun IdeActionButton(
     onClick: () -> Unit,
     tooltip: String,
     modifier: Modifier = Modifier,
+    /** The action's keyboard shortcut, shown beside the label in the platform's muted style. */
+    shortcut: String? = null,
     selected: Boolean = false,
     enabled: Boolean = true,
     size: Dp = Tokens.ControlSize,
@@ -59,7 +62,7 @@ public fun IdeActionButton(
         enabled = enabled,
     )
 
-    Tooltip(tooltip = { Text(tooltip) }) {
+    Tooltip(tooltip = { ActionTooltip(tooltip, shortcut) }) {
         Box(
             modifier = modifier.size(size)
                 .clip(RoundedCornerShape(Tokens.Radius.Control))
@@ -140,5 +143,30 @@ public fun IdeToggleChip(
             color = if (checked) shell.text else tint,
             maxLines = 1,
         )
+    }
+}
+
+/**
+ * An action tooltip: what the control does, and the shortcut that does it without the pointer.
+ *
+ * The platform treats the tooltip as a design-system component rather than as a string — an
+ * icon-only control is *required* to carry one, and where a shortcut exists it is shown. Two
+ * elements rather than one concatenated string, because the shortcut is reference material and the
+ * label is the answer: run them together at the same weight and the eye has to separate them every
+ * time.
+ */
+@Composable
+public fun ActionTooltip(label: String, shortcut: String? = null) {
+    val shell = LocalShellPalette.current
+    val scale = LocalTypeScale.current
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.Small),
+    ) {
+        Text(label, fontSize = scale.default, color = shell.text, maxLines = 1)
+        if (shortcut != null) {
+            Text(shortcut, fontSize = scale.medium, color = shell.mutedText, maxLines = 1)
+        }
     }
 }

@@ -85,14 +85,16 @@ public fun FindReplaceBar(controller: QuillController, workspace: WorkspaceState
 
             IdeActionButton(
                 onClick = { controller.stepMatch(forward = false) },
-                tooltip = "Previous Occurrence  Shift+F3",
+                tooltip = "Previous Occurrence",
+                shortcut = "Shift+F3",
                 enabled = matchCount > 0,
                 size = Tokens.SmallControlSize,
             ) { tint -> IdeIcons.ArrowUp(tint, size = Tokens.IconSize) }
 
             IdeActionButton(
                 onClick = { controller.stepMatch(forward = true) },
-                tooltip = "Next Occurrence  F3",
+                tooltip = "Next Occurrence",
+                shortcut = "F3",
                 enabled = matchCount > 0,
                 size = Tokens.SmallControlSize,
             ) { tint -> IdeIcons.ArrowDown(tint, size = Tokens.IconSize) }
@@ -132,7 +134,8 @@ public fun FindReplaceBar(controller: QuillController, workspace: WorkspaceState
 
             IdeActionButton(
                 onClick = { controller.setFindVisible(false) },
-                tooltip = "Close  Escape",
+                tooltip = "Close",
+                shortcut = "Escape",
                 size = Tokens.SmallControlSize,
             ) { tint -> IdeIcons.Close(tint, size = Tokens.IconSize) }
         }
