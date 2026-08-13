@@ -191,8 +191,15 @@ if (nativePlatform.os == "windows") {
         // archive tasks carry the source permissions through unless told otherwise, and this asserts
         // that rather than assuming it: an archive that unpacks to a launcher nobody can run is
         // indistinguishable from a working one until somebody tries it.
+        //
+        // The launcher is in a different place on each platform — `Quill/bin/Quill` on Linux,
+        // `Quill.app/Contents/MacOS/Quill` on macOS — so it is searched for rather than named. A
+        // check that hard-codes one layout does not verify the other platform, it fails it.
         doLast {
-            val launcher = releaseAppImage.get().asFile.resolve("Quill/bin/Quill")
+            val image = releaseAppImage.get().asFile
+            val launcher = image.walkTopDown()
+                .firstOrNull { it.isFile && it.name == "Quill" && it.parentFile.name in setOf("bin", "MacOS") }
+            checkNotNull(launcher) { "no launcher found under $image, so there is nothing to package" }
             check(launcher.canExecute()) {
                 "the packaged launcher at $launcher is not executable, so the archive will not be either"
             }
