@@ -34,6 +34,39 @@ public enum class MarkdownFlavour(internal val id: Byte, public val displayName:
      * preview draw a callout or a partial as a block instead of showing the braces.
      */
     MARKDOC(3, "Markdoc"),
+
+    /**
+     * MyST: CommonMark plus maths, directives and definition lists.
+     *
+     * The dialect Jupyter Book and Sphinx read. `$x$` and `$$…$$` are formulae rather than dollar
+     * signs, `:::{note}` opens a directive, and `[[target|title]]` is a cross-reference.
+     */
+    MY_ST(4, "MyST"),
+
+    /**
+     * Pandoc's Markdown: the most permissive dialect of the family.
+     *
+     * It is the one people convert *from*, so it accepts most of what every other dialect added:
+     * definition lists, maths, `H~2~O` and `x^2^`, `==highlights==`, inline `^[footnotes]` and
+     * `{#custom-id}` heading attributes.
+     */
+    PANDOC(5, "Pandoc Markdown"),
+
+    /**
+     * MultiMarkdown: tables, footnotes, definition lists, maths, sub- and superscript.
+     *
+     * It predates GFM and shares most of Pandoc's additions, but none of GitHub's — no task lists,
+     * no strikethrough, no bare-URL autolinking.
+     */
+    MULTIMARKDOWN(6, "MultiMarkdown"),
+
+    /**
+     * PHP Markdown Extra: the original set of additions, and deliberately none of GitHub's.
+     *
+     * Tables, footnotes, definition lists and `{#custom-id}` heading attributes. A `- [x]` here is
+     * a bullet containing brackets, which is what it meant before GitHub gave it another meaning.
+     */
+    MARKDOWN_EXTRA(7, "Markdown Extra"),
     ;
 
     public companion object {
@@ -52,6 +85,10 @@ public enum class MarkdownFlavour(internal val id: Byte, public val displayName:
                 "mdx" -> MDX
                 "mdoc", "markdoc" -> MARKDOC
                 "commonmark", "cmark" -> COMMON_MARK
+                "myst", "mystmd" -> MY_ST
+                "pandoc", "pmd" -> PANDOC
+                "mmd", "multimarkdown" -> MULTIMARKDOWN
+                "mdextra" -> MARKDOWN_EXTRA
                 "md", "markdown", "mdown", "mkd", "mkdn", "text", "txt" -> GFM
                 else -> null
             }

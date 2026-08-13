@@ -6,12 +6,65 @@
 //! or shows syntax as literal text, so the flavour is a property of the document, chosen from its
 //! extension and overridable per file.
 //!
-//! Only CommonMark and GFM are *parsing* differences — comrak handles both natively. MDX and Markdoc
-//! are handled by rewriting their extra syntax into HTML before parsing, which is the honest shape
-//! of the support: their block structure is Markdown, and what they add is a component vocabulary a
-//! renderer either understands or passes through.
+//! Every dialect here is a member of the Markdown family: each one is CommonMark plus a set of
+//! extensions, so each is a genuinely different *parser configuration* rather than a label. See
+//! [`Flavour::extensions`] for what each one turns on — a MyST document's `$x$` is maths, a Pandoc
+//! document's `H~2~O` is a subscript, and in CommonMark both are literal text.
+//!
+//! MDX and Markdoc additionally rewrite their non-Markdown syntax before parsing, which is the
+//! honest shape of that support: their block structure is Markdown, and what they add is a component
+//! vocabulary a renderer either understands or passes through.
+//!
+//! **AsciiDoc and Djot are deliberately absent.** Neither is a Markdown superset — they are separate
+//! grammars with their own block and inline syntax, and supporting them means a second parser rather
+//! than another option set on this one. Listing them here with a comrak configuration behind them
+//! would parse `= Title` and `_emphasis_` as literal text and call it support.
 
 use std::fmt;
+
+/// One dialect's parser configuration.
+///
+/// A plain record rather than comrak's own options type, so the dialect table below reads as a
+/// comparison: every row states what that dialect adds, and a reader can see at a glance that MyST
+/// has maths and CommonMark does not.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Extensions {
+    pub tables: bool,
+    pub strikethrough: bool,
+    pub autolink: bool,
+    pub tasklist: bool,
+    pub footnotes: bool,
+    /// Pandoc's `^[inline note]`, which puts the note where it is referenced.
+    pub inline_footnotes: bool,
+    /// GitHub's `> [!NOTE]` callouts.
+    pub alerts: bool,
+    /// GitHub's filtering of scripting tags out of raw HTML.
+    pub tagfilter: bool,
+    /// `Term`/`: definition` lists, from PHP Markdown Extra and inherited by Pandoc and MultiMarkdown.
+    pub description_lists: bool,
+    /// `$x$` and `$$x$$` maths, as MyST, Pandoc and MultiMarkdown all use.
+    pub math_dollars: bool,
+    /// `\\(x\\)` LaTeX maths delimiters.
+    pub math_latex: bool,
+    /// `H~2~O` and `x^2^`.
+    pub sub_superscript: bool,
+    /// `==marked==` text.
+    pub highlight: bool,
+    /// `[[Wiki links]]`.
+    pub wikilinks: bool,
+    /// `>>>` multi-line block quotes, which MyST's `:::` directives are built on.
+    pub multiline_block_quotes: bool,
+    /// `:::{note}` block directives, MyST's own extension vocabulary.
+    pub block_directives: bool,
+    /// `__underline__` rather than bold.
+    pub underline: bool,
+    /// `## Heading {#custom-id}`, from PHP Markdown Extra and kept by Pandoc.
+    pub header_attributes: bool,
+    /// `:smile:` emoji shortcodes.
+    pub shortcodes: bool,
+    /// Anchor ids on headings, which every dialect that generates a table of contents needs.
+    pub header_ids: bool,
+}
 
 /// A Markdown dialect.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -26,6 +79,14 @@ pub enum Flavour {
     Mdx = 2,
     /// Markdoc: GFM plus `{% tag %}` annotations.
     Markdoc = 3,
+    /// MyST: CommonMark plus maths, directives and footnotes, as used by Jupyter Book and Sphinx.
+    MyST = 4,
+    /// Pandoc Markdown: tables, definition lists, footnotes, maths, sub- and superscript.
+    Pandoc = 5,
+    /// MultiMarkdown: tables, footnotes, definition lists, maths, sub- and superscript.
+    MultiMarkdown = 6,
+    /// PHP Markdown Extra: tables, footnotes and definition lists, and no GitHub additions.
+    MarkdownExtra = 7,
 }
 
 impl Flavour {
@@ -42,7 +103,128 @@ impl Flavour {
             1 => Some(Self::Gfm),
             2 => Some(Self::Mdx),
             3 => Some(Self::Markdoc),
+            4 => Some(Self::MyST),
+            5 => Some(Self::Pandoc),
+            6 => Some(Self::MultiMarkdown),
+            7 => Some(Self::MarkdownExtra),
             _ => None,
+        }
+    }
+
+    /// Every dialect this build knows, in the order the picker offers them.
+    pub fn all() -> [Self; 8] {
+        [
+            Self::Gfm,
+            Self::CommonMark,
+            Self::MyST,
+            Self::Pandoc,
+            Self::MultiMarkdown,
+            Self::MarkdownExtra,
+            Self::Mdx,
+            Self::Markdoc,
+        ]
+    }
+
+    /// What this dialect adds on top of CommonMark.
+    ///
+    /// The one table that decides how a document parses. Written out per dialect rather than as a
+    /// set of inherited defaults, because the interesting question when reading it is "what is the
+    /// difference between these two", and inheritance hides exactly that.
+    pub fn extensions(self) -> Extensions {
+        match self {
+            // The specification, and nothing else.
+            Self::CommonMark => Extensions {
+                header_ids: true,
+                ..Extensions::default()
+            },
+
+            Self::Gfm => Extensions {
+                tables: true,
+                strikethrough: true,
+                autolink: true,
+                tasklist: true,
+                footnotes: true,
+                alerts: true,
+                tagfilter: true,
+                shortcodes: true,
+                header_ids: true,
+                ..Extensions::default()
+            },
+
+            // MDX and Markdoc are GFM underneath — what they add is a component vocabulary, handled
+            // by `prepare` rather than by the parser. The tag filter is off for both: their whole
+            // point is embedding markup, so stripping it would fight the dialect.
+            Self::Mdx | Self::Markdoc => Extensions {
+                tables: true,
+                strikethrough: true,
+                autolink: true,
+                tasklist: true,
+                footnotes: true,
+                alerts: true,
+                header_ids: true,
+                ..Extensions::default()
+            },
+
+            // MyST is CommonMark plus maths and directives, for scientific writing. Its directives
+            // are fenced blocks, and its roles are inline — the block structure a reader sees is
+            // carried by the multi-line block quotes and the maths.
+            Self::MyST => Extensions {
+                tables: true,
+                strikethrough: true,
+                tasklist: true,
+                footnotes: true,
+                description_lists: true,
+                math_dollars: true,
+                math_latex: true,
+                multiline_block_quotes: true,
+                block_directives: true,
+                wikilinks: true,
+                header_attributes: true,
+                header_ids: true,
+                ..Extensions::default()
+            },
+
+            // Pandoc's Markdown is the most permissive of the family: it is the one people convert
+            // *from*, so it accepts most of what the others each added.
+            Self::Pandoc => Extensions {
+                tables: true,
+                strikethrough: true,
+                autolink: true,
+                tasklist: true,
+                footnotes: true,
+                inline_footnotes: true,
+                description_lists: true,
+                math_dollars: true,
+                math_latex: true,
+                sub_superscript: true,
+                highlight: true,
+                header_attributes: true,
+                header_ids: true,
+                ..Extensions::default()
+            },
+
+            // MultiMarkdown predates GFM and shares most of Pandoc's additions, but not its
+            // autolinking or task lists.
+            Self::MultiMarkdown => Extensions {
+                tables: true,
+                footnotes: true,
+                description_lists: true,
+                math_dollars: true,
+                sub_superscript: true,
+                header_ids: true,
+                ..Extensions::default()
+            },
+
+            // PHP Markdown Extra is the original set of additions, and deliberately none of
+            // GitHub's: no task lists, no strikethrough, no autolinking.
+            Self::MarkdownExtra => Extensions {
+                tables: true,
+                footnotes: true,
+                description_lists: true,
+                header_attributes: true,
+                header_ids: true,
+                ..Extensions::default()
+            },
         }
     }
 
@@ -60,6 +242,10 @@ impl Flavour {
             "mdx" => Self::Mdx,
             "mdoc" | "markdoc" => Self::Markdoc,
             "commonmark" | "cmark" => Self::CommonMark,
+            "myst" | "mystmd" => Self::MyST,
+            "pandoc" | "pmd" => Self::Pandoc,
+            "mmd" | "multimarkdown" => Self::MultiMarkdown,
+            "mdextra" => Self::MarkdownExtra,
             _ => Self::Gfm,
         }
     }
@@ -68,9 +254,13 @@ impl Flavour {
     pub fn display_name(self) -> &'static str {
         match self {
             Self::CommonMark => "CommonMark",
-            Self::Gfm => "Markdown",
+            Self::Gfm => "GitHub Flavored Markdown",
             Self::Mdx => "MDX",
             Self::Markdoc => "Markdoc",
+            Self::MyST => "MyST",
+            Self::Pandoc => "Pandoc Markdown",
+            Self::MultiMarkdown => "MultiMarkdown",
+            Self::MarkdownExtra => "Markdown Extra",
         }
     }
 
@@ -83,9 +273,9 @@ impl Flavour {
         matches!(self, Self::Mdx)
     }
 
-    /// Whether the GFM extensions apply.
+    /// Whether the GFM extensions apply. Kept for callers that only need the coarse answer.
     pub fn uses_gfm_extensions(self) -> bool {
-        !matches!(self, Self::CommonMark)
+        self.extensions().alerts
     }
 }
 
@@ -140,12 +330,14 @@ pub struct Prepared {
 /// a writer can see and work around.
 pub fn prepare(source: &str, flavour: Flavour) -> Prepared {
     match flavour {
-        Flavour::CommonMark | Flavour::Gfm => Prepared {
+        // Every dialect but these two is a pure option set on the same parser, so preparation is
+        // the identity: the difference is in how the text is read, not in rewriting it first.
+        Flavour::Mdx => prepare_mdx(source),
+        Flavour::Markdoc => prepare_markdoc(source),
+        _ => Prepared {
             text: source.to_owned(),
             constructs: Vec::new(),
         },
-        Flavour::Mdx => prepare_mdx(source),
-        Flavour::Markdoc => prepare_markdoc(source),
     }
 }
 
@@ -338,20 +530,58 @@ mod tests {
 
     #[test]
     fn wire_values_round_trip() {
-        for flavour in [
-            Flavour::CommonMark,
-            Flavour::Gfm,
-            Flavour::Mdx,
-            Flavour::Markdoc,
-        ] {
+        for flavour in Flavour::all() {
             assert_eq!(Flavour::from_u8(flavour as u8), Some(flavour));
         }
 
         // An out-of-range value is rejected rather than falling back. It arrives over an FFI
         // boundary, so it means the bridge and the library disagree about what dialects exist, and
         // quietly serving GFM would render the document wrongly with nothing reporting why.
-        assert_eq!(Flavour::from_u8(4), None);
+        assert_eq!(Flavour::from_u8(Flavour::all().len() as u8), None);
         assert_eq!(Flavour::from_u8(200), None);
+    }
+
+    #[test]
+    fn every_dialect_is_listed_exactly_once() {
+        // `all()` drives the picker and the round-trip test above, so a dialect missing from it is
+        // one the user can never select and the wire test never covers.
+        let mut seen: Vec<u8> = Flavour::all().iter().map(|f| *f as u8).collect();
+        seen.sort_unstable();
+        assert_eq!(seen, (0..seen.len() as u8).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn the_dialects_are_actually_different_from_one_another() {
+        // The point of the table: no two dialects may share an option set, or one of them is a
+        // label on another rather than a dialect.
+        let configurations: Vec<Extensions> = Flavour::all()
+            .iter()
+            .filter(|f| !matches!(f, Flavour::Mdx | Flavour::Markdoc))
+            .map(|f| f.extensions())
+            .collect();
+
+        for (index, left) in configurations.iter().enumerate() {
+            for right in &configurations[index + 1..] {
+                assert_ne!(left, right, "two dialects parse identically");
+            }
+        }
+    }
+
+    #[test]
+    fn the_family_resemblances_hold() {
+        // Spot checks that say what each dialect is *for*, so a careless edit to the table above
+        // fails here rather than in somebody's document.
+        assert!(!Flavour::CommonMark.extensions().tables, "CommonMark has no tables");
+        assert!(Flavour::MyST.extensions().math_dollars, "MyST is for scientific writing");
+        assert!(Flavour::Pandoc.extensions().sub_superscript, "Pandoc has H~2~O");
+        assert!(
+            !Flavour::MarkdownExtra.extensions().tasklist,
+            "task lists are GitHub's, and predate nothing in Markdown Extra",
+        );
+        assert!(
+            Flavour::MultiMarkdown.extensions().description_lists,
+            "MultiMarkdown inherited definition lists from Markdown Extra",
+        );
     }
 
     #[test]

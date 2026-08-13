@@ -62,7 +62,7 @@ Final ~~struck~~ paragraph with 한국어 and 🪶.\n";
 
     #[test]
     fn parses_the_full_sample_without_losing_blocks() {
-        let bytes = crate::parser::encode_blocks(SAMPLE);
+        let bytes = crate::parser::encode_blocks(SAMPLE, crate::flavour::Flavour::default());
         let (mut decoder, kind) = Decoder::new(&bytes).unwrap();
         assert_eq!(kind, PayloadKind::Blocks);
         let count = decoder.u32().unwrap();
@@ -111,8 +111,8 @@ Final ~~struck~~ paragraph with 한국어 and 🪶.\n";
         let mut whole = Document::new("# Title\n\nSome added text.\n");
         assert_eq!(incremental.text(), whole.text());
         assert_eq!(
-            crate::parser::encode_blocks(incremental.text()),
-            crate::parser::encode_blocks(whole.text())
+            crate::parser::encode_blocks(incremental.text(), crate::flavour::Flavour::default()),
+            crate::parser::encode_blocks(whole.text(), crate::flavour::Flavour::default())
         );
     }
 

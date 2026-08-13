@@ -9,28 +9,67 @@ pub mod ir;
 use comrak::nodes::{AlertType, AstNode, ListDelimType, ListType, NodeValue, TableAlignment};
 use comrak::{Arena, Options, parse_document};
 
+use crate::flavour::Flavour;
 use crate::wire::{Encoder, PayloadKind};
 
-/// Parser configuration: CommonMark plus the GFM extensions Jewel can render.
-pub fn options() -> Options<'static> {
+/// The parser configuration a dialect asks for.
+///
+/// This is the only place [`crate::flavour::Extensions`] is turned into comrak's own option struct,
+/// so "which dialect is this document" is decided once, in `flavour.rs`, and applied once, here.
+pub fn options_for(flavour: Flavour) -> Options<'static> {
+    let extensions = flavour.extensions();
     let mut options = Options::default();
 
-    options.extension.strikethrough = true;
-    options.extension.table = true;
-    options.extension.autolink = true;
-    options.extension.tasklist = true;
-    options.extension.footnotes = true;
+    options.extension.strikethrough = extensions.strikethrough;
+    options.extension.table = extensions.tables;
+    options.extension.autolink = extensions.autolink;
+    options.extension.tasklist = extensions.tasklist;
+    options.extension.footnotes = extensions.footnotes;
+    options.extension.inline_footnotes = extensions.inline_footnotes;
+    options.extension.alerts = extensions.alerts;
+    options.extension.tagfilter = extensions.tagfilter;
+    options.extension.description_lists = extensions.description_lists;
+    options.extension.math_dollars = extensions.math_dollars;
+    options.extension.math_latex = extensions.math_latex;
+    options.extension.superscript = extensions.sub_superscript;
+    options.extension.subscript = extensions.sub_superscript;
+    options.extension.highlight = extensions.highlight;
+    options.extension.underline = extensions.underline;
+    options.extension.multiline_block_quotes = extensions.multiline_block_quotes;
+    options.extension.block_directive = extensions.block_directives;
+    options.extension.header_attributes = extensions.header_attributes;
+    options.extension.shortcodes = extensions.shortcodes;
+    // `header_ids` is deliberately *not* applied here. comrak implements it by injecting an empty
+    // `<a class="anchor">` into every heading, which is what a published page wants and what a
+    // preview pane does not: on screen it is an invisible element that nonetheless takes a click
+    // and shifts the caret. The exporter turns it on for standalone documents instead, which is
+    // where a `#section` link has somewhere to point.
+    //
+    // `[[target|title]]`, the form MyST and every wiki that grew out of it use.
+    options.extension.wikilinks_title_after_pipe = extensions.wikilinks;
+
+    // Front matter is not a dialect feature: every one of these is written in files that open with
+    // a YAML block, and parsing it as a thematic break followed by a setext heading is wrong in all
+    // of them.
     options.extension.front_matter_delimiter = Some("---".to_owned());
-    options.extension.alerts = true;
 
     options.parse.smart = false;
     // Source positions are what make editor <-> preview scroll synchronisation possible.
     options.render.sourcepos = true;
     // Raw HTML is not trusted by default; the preview renders it as literal text.
-    options.render.r#unsafe = false;
+    options.render.r#unsafe = flavour.allows_raw_html();
     options.render.hardbreaks = false;
 
     options
+}
+
+/// Parser configuration for the default dialect.
+///
+/// Used by the derivations that are about a document's *shape* rather than its dialect — the
+/// outline, the word count, the inspections. Reading those under the widest common set means a
+/// heading is a heading whichever dialect the file is in.
+pub fn options() -> Options<'static> {
+    options_for(Flavour::default())
 }
 
 /// Zero-based inclusive line range for a node.
@@ -83,10 +122,16 @@ fn alert_tag(alert_type: AlertType) -> u8 {
     }
 }
 
-/// Encodes a document's blocks as a [`PayloadKind::Blocks`] payload.
-pub fn encode_blocks(text: &str) -> Vec<u8> {
+/// Encodes a document's blocks as a [`PayloadKind::Blocks`] payload, read in [`Flavour`]'s dialect.
+///
+/// The *original* text is parsed rather than [`crate::flavour::prepare`]'s rewrite, because every
+/// block here carries a source line range and the rewrite does not preserve line numbering for
+/// every dialect. A block IR whose line ranges point at the wrong lines would break scroll
+/// synchronisation and caret-following in the structure view, which is worse than showing a Markdoc
+/// annotation as a paragraph.
+pub fn encode_blocks(text: &str, flavour: Flavour) -> Vec<u8> {
     let arena = Arena::new();
-    let root = parse_document(&arena, text, &options());
+    let root = parse_document(&arena, text, &options_for(flavour));
 
     let mut encoder = Encoder::new(PayloadKind::Blocks);
     let count_slot = encoder.reserve_u32();
@@ -116,9 +161,40 @@ fn encode_block<'a>(node: &'a AstNode<'a>, list_level: u32, encoder: &mut Encode
             encoder.put_u8(heading.level);
             encode_inline_children(node, encoder);
         }
-        NodeValue::BlockQuote | NodeValue::MultilineBlockQuote(_) => {
+        // A multi-line block quote and a MyST directive are both containers whose contents are
+        // ordinary blocks. Rendering them as a quote keeps the nesting the writer sees, which is
+        // the part the structure view and the scroll synchroniser depend on.
+        NodeValue::BlockQuote
+        | NodeValue::MultilineBlockQuote(_)
+        | NodeValue::BlockDirective(_) => {
             write_header(encoder, ir::block::BLOCK_QUOTE, line_start, line_end);
             encode_block_children(node, list_level, encoder);
+        }
+        // A definition list is a list of terms, each with its details indented beneath — which is
+        // exactly a tight bullet list of items in the vocabulary the IR already has.
+        NodeValue::DescriptionList => {
+            write_header(encoder, ir::block::UNORDERED_LIST, line_start, line_end);
+            encoder.put_bool(true);
+            encoder.put_str("-");
+            encode_block_children(node, list_level + 1, encoder);
+        }
+        NodeValue::DescriptionItem(_) => {
+            write_header(encoder, ir::block::LIST_ITEM, line_start, line_end);
+            encoder.put_u32(list_level.saturating_sub(1));
+            encoder.put_u8(ir::task::NONE);
+            encode_block_children(node, list_level, encoder);
+        }
+        NodeValue::DescriptionTerm | NodeValue::DescriptionDetails => {
+            write_header(encoder, ir::block::PARAGRAPH, line_start, line_end);
+            encode_inline_children(node, encoder);
+        }
+        // Display maths is a block of LaTeX. It goes over as a fenced block tagged `math`, which
+        // gives the preview a language to switch on and the editor something to leave alone.
+        NodeValue::Math(math) if math.display_math => {
+            write_header(encoder, ir::block::FENCED_CODE_BLOCK, line_start, line_end);
+            encoder.put_opt_str(Some("math"));
+            encoder.put_str(&math.literal);
+            encoder.put_u32(0);
         }
         NodeValue::List(list) => {
             let tag = match list.list_type {
@@ -311,6 +387,43 @@ fn encode_inline<'a>(node: &'a AstNode<'a>, encoder: &mut Encoder) -> bool {
             encoder.put_str(&code.literal);
             encoder.put_u32(0);
         }
+        // Inline maths reaches the IR as code, which is the closest true statement the vocabulary
+        // can make: a run of source that is not prose and must not be re-wrapped or spell-checked.
+        NodeValue::Math(math) => {
+            encoder.put_u8(ir::inline::CODE);
+            encoder.put_str(&math.literal);
+            encoder.put_u32(0);
+        }
+        // The dialects' own emphases. Each keeps its source marker so a round trip through the IR
+        // still says which dialect wrote it, rather than flattening every one of them to italics.
+        NodeValue::Underline => {
+            encoder.put_u8(ir::inline::EMPHASIS);
+            encoder.put_str("__");
+            encode_inline_children(node, encoder);
+        }
+        NodeValue::Highlight => {
+            encoder.put_u8(ir::inline::EMPHASIS);
+            encoder.put_str("==");
+            encode_inline_children(node, encoder);
+        }
+        NodeValue::Superscript => {
+            encoder.put_u8(ir::inline::EMPHASIS);
+            encoder.put_str("^");
+            encode_inline_children(node, encoder);
+        }
+        NodeValue::Subscript => {
+            encoder.put_u8(ir::inline::EMPHASIS);
+            encoder.put_str("~");
+            encode_inline_children(node, encoder);
+        }
+        // A wiki link's target is its URL; its children are the title, if one was given after the
+        // pipe, and otherwise the target itself.
+        NodeValue::WikiLink(link) => {
+            encoder.put_u8(ir::inline::LINK);
+            encoder.put_str(&link.url);
+            encoder.put_opt_str(None);
+            encode_inline_children(node, encoder);
+        }
         NodeValue::Link(link) => {
             encoder.put_u8(ir::inline::LINK);
             encoder.put_str(&link.url);
@@ -368,22 +481,13 @@ fn encode_inline<'a>(node: &'a AstNode<'a>, encoder: &mut Encoder) -> bool {
 ///
 /// This is the single conversion the preview and the export both go through, which is what keeps
 /// what you see on screen and what you publish from drifting apart.
-pub fn to_html_for(text: &str, flavour: crate::flavour::Flavour) -> String {
+pub fn to_html_for(text: &str, flavour: Flavour) -> String {
     let prepared = crate::flavour::prepare(text, flavour);
 
-    let mut render_options = options();
-    if !flavour.uses_gfm_extensions() {
-        render_options.extension.strikethrough = false;
-        render_options.extension.table = false;
-        render_options.extension.autolink = false;
-        render_options.extension.tasklist = false;
-        render_options.extension.footnotes = false;
-        render_options.extension.alerts = false;
-    }
-    // MDX and Markdoc both reach the parser as HTML wrappers around Markdown, so their output has
-    // to survive rather than be escaped.
-    render_options.render.r#unsafe =
-        flavour.allows_raw_html() || flavour == crate::flavour::Flavour::Markdoc;
+    let mut render_options = options_for(flavour);
+    // Markdoc's annotations were rewritten into `<div>` wrappers a moment ago, so its own output
+    // has to survive rather than be escaped back into visible angle brackets.
+    render_options.render.r#unsafe = flavour.allows_raw_html() || flavour == Flavour::Markdoc;
     render_options.render.sourcepos = false;
 
     let arena = Arena::new();
@@ -419,6 +523,11 @@ mod tests {
     use super::*;
     use crate::wire::Decoder;
 
+    /// The block IR under the default dialect, which is what most of these cases are about.
+    fn encode_blocks_gfm(text: &str) -> Vec<u8> {
+        encode_blocks(text, Flavour::Gfm)
+    }
+
     /// Reads a block header and returns `(tag, line_start, line_end)`.
     fn read_header(decoder: &mut Decoder<'_>) -> (u8, u32, u32) {
         (
@@ -430,7 +539,7 @@ mod tests {
 
     #[test]
     fn encodes_a_heading_and_paragraph() {
-        let bytes = encode_blocks("# Title\n\nSome *text*.\n");
+        let bytes = encode_blocks_gfm("# Title\n\nSome *text*.\n");
         let (mut decoder, kind) = Decoder::new(&bytes).unwrap();
         assert_eq!(kind, PayloadKind::Blocks);
         assert_eq!(decoder.u32().unwrap(), 2, "two top-level blocks");
@@ -451,7 +560,7 @@ mod tests {
 
     #[test]
     fn encodes_fenced_code_with_language() {
-        let bytes = encode_blocks("```rust,no_run\nfn main() {}\n```\n");
+        let bytes = encode_blocks_gfm("```rust,no_run\nfn main() {}\n```\n");
         let (mut decoder, _) = Decoder::new(&bytes).unwrap();
         assert_eq!(decoder.u32().unwrap(), 1);
 
@@ -464,7 +573,7 @@ mod tests {
 
     #[test]
     fn encodes_fenced_code_without_language_as_absent() {
-        let bytes = encode_blocks("```\nplain\n```\n");
+        let bytes = encode_blocks_gfm("```\nplain\n```\n");
         let (mut decoder, _) = Decoder::new(&bytes).unwrap();
         decoder.u32().unwrap();
         read_header(&mut decoder);
@@ -473,7 +582,7 @@ mod tests {
 
     #[test]
     fn encodes_task_list_state() {
-        let bytes = encode_blocks("- [x] done\n- [ ] todo\n");
+        let bytes = encode_blocks_gfm("- [x] done\n- [ ] todo\n");
         let (mut decoder, _) = Decoder::new(&bytes).unwrap();
         assert_eq!(decoder.u32().unwrap(), 1, "a single list block");
 
@@ -491,7 +600,7 @@ mod tests {
 
     #[test]
     fn encodes_ordered_list_start_and_delimiter() {
-        let bytes = encode_blocks("3) first\n4) second\n");
+        let bytes = encode_blocks_gfm("3) first\n4) second\n");
         let (mut decoder, _) = Decoder::new(&bytes).unwrap();
         decoder.u32().unwrap();
         let (tag, _, _) = read_header(&mut decoder);
@@ -503,7 +612,7 @@ mod tests {
 
     #[test]
     fn encodes_gfm_table_alignments() {
-        let bytes = encode_blocks("| a | b |\n|:--|--:|\n| 1 | 2 |\n");
+        let bytes = encode_blocks_gfm("| a | b |\n|:--|--:|\n| 1 | 2 |\n");
         let (mut decoder, _) = Decoder::new(&bytes).unwrap();
         decoder.u32().unwrap();
 
@@ -517,7 +626,7 @@ mod tests {
 
     #[test]
     fn encodes_strikethrough_and_links() {
-        let bytes = encode_blocks("~~gone~~ and [text](https://example.com \"t\")\n");
+        let bytes = encode_blocks_gfm("~~gone~~ and [text](https://example.com \"t\")\n");
         let (mut decoder, _) = Decoder::new(&bytes).unwrap();
         decoder.u32().unwrap();
         read_header(&mut decoder);
@@ -532,7 +641,7 @@ mod tests {
 
     #[test]
     fn handles_empty_input() {
-        let bytes = encode_blocks("");
+        let bytes = encode_blocks_gfm("");
         let (mut decoder, kind) = Decoder::new(&bytes).unwrap();
         assert_eq!(kind, PayloadKind::Blocks);
         assert_eq!(decoder.u32().unwrap(), 0);
@@ -548,7 +657,11 @@ mod tests {
             "raw HTML must be escaped unless explicitly allowed"
         );
 
-        assert!(to_html("<script>x</script>\n", true).contains("<script>"));
+        // Allowing raw HTML lets markup through, but not scripting: the default dialect is GFM,
+        // and GitHub's tag filter is part of it. A `<script>` in a Markdown file somebody sent you
+        // stays inert whatever the render flag says.
+        assert!(to_html("<figure>x</figure>\n", true).contains("<figure>"));
+        assert!(!to_html("<script>x</script>\n", true).contains("<script>"));
     }
 
     #[test]
@@ -556,6 +669,127 @@ mod tests {
         let html = to_html("| a |\n|---|\n| 1 |\n\n~~x~~\n", false);
         assert!(html.contains("<table>"));
         assert!(html.contains("<del>"));
+    }
+
+    // ---------------------------------------------------------------- dialects
+
+    #[test]
+    fn maths_is_maths_in_myst_and_literal_text_in_commonmark() {
+        // The single clearest demonstration that the dialect reaches the parser: the same three
+        // characters are a formula in one dialect and three characters in another.
+        let source = "The value $x^2$ matters.\n";
+
+        let myst = to_html_for(source, Flavour::MyST);
+        assert!(
+            myst.contains("data-math-style"),
+            "MyST should read $..$ as maths, got: {myst}",
+        );
+
+        let commonmark = to_html_for(source, Flavour::CommonMark);
+        assert!(
+            commonmark.contains("$x^2$"),
+            "CommonMark has no maths and must leave the dollars alone, got: {commonmark}",
+        );
+    }
+
+    #[test]
+    fn tables_are_a_github_and_pandoc_feature_and_not_a_commonmark_one() {
+        let source = "| a | b |\n|---|---|\n| 1 | 2 |\n";
+
+        for dialect in [Flavour::Gfm, Flavour::Pandoc, Flavour::MultiMarkdown] {
+            assert!(
+                to_html_for(source, dialect).contains("<table>"),
+                "{dialect} should have tables",
+            );
+        }
+        assert!(
+            !to_html_for(source, Flavour::CommonMark).contains("<table>"),
+            "CommonMark has no tables; the pipes are ordinary text",
+        );
+    }
+
+    #[test]
+    fn pandoc_reads_subscripts_that_gfm_leaves_as_tildes() {
+        let source = "H~2~O\n";
+        assert!(to_html_for(source, Flavour::Pandoc).contains("<sub>"));
+        // In GFM a single tilde pair is not strikethrough either, so it stays as written.
+        assert!(!to_html_for(source, Flavour::Gfm).contains("<sub>"));
+    }
+
+    #[test]
+    fn markdown_extra_has_definition_lists_and_no_task_lists() {
+        let definitions = "Term\n\n: The definition.\n";
+        assert!(
+            to_html_for(definitions, Flavour::MarkdownExtra).contains("<dl>"),
+            "definition lists are the reason Markdown Extra exists",
+        );
+        assert!(!to_html_for(definitions, Flavour::Gfm).contains("<dl>"));
+
+        let tasks = "- [x] done\n";
+        assert!(to_html_for(tasks, Flavour::Gfm).contains("type=\"checkbox\""));
+        assert!(
+            !to_html_for(tasks, Flavour::MarkdownExtra).contains("type=\"checkbox\""),
+            "task lists are GitHub's addition and predate nothing in Markdown Extra",
+        );
+    }
+
+    #[test]
+    fn alerts_are_a_github_extension_and_a_plain_quote_elsewhere() {
+        let source = "> [!NOTE]\n> Mind the gap.\n";
+        assert!(to_html_for(source, Flavour::Gfm).contains("markdown-alert"));
+
+        let pandoc = to_html_for(source, Flavour::Pandoc);
+        assert!(pandoc.contains("<blockquote>"), "still a quote: {pandoc}");
+        assert!(!pandoc.contains("markdown-alert"));
+    }
+
+    #[test]
+    fn every_dialect_renders_the_common_core_the_same_way() {
+        // Whatever else changes, a heading, a list and emphasis mean the same thing everywhere.
+        // Without this the table in `flavour.rs` could disable something load-bearing and only the
+        // dialect-specific tests above would notice.
+        let source = "# Title\n\n- one\n- two\n\nSome *emphasis* and `code`.\n";
+        for dialect in Flavour::all() {
+            let html = to_html_for(source, dialect);
+            assert!(html.contains("Title</h1>"), "{dialect} lost its heading");
+            assert!(html.contains("<li>one</li>"), "{dialect} lost its list");
+            assert!(html.contains("<em>emphasis</em>"), "{dialect} lost emphasis");
+            assert!(html.contains("<code>code</code>"), "{dialect} lost code");
+        }
+    }
+
+    #[test]
+    fn dialect_specific_blocks_survive_into_the_ir() {
+        // A definition list has no tag of its own in the IR, so it is carried as the tight bullet
+        // list it visually is. What matters is that the terms and definitions are not dropped.
+        let bytes = encode_blocks("Term\n\n: The definition.\n", Flavour::Pandoc);
+        let (mut decoder, _) = Decoder::new(&bytes).unwrap();
+        assert_eq!(decoder.u32().unwrap(), 1, "one top-level block");
+        let (tag, _, _) = read_header(&mut decoder);
+        assert_eq!(tag, ir::block::UNORDERED_LIST);
+    }
+
+    #[test]
+    fn maths_reaches_the_ir_as_code_rather_than_as_prose() {
+        // comrak treats `$$…$$` as an inline inside its paragraph rather than as a block of its
+        // own, so the IR carries it as inline code — which is the true statement about it: a run
+        // of source that is not prose, and must not be re-wrapped or spell-checked.
+        let bytes = encode_blocks("$$E = mc^2$$\n", Flavour::MyST);
+        let (mut decoder, _) = Decoder::new(&bytes).unwrap();
+        assert_eq!(decoder.u32().unwrap(), 1);
+        let (tag, _, _) = read_header(&mut decoder);
+        assert_eq!(tag, ir::block::PARAGRAPH);
+        assert_eq!(decoder.u32().unwrap(), 1, "one inline child");
+        assert_eq!(decoder.u8().unwrap(), ir::inline::CODE);
+        assert_eq!(decoder.string().unwrap(), "E = mc^2");
+
+        // Under a dialect without maths the same characters are prose.
+        let bytes = encode_blocks("$$E = mc^2$$\n", Flavour::Gfm);
+        let (mut decoder, _) = Decoder::new(&bytes).unwrap();
+        decoder.u32().unwrap();
+        read_header(&mut decoder);
+        decoder.u32().unwrap();
+        assert_eq!(decoder.u8().unwrap(), ir::inline::TEXT);
     }
 
     #[test]

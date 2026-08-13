@@ -304,7 +304,8 @@ pub extern "C" fn quill_doc_blocks(doc: *mut QuillDoc, out: *mut QuillBuf) -> i3
         if let Some(cached) = document.cached(PayloadKind::Blocks) {
             return write_out(slot, cached.to_vec());
         }
-        let bytes = crate::parser::encode_blocks(document.text());
+        let flavour = document.flavour();
+        let bytes = crate::parser::encode_blocks(document.text(), flavour);
         document.cache(PayloadKind::Blocks, bytes.clone());
         write_out(slot, bytes)
     })
@@ -323,7 +324,8 @@ pub extern "C" fn quill_doc_set_flavour(doc: *mut QuillDoc, flavour: u8) -> i32 
         };
         let Some(parsed) = crate::flavour::Flavour::from_u8(flavour) else {
             set_last_error(format!(
-                "unknown Markdown flavour {flavour}; this library knows 0..=3"
+                "unknown Markdown flavour {flavour}; this library knows 0..={}",
+                crate::flavour::Flavour::all().len() - 1
             ));
             return status::INVALID_ARGUMENT;
         };

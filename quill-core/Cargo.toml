@@ -15,7 +15,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 # Markdown parsing. Default features pull in the CLI, `bon` and syntect's Oniguruma
 # backend -- none of which belong inside a shared library.
-comrak = { version = "0.54", default-features = false }
+comrak = { version = "0.54", default-features = false, features = ["attributes", "shortcodes"] }
 
 # Rope buffer. Gives O(log n) edits plus native UTF-8 <-> UTF-16 index conversion,
 # which is what keeps offsets consistent with the JVM side.
