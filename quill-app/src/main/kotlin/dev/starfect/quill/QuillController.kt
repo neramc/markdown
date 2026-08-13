@@ -36,6 +36,7 @@ import dev.starfect.quill.model.RunTask
 import dev.starfect.quill.model.ToolWindow
 import dev.starfect.quill.model.ViewMode
 import dev.starfect.quill.model.WorkspaceState
+import dev.starfect.quill.search.ProjectSearch
 import java.awt.Toolkit
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
@@ -44,6 +45,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -96,6 +98,14 @@ public class QuillController(
 
         /** How many notifications to keep. Older ones are noise nobody scrolls back to. */
         const val MAX_NOTIFICATIONS = 50
+
+        /** Debounce before a project search touches the disk. Longer than the parse debounce: this
+         *  one reads every file under the root, so a keystroke's worth of work is much larger. */
+        const val PROJECT_SEARCH_DEBOUNCE_MILLIS = 180L
+
+        /** How long to wait for a file opened from a search result before giving up on the jump. */
+        const val OPEN_POLL_ATTEMPTS = 40
+        const val OPEN_POLL_INTERVAL_MILLIS = 25L
     }
 
     /**
@@ -621,6 +631,115 @@ public class QuillController(
                     update { it.copy(find = it.find.copy(error = failure.message)) }
                     updateDocument(id) { it.copy(matches = emptyList(), currentMatch = -1) }
                 }
+        }
+    }
+
+    // ---------------------------------------------------------------- project search
+
+    /** The search currently walking the disk, so a new query can cancel it. */
+    private var projectSearchJob: Job? = null
+
+    /** Opens the project search dialog on [scope]. */
+    public fun showProjectSearch(scope: ProjectSearch.Scope) {
+        update {
+            it.copy(projectSearch = it.projectSearch.copy(visible = true, scope = scope))
+        }
+        runProjectSearch()
+    }
+
+    public fun hideProjectSearch() {
+        projectSearchJob?.cancel()
+        update { it.copy(projectSearch = it.projectSearch.copy(visible = false)) }
+    }
+
+    /** Changes what is being searched for, and re-runs. */
+    public fun updateProjectSearch(
+        query: String = _state.value.projectSearch.query,
+        scope: ProjectSearch.Scope = _state.value.projectSearch.scope,
+        caseSensitive: Boolean = _state.value.projectSearch.caseSensitive,
+    ) {
+        update {
+            it.copy(
+                projectSearch = it.projectSearch.copy(
+                    query = query,
+                    scope = scope,
+                    caseSensitive = caseSensitive,
+                )
+            )
+        }
+        runProjectSearch()
+    }
+
+    /**
+     * Runs the search on a worker, replacing whatever was running.
+     *
+     * Debounced like the derivation is, and for the same reason: a project search reads every file
+     * under the root, and starting one per keystroke would have the disk doing a hundred times the
+     * work for a query nobody finished typing. Cancellation is cooperative and checked inside the
+     * walk, so an abandoned search stops rather than finishing into a discarded result.
+     */
+    private fun runProjectSearch() {
+        projectSearchJob?.cancel()
+        val workspace = _state.value
+        val root = workspace.projectRoot
+        val request = workspace.projectSearch
+
+        if (!request.visible || root == null) {
+            update { it.copy(projectSearch = it.projectSearch.copy(results = ProjectSearch.Results.EMPTY, running = false)) }
+            return
+        }
+
+        update { it.copy(projectSearch = it.projectSearch.copy(running = true)) }
+
+        projectSearchJob = scope.launch {
+            delay(PROJECT_SEARCH_DEBOUNCE_MILLIS)
+            val results = withContext(Dispatchers.IO) {
+                ProjectSearch.run(
+                    root = root,
+                    scope = request.scope,
+                    query = request.query,
+                    caseSensitive = request.caseSensitive,
+                    progress = { !isActive },
+                )
+            }
+
+            // A result that arrived after the query moved on is not this query's result.
+            val current = _state.value.projectSearch
+            if (current.query != request.query || current.scope != request.scope) return@launch
+            update { it.copy(projectSearch = it.projectSearch.copy(results = results, running = false)) }
+        }
+    }
+
+    /**
+     * Opens a search result and puts the caret on it.
+     *
+     * The offset has to be applied *after* the file has loaded, which it may not have when this is
+     * called — so opening and jumping are one operation here rather than two the caller sequences.
+     */
+    public fun openHit(hit: ProjectSearch.Hit) {
+        hideProjectSearch()
+        val existing = _state.value.documents.firstOrNull { it.path == hit.path }
+        if (existing != null) {
+            update { it.copy(activeDocumentId = existing.id) }
+            if (hit.offset >= 0) moveCaret(existing.id, hit.offset)
+            return
+        }
+
+        openFile(hit.path)
+        if (hit.offset < 0) return
+
+        scope.launch {
+            // The open is asynchronous and there is no completion to await from here, so this waits
+            // for the document to appear rather than guessing at a delay. It gives up rather than
+            // spinning: a file that never opens has already reported why.
+            repeat(OPEN_POLL_ATTEMPTS) {
+                val opened = _state.value.documents.firstOrNull { it.path == hit.path }
+                if (opened != null) {
+                    moveCaret(opened.id, hit.offset)
+                    return@launch
+                }
+                delay(OPEN_POLL_INTERVAL_MILLIS)
+            }
         }
     }
 

@@ -11,6 +11,7 @@ import dev.starfect.quill.bridge.wire.MarkdownBlockIr
 import dev.starfect.quill.bridge.wire.OutlineEntry
 import dev.starfect.quill.bridge.wire.SearchMatch
 import dev.starfect.quill.bridge.wire.StyleSpan
+import dev.starfect.quill.search.ProjectSearch
 import java.nio.file.Path
 
 /** How the editor and preview share the main area. */
@@ -108,6 +109,23 @@ public data class DocumentSession(
             return CaretPosition(line, offset - lineStart, offset)
         }
 }
+
+/**
+ * The project-wide search dialog's state.
+ *
+ * Results live here rather than being recomputed by the dialog, because a search walks the disk:
+ * it is a background job with a lifetime, and the dialog is a view of whatever that job last
+ * produced.
+ */
+@Immutable
+public data class ProjectSearchState(
+    val visible: Boolean = false,
+    val scope: ProjectSearch.Scope = ProjectSearch.Scope.FILE_NAMES,
+    val query: String = "",
+    val caseSensitive: Boolean = false,
+    val results: ProjectSearch.Results = ProjectSearch.Results.EMPTY,
+    val running: Boolean = false,
+)
 
 /** Find/replace panel state. */
 @Immutable
@@ -228,6 +246,7 @@ public data class WorkspaceState(
     val documents: List<DocumentSession> = emptyList(),
     val activeDocumentId: Long? = null,
     val find: FindState = FindState(),
+    val projectSearch: ProjectSearchState = ProjectSearchState(),
     val commandPaletteVisible: Boolean = false,
     /** The Ctrl/Cmd+K list of everything Markdown can do. */
     val featurePaletteVisible: Boolean = false,

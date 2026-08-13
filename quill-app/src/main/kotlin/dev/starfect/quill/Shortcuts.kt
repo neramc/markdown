@@ -13,6 +13,7 @@ import dev.starfect.quill.editing.MarkdownEdits
 import dev.starfect.quill.model.Dialog
 import dev.starfect.quill.model.ToolWindow
 import dev.starfect.quill.model.ViewMode
+import dev.starfect.quill.search.ProjectSearch
 
 /**
  * Window-level keyboard shortcuts, using the IDE's own bindings.
@@ -31,6 +32,10 @@ internal fun handleShortcut(event: KeyEvent, controller: QuillController): Boole
                 // Innermost first: a dialog over a palette over a find bar, closed in that order.
                 workspace.dialog != null -> {
                     controller.dismissDialog()
+                    true
+                }
+                workspace.projectSearch.visible -> {
+                    controller.hideProjectSearch()
                     true
                 }
                 workspace.featurePaletteVisible -> {
@@ -169,6 +174,26 @@ internal fun handleShortcut(event: KeyEvent, controller: QuillController): Boole
         }
         event.key == Key.F && !event.isShiftPressed -> {
             controller.setFindVisible(true)
+            true
+        }
+        // Ctrl+Shift+F searches the project rather than the document, as it does in the IDE.
+        event.key == Key.F && event.isShiftPressed -> {
+            controller.showProjectSearch(ProjectSearch.Scope.CONTENT)
+            true
+        }
+        // Ctrl+Shift+N goes to a file by name; the other three scopes are a click away from there.
+        event.key == Key.N && event.isShiftPressed -> {
+            controller.showProjectSearch(ProjectSearch.Scope.FILE_NAMES)
+            true
+        }
+        // Ctrl+Shift+O lists what was left unfinished, which nothing else in the editor can show.
+        event.key == Key.O && event.isShiftPressed -> {
+            controller.showProjectSearch(ProjectSearch.Scope.TODO)
+            true
+        }
+        // Ctrl+E is the IDE's recent-files switcher.
+        event.key == Key.E && !event.isShiftPressed -> {
+            controller.showProjectSearch(ProjectSearch.Scope.RECENT)
             true
         }
         event.key == Key.R && !event.isShiftPressed -> {
