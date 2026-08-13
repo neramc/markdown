@@ -783,10 +783,28 @@ public class QuillController(
     /** Opens the project search dialog on [scope]. */
     public fun showProjectSearch(scope: ProjectSearch.Scope) {
         update {
-            it.copy(projectSearch = it.projectSearch.copy(visible = true, scope = scope))
+            it.copy(
+                projectSearch = it.projectSearch.copy(
+                    visible = true,
+                    scope = scope,
+                    query = if (isList(scope)) "" else it.projectSearch.query,
+                )
+            )
         }
         runProjectSearch()
     }
+
+    /**
+     * Whether a scope is a list rather than a search.
+     *
+     * Recent and TODO both mean something with an empty query — "what did I change", "what did I
+     * leave unfinished" — and the others mean nothing at all. That difference decides whether a
+     * query survives a change of scope: carrying "rate limit" into the TODO tab hides the list
+     * behind a filter nobody typed for it, while carrying it from Text to Regex is the whole point
+     * of having both.
+     */
+    private fun isList(scope: ProjectSearch.Scope): Boolean =
+        scope == ProjectSearch.Scope.RECENT || scope == ProjectSearch.Scope.TODO
 
     public fun hideProjectSearch() {
         projectSearchJob?.cancel()
@@ -799,10 +817,14 @@ public class QuillController(
         scope: ProjectSearch.Scope = _state.value.projectSearch.scope,
         caseSensitive: Boolean = _state.value.projectSearch.caseSensitive,
     ) {
+        val previous = _state.value.projectSearch
+        // Switching *to* a list scope drops the query; switching between two searches keeps it.
+        val carried = if (scope != previous.scope && isList(scope)) "" else query
+
         update {
             it.copy(
                 projectSearch = it.projectSearch.copy(
-                    query = query,
+                    query = carried,
                     scope = scope,
                     caseSensitive = caseSensitive,
                 )

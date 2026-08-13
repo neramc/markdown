@@ -63,8 +63,10 @@ private val ResultRowHeight = 40.dp
  *
  * One dialog with five scopes rather than five dialogs, because the question a writer has is
  * usually "where is that", and which of the five answers it is something they discover by trying.
- * Switching scope keeps the query, so a text search that finds nothing is one keystroke away from
- * being a file-name search that does.
+ * Switching between two *searches* keeps the query, so a text search that finds nothing is one
+ * click from being a file-name search that does — while switching to Recent or TODO drops it,
+ * because those two mean something with an empty query and a carried-over filter would hide the
+ * list behind words nobody typed for it.
  *
  * The results are whatever the controller's background search last produced. Nothing here touches
  * the disk, which is what keeps a scroll through four hundred results smooth while the search that
@@ -76,7 +78,9 @@ public fun ProjectSearchDialog(controller: QuillController, workspace: Workspace
     val scale = LocalTypeScale.current
     val state = workspace.projectSearch
 
-    var query by remember { mutableStateOf(TextFieldValue(state.query)) }
+    // Re-created when the scope changes, so a query the controller dropped on the way into a list
+    // scope actually disappears from the field rather than only from the search.
+    var query by remember(state.scope) { mutableStateOf(TextFieldValue(state.query)) }
     var selected by remember { mutableIntStateOf(0) }
     val listState = rememberLazyListState()
     val focus = remember { FocusRequester() }
@@ -281,8 +285,12 @@ private fun ResultRow(
     val shell = LocalShellPalette.current
     val scale = LocalTypeScale.current
 
+    // The *directory*, not the path: the file name is already the first thing on the row, and
+    // repeating it on the right for every file at the project root reads as a bug.
     val relative = remember(hit.path, root) {
-        root?.let { hit.path.relativeToOrSelf(it).toString().replace('\\', '/') } ?: hit.path.toString()
+        val directory = hit.path.parent ?: return@remember ""
+        root?.let { directory.relativeToOrSelf(it).toString().replace('\\', '/') }
+            ?: directory.toString()
     }
 
     Row(
@@ -321,12 +329,12 @@ private fun ResultRow(
                     color = shell.secondaryText,
                     maxLines = 1,
                 )
-            } else {
+            } else if (relative.isNotEmpty()) {
                 Text(relative, fontSize = scale.medium, color = shell.mutedText, maxLines = 1)
             }
         }
 
-        if (hit.preview.isNotEmpty()) {
+        if (hit.preview.isNotEmpty() && relative.isNotEmpty()) {
             Text(relative, fontSize = scale.medium, color = shell.mutedText, maxLines = 1)
         }
     }

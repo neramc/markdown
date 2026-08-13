@@ -571,9 +571,18 @@ mod tests {
     fn the_family_resemblances_hold() {
         // Spot checks that say what each dialect is *for*, so a careless edit to the table above
         // fails here rather than in somebody's document.
-        assert!(!Flavour::CommonMark.extensions().tables, "CommonMark has no tables");
-        assert!(Flavour::MyST.extensions().math_dollars, "MyST is for scientific writing");
-        assert!(Flavour::Pandoc.extensions().sub_superscript, "Pandoc has H~2~O");
+        assert!(
+            !Flavour::CommonMark.extensions().tables,
+            "CommonMark has no tables"
+        );
+        assert!(
+            Flavour::MyST.extensions().math_dollars,
+            "MyST is for scientific writing"
+        );
+        assert!(
+            Flavour::Pandoc.extensions().sub_superscript,
+            "Pandoc has H~2~O"
+        );
         assert!(
             !Flavour::MarkdownExtra.extensions().tasklist,
             "task lists are GitHub's, and predate nothing in Markdown Extra",

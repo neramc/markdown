@@ -228,7 +228,10 @@ fn convert_pre(element: &Element) -> String {
         Node::Element(child) if child.tag == "code" => Some(child),
         _ => None,
     }) {
-        Some(code) => (language_of(code), text_content(&Node::Element(code.clone()))),
+        Some(code) => (
+            language_of(code),
+            text_content(&Node::Element(code.clone())),
+        ),
         None => (
             language_of(element),
             text_content(&Node::Element(element.clone())),
@@ -372,7 +375,13 @@ fn convert_table(element: &Element, context: &mut Context) -> Option<String> {
     let mut rows: Vec<Vec<String>> = Vec::new();
     let mut header_rows = 0usize;
 
-    collect_rows(&element.children, context, &mut rows, &mut header_rows, false);
+    collect_rows(
+        &element.children,
+        context,
+        &mut rows,
+        &mut header_rows,
+        false,
+    );
 
     let rows: Vec<Vec<String>> = rows.into_iter().filter(|row| !row.is_empty()).collect();
     if rows.is_empty() {
@@ -602,7 +611,11 @@ fn convert_inline_element(element: &Element, context: &mut Context) -> String {
                 return format!("<{href}>");
             }
             match element.attribute("title").filter(|title| !title.is_empty()) {
-                Some(title) => format!("[{inner}]({} \"{}\")", encode_url(href), escape_quotes(title)),
+                Some(title) => format!(
+                    "[{inner}]({} \"{}\")",
+                    encode_url(href),
+                    escape_quotes(title)
+                ),
                 None => format!("[{inner}]({})", encode_url(href)),
             }
         }
@@ -713,9 +726,7 @@ fn apply_styles(element: &Element, inner: String, _context: &mut Context) -> Str
     if declaration(&style, "font-style").is_some_and(|value| value.starts_with("italic")) {
         result = emphasise(&result, "*");
     }
-    if declaration(&style, "text-decoration")
-        .is_some_and(|value| value.contains("line-through"))
-    {
+    if declaration(&style, "text-decoration").is_some_and(|value| value.contains("line-through")) {
         result = emphasise(&result, "~~");
     }
     if style_weight(element) == Some(Weight::Bold) {
@@ -758,11 +769,7 @@ fn declaration<'a>(style: &'a str, property: &str) -> Option<&'a str> {
 
 /// Wraps a literal in the shortest backtick fence that can hold it.
 fn code_span(literal: &str) -> String {
-    let longest_run = literal
-        .split(|c| c != '`')
-        .map(str::len)
-        .max()
-        .unwrap_or(0);
+    let longest_run = literal.split(|c| c != '`').map(str::len).max().unwrap_or(0);
     let fence = "`".repeat(longest_run + 1);
     // A literal that starts or ends with a backtick needs a space inside the fence, or the fence
     // and the content run together into a longer fence.
@@ -784,7 +791,8 @@ fn collapse(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     let mut in_space = false;
     for character in text.chars() {
-        let is_space = character.is_whitespace() || character == '\u{a0}' || character == '\u{200b}';
+        let is_space =
+            character.is_whitespace() || character == '\u{a0}' || character == '\u{200b}';
         if is_space {
             if !in_space {
                 out.push(' ');
@@ -1030,7 +1038,10 @@ mod tests {
     #[test]
     fn a_headerless_table_gets_an_empty_header_rather_than_losing_a_row() {
         let html = "<table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table>";
-        assert_eq!(convert(html), "|  |  |\n| --- | --- |\n| a | b |\n| c | d |\n");
+        assert_eq!(
+            convert(html),
+            "|  |  |\n| --- | --- |\n| a | b |\n| c | d |\n"
+        );
     }
 
     #[test]
@@ -1098,7 +1109,10 @@ mod tests {
         // Over-escaping is the other failure: `snake\_case` and `1\. two` are correct Markdown and
         // look like a broken tool.
         assert_eq!(convert("<p>snake_case_name</p>"), "snake_case_name\n");
-        assert_eq!(convert("<p>well-known state-of-the-art</p>"), "well-known state-of-the-art\n");
+        assert_eq!(
+            convert("<p>well-known state-of-the-art</p>"),
+            "well-known state-of-the-art\n"
+        );
         assert_eq!(convert("<p>5 > 3 and 2 < 4</p>"), "5 > 3 and 2 < 4\n");
     }
 
@@ -1113,7 +1127,10 @@ mod tests {
     #[test]
     fn a_url_with_spaces_is_wrapped_rather_than_broken() {
         let markdown = convert(r#"<a href="/my file.png">x</a>"#);
-        assert!(markdown.contains("(<%2F") || markdown.contains("(</my%20file.png>"), "{markdown}");
+        assert!(
+            markdown.contains("(<%2F") || markdown.contains("(</my%20file.png>"),
+            "{markdown}"
+        );
     }
 
     #[test]

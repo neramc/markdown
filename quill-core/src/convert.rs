@@ -351,8 +351,10 @@ impl Confluence {
             }
 
             NodeValue::WikiLink(link) => {
-                self.out
-                    .push_str(&format!("<ac:link><ri:page ri:content-title=\"{}\" /></ac:link>", escape(&link.url)));
+                self.out.push_str(&format!(
+                    "<ac:link><ri:page ri:content-title=\"{}\" /></ac:link>",
+                    escape(&link.url)
+                ));
             }
 
             // Confluence attaches images rather than linking them, and an external one is a
@@ -360,8 +362,9 @@ impl Confluence {
             NodeValue::Image(link) => {
                 let url = escape(&link.url);
                 if link.url.starts_with("http://") || link.url.starts_with("https://") {
-                    self.out
-                        .push_str(&format!("<ac:image><ri:url ri:value=\"{url}\" /></ac:image>"));
+                    self.out.push_str(&format!(
+                        "<ac:image><ri:url ri:value=\"{url}\" /></ac:image>"
+                    ));
                 } else {
                     let name = link.url.rsplit('/').next().unwrap_or(&link.url);
                     self.out.push_str(&format!(
@@ -597,7 +600,9 @@ impl Markdown {
                     };
 
                     let marker = match &child.data.borrow().value {
-                        NodeValue::TaskItem(task) if task.symbol.is_some() => format!("{marker}[x] "),
+                        NodeValue::TaskItem(task) if task.symbol.is_some() => {
+                            format!("{marker}[x] ")
+                        }
                         NodeValue::TaskItem(_) => format!("{marker}[ ] "),
                         _ => marker,
                     };
@@ -732,9 +737,8 @@ impl Markdown {
 
             NodeValue::Code(code) => {
                 let literal = &code.literal;
-                let fence = "`".repeat(
-                    literal.split(|c| c != '`').map(str::len).max().unwrap_or(0) + 1,
-                );
+                let fence =
+                    "`".repeat(literal.split(|c| c != '`').map(str::len).max().unwrap_or(0) + 1);
                 format!("{fence}{literal}{fence}")
             }
 
@@ -775,7 +779,9 @@ impl Markdown {
                 format!("[{label}]({})", link.url)
             }
 
-            NodeValue::Image(link) => format!("![{}]({})", crate::parser::plain_text(node), link.url),
+            NodeValue::Image(link) => {
+                format!("![{}]({})", crate::parser::plain_text(node), link.url)
+            }
 
             // A footnote reference becomes a numbered marker with its text at the foot of the
             // document -- neither target has real footnotes, and dropping them loses the citation.
@@ -897,7 +903,9 @@ mod tests {
     #[test]
     fn an_image_is_an_attachment_when_it_is_local_and_a_url_when_it_is_not() {
         assert!(confluence("![](assets/a.png)\n").contains("ri:attachment ri:filename=\"a.png\""));
-        assert!(confluence("![](https://x/a.png)\n").contains("ri:url ri:value=\"https://x/a.png\""));
+        assert!(
+            confluence("![](https://x/a.png)\n").contains("ri:url ri:value=\"https://x/a.png\"")
+        );
     }
 
     #[test]
@@ -981,7 +989,11 @@ mod tests {
 
     #[test]
     fn a_wiki_link_becomes_an_ordinary_link() {
-        let out = convert("See [[Guide|the guide]].\n", Flavour::MyST, Target::GitHubReadme);
+        let out = convert(
+            "See [[Guide|the guide]].\n",
+            Flavour::MyST,
+            Target::GitHubReadme,
+        );
         assert!(out.contains("[the guide](Guide)"), "{out}");
     }
 
@@ -1019,7 +1031,10 @@ mod tests {
     fn korean_and_emoji_survive_every_target() {
         for target in [Target::Confluence, Target::Notion, Target::GitHubReadme] {
             let out = convert("# 한국어 제목 🪶\n", Flavour::Gfm, target);
-            assert!(out.contains("한국어 제목 🪶"), "{target:?} lost the text: {out}");
+            assert!(
+                out.contains("한국어 제목 🪶"),
+                "{target:?} lost the text: {out}"
+            );
         }
     }
 

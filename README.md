@@ -42,6 +42,27 @@ the problems list and the rendered page all come from the same engine, from the 
 - **Find and replace,** docked above the document, with literal, whole-word and regular-expression
   modes and a match counter in the field. Stepping and replace-all run in the engine.
 - **Search Everywhere** (`Ctrl+Shift+P`) over every command, with subsequence matching.
+- **Every Markdown feature, searchable** (`Ctrl+K`), or by typing `/` at the start of a line.
+  Markdown's problem was never that it is hard — it is that nobody remembers all of it. Each entry
+  shows the syntax it writes, so twice through the list and you no longer need it. The `/` trigger
+  only fires at the start of a line, because `and/or` and `src/main` are prose.
+- **Paste from anywhere.** The clipboard is never one thing: copy a passage from a web page and it
+  carries plain text *and* an HTML fragment, and the plain one — the flavour a naive paste takes —
+  is the one the structure has already been thrown away from. Quill converts the HTML, so a paste
+  from Word, Notion, Google Docs, Confluence or a rendered README arrives as source you would have
+  typed. Google Docs' `font-weight:700` bold and Word's `mso-list` paragraphs are both handled.
+- **Drop a file or a screenshot** anywhere in the window: an image is filed beside the document and
+  linked, a file from elsewhere is copied in first.
+- **Tick a checkbox in the preview** and the source changes. A checklist you can read and cannot
+  tick is a picture of a checklist.
+- **Drag a section in the Structure panel** to move it — the heading and every subsection under it.
+- **A table of contents that stays current,** between `<!-- toc -->` and `<!-- /toc -->`. A document
+  without the markers is never touched.
+- **Vim mode** — a parser, not a key map: `d2w`, `yyp`, `ci"`, counts, operators, motions, registers,
+  `u`/`Ctrl+R` and `:w`/`:q`. Insert mode is deliberately left alone, so input methods, dead keys
+  and the clipboard keep working.
+- **Focus Mode** (`Ctrl+Shift+D`): one centred column, every paragraph but the current one dimmed,
+  and nothing else on screen. `Ctrl+Shift+M` switches between writing and reading.
 
 ### Dialects
 
@@ -54,6 +75,51 @@ extension, and lets you override it from the picker above the editor.
 | **GitHub Flavored Markdown** | `.md`, `.markdown` | Tables, task lists, strikethrough, autolinks, footnotes and alerts. |
 | **MDX** | `.mdx` | `import`/`export` statements and `{/* … */}` expressions are stripped before parsing; JSX components survive into the page as elements. Raw HTML passes through. |
 | **Markdoc** | `.mdoc`, `.markdoc` | `{% tag %}` … `{% /tag %}` becomes an element carrying `data-markdoc`, which the preview draws as a titled callout. |
+| **MyST** | `.myst`, `.mystmd` | `$x$` and `$$…$$` maths, `:::{note}` directives, definition lists and `[[wiki links]]`. What Jupyter Book and Sphinx read. |
+| **Pandoc Markdown** | `.pandoc`, `.pmd` | The most permissive of the family: definition lists, maths, `H~2~O` and `x^2^`, `==marked==`, inline `^[footnotes]` and `{#custom-id}` headings. |
+| **MultiMarkdown** | `.mmd` | Tables, footnotes, definition lists, maths, sub- and superscript — and none of GitHub's additions. |
+| **Markdown Extra** | `.mdextra` | The original set: tables, footnotes, definition lists and `{#custom-id}`. A `- [x]` here is a bullet containing brackets, which is what it meant before GitHub gave it another meaning. |
+
+These are parser configurations, not labels. `$x^2$` is a formula in MyST and three characters in
+CommonMark; `H~2~O` is a subscript in Pandoc and a pair of tildes in GFM; a definition list parses
+in Markdown Extra and a task list does not.
+
+**AsciiDoc and Djot are deliberately absent.** Neither is a Markdown superset — they are separate
+grammars with their own block and inline syntax, and supporting them means a second parser rather
+than another option set on this one. Listing them with a Markdown parser behind them would show
+`= Title` as literal text and call it support.
+
+### Searching a project
+
+`Ctrl+Shift+F` opens one dialog with five scopes, because "where is that" is not one question:
+
+| Scope | The question it answers |
+|---|---|
+| **Files** (`Ctrl+Shift+N`) | You know roughly what it is called. Subsequence matching over the path, so `docsdep` finds `docs/deployment.md`. |
+| **Text** (`Ctrl+Shift+F`) | You know what it says. |
+| **Regex** | You know the shape — every link to the old domain, say. |
+| **Recent** (`Ctrl+E`) | You only know it was yesterday. |
+| **TODO** (`Ctrl+Shift+O`) | The notes you left yourself, which are a list you can never otherwise see because they are scattered through every file that has one. |
+
+Build output and version control are never searched, and a truncated result set says so — the
+absence of a result should never read as proof the project has none.
+
+### Exporting
+
+| Format | What it is for |
+|---|---|
+| **HTML** | A standalone page with the styling baked in. |
+| **PDF** | Fixed pages with the font embedded — including a CJK font when the document needs one, so Korean is glyphs rather than empty boxes. |
+| **Word** | Headings, lists and tables as real Word *styles*, so the document can be navigated and restyled. |
+| **EPUB** | A reflowable book with a table of contents. |
+| **Confluence** | Storage format: a code block is a macro, a callout is a macro, a task list is a first-class element. |
+| **Notion** | Markdown in the subset Notion imports — three heading levels, no raw HTML — because Markdown it cannot represent imports as literal text in the middle of the page. |
+| **GitHub README** | GFM, with other dialects' syntax translated into what GitHub actually renders. |
+
+The last three are translations rather than renderings: the output is still a document, which the
+target system then owns. Every lossy step loses the *syntax* and keeps the *content* — a footnote
+becomes a numbered note, a definition list becomes a bold term and its definition, neither becomes
+nothing.
 
 ### Inspections
 
@@ -95,7 +161,7 @@ lines instead.
 - **Settings** covering appearance, editor behaviour, inspections and save actions.
 - **Breadcrumbs** along the status bar: project, folders, file, and the heading the caret sits under.
 - **Dark and light themes,** switched at runtime.
-- **HTML export,** standalone and themed.
+- **Export** to HTML, PDF, Word, EPUB, Confluence, Notion and a GitHub README.
 
 ## Architecture
 

@@ -753,7 +753,10 @@ mod tests {
             let html = to_html_for(source, dialect);
             assert!(html.contains("Title</h1>"), "{dialect} lost its heading");
             assert!(html.contains("<li>one</li>"), "{dialect} lost its list");
-            assert!(html.contains("<em>emphasis</em>"), "{dialect} lost emphasis");
+            assert!(
+                html.contains("<em>emphasis</em>"),
+                "{dialect} lost emphasis"
+            );
             assert!(html.contains("<code>code</code>"), "{dialect} lost code");
         }
     }

@@ -27,14 +27,35 @@ each layer owns and why the boundaries are where they are.
 ┌──────────────────── quill-core (Rust cdylib) ───────────────────────────────────────┐
 │  ffi/            extern "C" entry points, catch_unwind, QuillBuf ownership           │
 │  document.rs     ropey rope, version counter, per-version result cache               │
-│  flavour.rs      CommonMark / GFM / MDX / Markdoc source preparation                 │
+│  flavour.rs      eight dialects as parser configurations, MDX/Markdoc preparation    │
 │  parser/         comrak AST → block IR carrying source line ranges                   │
 │  html.rs         rendered HTML → the DOM the preview draws                           │
+│  import.rs       clipboard HTML → clean Markdown (Word, Docs, Notion, the web)       │
+│  convert.rs      AST → Confluence storage format, Notion, GitHub README              │
 │  inspect.rs      fourteen inspections, AST and source-line                           │
 │  highlight/      editor.rs (line lexer), code.rs (syntect + two-face)                │
 │  outline.rs · stats.rs · search.rs · export.rs · theme.rs · wire.rs                  │
 └──────────────────────────────────────────────────────────────────────────────────────┘
 ```
+
+## What is not in Rust, and why
+
+Three pieces of this application are deliberately on the JVM side, and each has a reason beyond
+convenience:
+
+- **The exporters for PDF, DOCX and EPUB** (`quill-app/…/export/`). All three need the *host*: a
+  font file to embed, a zip container, the platform's own font directories. Rust would have to be
+  handed all of that across the boundary, and the boundary is the expensive part.
+- **The project-wide search** (`quill-app/…/search/`). It walks the file system rather than a
+  document, so there is no rope, no cache and no engine handle involved — putting it behind the FFI
+  would buy nothing and cost a payload format.
+- **The editing grammars** — Vim, the feature catalogue, the structural edits. Every one of them is
+  a pure function from a `TextFieldValue` to a `TextFieldValue`, which is what makes them testable
+  as string-in/string-out. Sending each keystroke through the FFI to compute a caret position would
+  add a round trip to the one operation that has to feel instant.
+
+The rule that survives: **the engine owns what a document *is*; the application owns what a person
+is doing to it.**
 
 ## Why Rust owns the pipeline
 
