@@ -52,8 +52,17 @@ import org.jetbrains.jewel.ui.Orientation
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.TextField
 
-/** How wide the feature list is, in both of its forms. */
+/** How wide the modal palette is. It floats over the whole window, so it can take the room. */
 private val PaletteWidth = 520.dp
+
+/**
+ * How wide the `/` menu is.
+ *
+ * Narrower than the palette, because it hangs inside the editor pane rather than over the window —
+ * and in a split view that pane can be a third of the width. At 520dp the syntax column ran off the
+ * right-hand edge and was simply not there.
+ */
+public val SlashMenuWidth: androidx.compose.ui.unit.Dp = 340.dp
 
 /** How tall the list gets before it scrolls. */
 private val PaletteMaxHeight = 320.dp
@@ -203,12 +212,16 @@ public fun SlashMenu(
     val shell = LocalShellPalette.current
     val listState = rememberLazyListState()
 
-    LaunchedEffect(selected) {
-        if (selected in matches.indices) listState.scrollToItem(selected)
+    // Keyed on the list as well as the cursor. Typing another character produces a *different* list
+    // while the cursor stays at zero, and a LazyColumn keeps its scroll offset across that — which
+    // left the menu opening part-way down, with the first entry's name cut off above its own top
+    // edge.
+    LaunchedEffect(matches.size, selected) {
+        listState.scrollToItem(selected.coerceIn(0, (matches.size - 1).coerceAtLeast(0)))
     }
 
     Column(
-        modifier = modifier.width(PaletteWidth)
+        modifier = modifier.width(SlashMenuWidth)
             .clip(RoundedCornerShape(Tokens.Radius.Popup))
             .dropShadow(RoundedCornerShape(Tokens.Radius.Popup))
             .floatingFill(shell.popupBackground)
@@ -216,7 +229,8 @@ public fun SlashMenu(
     ) {
         LazyColumn(
             state = listState,
-            modifier = Modifier.heightIn(max = SlashMenuMaxHeight).padding(vertical = Tokens.Spacing.Tiny),
+            modifier = Modifier.heightIn(max = SlashMenuMaxHeight),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = Tokens.Spacing.Tiny),
         ) {
             items(matches.size, key = { matches[it].id }) { index ->
                 FeatureRow(
@@ -229,8 +243,13 @@ public fun SlashMenu(
     }
 }
 
-/** Shorter than the palette's: it hangs off the caret and must not cover the paragraph above. */
-private val SlashMenuMaxHeight = 220.dp
+/**
+ * Shorter than the palette's: it hangs off the caret and must not cover the paragraph above.
+ *
+ * An exact multiple of the row height plus the list's own padding, so the last row visible is a
+ * whole row rather than a band of text cut through the middle.
+ */
+private val SlashMenuMaxHeight = FeatureRowHeight * 5 + 8.dp
 
 /**
  * Arrow-key navigation shared by both forms.

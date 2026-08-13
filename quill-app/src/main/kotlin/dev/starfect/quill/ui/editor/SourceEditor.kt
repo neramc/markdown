@@ -58,6 +58,7 @@ import dev.starfect.quill.editing.MarkdownEdits
 import dev.starfect.quill.editing.Vim
 import dev.starfect.quill.editing.MarkdownFeatures
 import dev.starfect.quill.ui.palette.SlashMenu
+import dev.starfect.quill.ui.palette.SlashMenuWidth
 import dev.starfect.quill.ui.palette.navigateFeatureList
 import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalEditorPalette
@@ -148,12 +149,14 @@ public fun SourceEditor(
     var textAreaOrigin by remember { mutableStateOf(Offset.Zero) }
     var editorOrigin by remember { mutableStateOf(Offset.Zero) }
     var editorHeight by remember { mutableIntStateOf(0) }
+    var editorWidth by remember { mutableIntStateOf(0) }
 
     Box(
         modifier.background(palette.background)
             .onGloballyPositioned {
                 editorOrigin = it.positionInRoot()
                 editorHeight = it.size.height
+                editorWidth = it.size.width
             },
     ) {
         VerticallyScrollableContainer(scrollState = scrollState, modifier = Modifier.fillMaxSize()) {
@@ -229,6 +232,7 @@ public fun SourceEditor(
                         editorOrigin = editorOrigin,
                         scrollOffset = scrollState.value,
                         viewportHeight = editorHeight,
+                        viewportWidth = editorWidth,
                     )
                 },
             )
@@ -255,6 +259,7 @@ private fun androidx.compose.ui.unit.Density.caretMenuOffset(
     editorOrigin: Offset,
     scrollOffset: Int,
     viewportHeight: Int,
+    viewportWidth: Int,
 ): IntOffset {
     val result = layout ?: return IntOffset.Zero
     val offset = caretOffset.coerceIn(0, result.layoutInput.text.length)
@@ -275,7 +280,16 @@ private fun androidx.compose.ui.unit.Density.caretMenuOffset(
         below
     }
 
-    return IntOffset(left.coerceAtLeast(0f).toInt(), top.coerceAtLeast(0f).toInt())
+    // Pinned inside the pane. In a split view the editor can be a third of the window, and a menu
+    // anchored at the caret runs straight off the right-hand edge -- where it is not clipped so much
+    // as absent, because it is drawn inside the pane's own bounds.
+    val menuWidth = SlashMenuWidth.toPx()
+    val maximumLeft = (viewportWidth - menuWidth - Tokens.Spacing.Tiny.toPx()).coerceAtLeast(0f)
+
+    return IntOffset(
+        left.coerceIn(0f, maximumLeft).toInt(),
+        top.coerceAtLeast(0f).toInt(),
+    )
 }
 
 /**
