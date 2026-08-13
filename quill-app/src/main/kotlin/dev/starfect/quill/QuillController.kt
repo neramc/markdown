@@ -31,6 +31,9 @@ import dev.starfect.quill.editing.CleanPaste
 import dev.starfect.quill.editing.MarkdownEdits
 import dev.starfect.quill.editing.MarkdownFeatures
 import dev.starfect.quill.editing.Vim
+import dev.starfect.quill.export.ExportFormat
+import dev.starfect.quill.export.OfficeExport
+import dev.starfect.quill.export.PdfExport
 import dev.starfect.quill.model.QuillSettings
 import dev.starfect.quill.model.RunConfiguration
 import dev.starfect.quill.model.RunTask
@@ -530,6 +533,61 @@ public class QuillController(
     }
 
     /** Exports a document to HTML. */
+    /**
+     * Exports the active document in [format].
+     *
+     * Every format goes through the same path deliberately: the same rendered tree the preview is
+     * showing. Two renderers is how a document comes to look one way on screen and another in the
+     * file, and that difference is invisible until somebody publishes.
+     */
+    public fun export(id: Long, format: ExportFormat, target: Path) {
+        val handle = handles[id] ?: return
+        val session = _state.value.documents.firstOrNull { it.id == id } ?: return
+        val name = session.displayName.substringBeforeLast('.')
+        val dark = _state.value.settings.darkTheme
+
+        scope.launch {
+            val message = withContext(Dispatchers.Default) {
+                runCatching {
+                    when (format) {
+                        ExportFormat.HTML -> {
+                            val options = ExportOptions.STANDALONE or (if (dark) ExportOptions.DARK else 0)
+                            fileService.write(target, handle.exportHtml(name, options))
+                            "Exported to ${target.fileName}"
+                        }
+
+                        ExportFormat.PDF -> {
+                            val report = PdfExport.write(target, name, session.html)
+                            buildString {
+                                append("Exported ${report.pages} page")
+                                if (report.pages != 1) append("s")
+                                append(" to ${target.fileName}")
+                                report.warning?.let { append(" — ").append(it) }
+                            }
+                        }
+
+                        ExportFormat.DOCX -> {
+                            OfficeExport.writeDocx(target, name, session.html)
+                            "Exported to ${target.fileName}"
+                        }
+
+                        ExportFormat.EPUB -> {
+                            OfficeExport.writeEpub(target, name, session.html)
+                            "Exported to ${target.fileName}"
+                        }
+
+                        ExportFormat.CONFLUENCE, ExportFormat.NOTION, ExportFormat.GITHUB_README -> {
+                            val conversion = requireNotNull(format.conversion)
+                            fileService.write(target, handle.convert(conversion))
+                            "Converted to ${format.label} in ${target.fileName}"
+                        }
+                    }
+                }.getOrElse { "Export failed: ${it.message}" }
+            }
+            update { it.copy(notification = message) }
+        }
+    }
+
     public fun exportHtml(id: Long, target: Path) {
         val handle = handles[id] ?: return
         val session = _state.value.documents.firstOrNull { it.id == id } ?: return

@@ -30,6 +30,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.rememberWindowState
 import dev.starfect.quill.QuillController
 import dev.starfect.quill.bridge.QuillNativeLibraryException
+import dev.starfect.quill.export.ExportFormat
 import dev.starfect.quill.io.FileService
 import dev.starfect.quill.io.GitStatus
 import dev.starfect.quill.model.Dialog
@@ -305,16 +306,33 @@ private fun MenuScope.mainMenu(
 
         passiveItem { MenuSeparator() }
 
-        selectableItem(
-            selected = false,
+        // One submenu rather than seven top-level items, and each entry says what the format is
+        // for: the choice is "who is this going to", not "which extension do I want".
+        submenu(
             enabled = activeId != null,
-            onClick = {
-                dismiss()
-                if (activeId != null) {
-                    controller.exportHtml(activeId, FileService().htmlExportTarget(workspace.activeDocument?.path))
+            submenu = {
+                ExportFormat.entries.forEach { format ->
+                    selectableItem(
+                        selected = false,
+                        onClick = {
+                            dismiss()
+                            if (activeId != null) {
+                                val stem = workspace.activeDocument?.displayName
+                                    ?.substringBeforeLast('.').orEmpty()
+                                controller.export(
+                                    activeId,
+                                    format,
+                                    FileService().exportTarget(
+                                        workspace.activeDocument?.path,
+                                        format.fileNameFor(stem.ifEmpty { "document" }),
+                                    ),
+                                )
+                            }
+                        },
+                    ) { Text(format.label) }
                 }
             },
-        ) { Text("Export to HTML…") }
+        ) { Text("Export") }
 
         passiveItem { MenuSeparator() }
 

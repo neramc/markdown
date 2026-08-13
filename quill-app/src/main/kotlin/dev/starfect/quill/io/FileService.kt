@@ -89,9 +89,21 @@ public class FileService {
     }
 
     /** Suggests an HTML export path next to the source file. */
-    public fun htmlExportTarget(source: Path?): Path {
+    public fun htmlExportTarget(source: Path?): Path = exportTarget(source, "html")
+
+    /**
+     * Where an export of [source] should be written, given a file name.
+     *
+     * Beside the document, not in a downloads folder: an export is nearly always about *this*
+     * document, and having it appear next to the source is what makes it findable without a dialog.
+     */
+    public fun exportTarget(source: Path?, fileName: String): Path {
         val base = source ?: Path.of(System.getProperty("user.home"), "untitled.md")
-        val name = base.name.substringBeforeLast('.', base.name)
-        return (base.parent ?: Path.of(".")).resolve("$name.html")
+        val directory = base.parent ?: Path.of(".")
+        return if (fileName.contains('.') && !fileName.startsWith('.')) {
+            directory.resolve(fileName)
+        } else {
+            directory.resolve(base.name.substringBeforeLast('.', base.name) + "." + fileName)
+        }
     }
 }

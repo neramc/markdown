@@ -208,6 +208,15 @@ public class QuillDocument internal constructor(
     public fun exportHtml(title: String, options: Int = ExportOptions.STANDALONE): String =
         decodeText(withHandle { QuillBindings.docExportHtml(it, title, options) }.require("exportHtml"))
 
+    /**
+     * Converts the document into another tool's own format.
+     *
+     * Unlike [exportHtml] the result is still a document rather than a rendering of one: somebody
+     * will paste it into Confluence or Notion and then edit it there. See [ConversionTarget].
+     */
+    public fun convert(target: ConversionTarget): String =
+        decodeText(withHandle { QuillBindings.docConvert(it, target.id) }.require("convert"))
+
     override fun close() {
         // Blocks until every in-flight call has returned. Freeing under a call is what corrupts the
         // heap, and it does not report itself where it happened.

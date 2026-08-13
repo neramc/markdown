@@ -96,6 +96,8 @@ public final class QuillBindings {
             handle(
                     "quill_highlight_code",
                     FunctionDescriptor.of(C_INT, PTR, PTR, C_SIZE_T, PTR, C_SIZE_T, PTR));
+    private static final MethodHandle DOC_CONVERT =
+            handle("quill_doc_convert", FunctionDescriptor.of(C_INT, PTR, ValueLayout.JAVA_BYTE, PTR));
     private static final MethodHandle HTML_TO_MARKDOWN =
             handle("quill_html_to_markdown", FunctionDescriptor.of(C_INT, PTR, C_SIZE_T, PTR));
     private static final MethodHandle LAST_ERROR = handle("quill_last_error", FunctionDescriptor.of(C_INT, PTR));
@@ -357,6 +359,17 @@ public final class QuillBindings {
             MemorySegment buffer = arena.allocate(QUILL_BUF);
             MemorySegment pointer = utf8(arena, bytes);
             int status = (int) DOC_SEARCH.invokeExact(doc, pointer, (long) bytes.length, flags, buffer);
+            return new Payload(status, status == STATUS_OK ? consume(buffer) : new byte[0]);
+        } catch (Throwable failure) {
+            throw rethrow(failure);
+        }
+    }
+
+    /** Converts the document into another tool's format. */
+    public static Payload docConvert(MemorySegment doc, byte target) {
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment buffer = arena.allocate(QUILL_BUF);
+            int status = (int) DOC_CONVERT.invokeExact(doc, target, buffer);
             return new Payload(status, status == STATUS_OK ? consume(buffer) : new byte[0]);
         } catch (Throwable failure) {
             throw rethrow(failure);

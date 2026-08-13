@@ -488,6 +488,31 @@ pub extern "C" fn quill_html_to_markdown(
     })
 }
 
+/// Converts the document into another tool's format and writes it into `out` as text.
+///
+/// See [`crate::convert::Target`] for the values `target` takes.
+#[unsafe(no_mangle)]
+pub extern "C" fn quill_doc_convert(doc: *mut QuillDoc, target: u8, out: *mut QuillBuf) -> i32 {
+    guard(|| {
+        // SAFETY: handle and output validity are the caller's contract.
+        let (Some(mut document), Some(slot)) =
+            (unsafe { lock_document(doc) }, unsafe { out_slot(out) })
+        else {
+            return null_pointer("document or output");
+        };
+        let Some(parsed) = crate::convert::Target::from_u8(target) else {
+            set_last_error(format!("unknown conversion target {target}"));
+            return status::INVALID_ARGUMENT;
+        };
+
+        let flavour = document.flavour();
+        let converted = crate::convert::convert(document.text(), flavour, parsed);
+        let mut encoder = Encoder::new(PayloadKind::Text);
+        encoder.put_str(&converted);
+        write_out(slot, encoder.finish())
+    })
+}
+
 /// Writes search results for `query` into `out`. See [`crate::search::flags`].
 #[unsafe(no_mangle)]
 pub extern "C" fn quill_doc_search(

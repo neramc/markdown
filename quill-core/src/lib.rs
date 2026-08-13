@@ -25,6 +25,7 @@
 
 #![deny(unsafe_op_in_unsafe_fn)]
 
+pub mod convert;
 pub mod document;
 pub mod export;
 pub mod ffi;
