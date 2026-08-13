@@ -176,6 +176,13 @@ public data class QuillSettings(
     val focusMode: Boolean = false,
     /** Vim keys in the source editor. */
     val vimMode: Boolean = false,
+    /**
+     * Keep a document's `<!-- toc -->` region up to date as its headings change.
+     *
+     * Opt-in twice over: the setting has to be on *and* the document has to carry the markers, so
+     * turning it on never makes a contents list appear in a file that did not ask for one.
+     */
+    val autoTableOfContents: Boolean = true,
     val showLineNumbers: Boolean = true,
     val editorFontSize: Int = 14,
     /**

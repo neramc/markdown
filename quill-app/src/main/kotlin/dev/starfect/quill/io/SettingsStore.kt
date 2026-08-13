@@ -64,6 +64,7 @@ public class SettingsStore(private val storePath: Path = defaultStorePath()) {
             islands = bool("islands", defaults.islands),
             focusMode = bool("focusMode", defaults.focusMode),
             vimMode = bool("vimMode", defaults.vimMode),
+            autoTableOfContents = bool("autoTableOfContents", defaults.autoTableOfContents),
             viewMode = properties.getProperty("viewMode")
                 ?.let { name -> ViewMode.entries.firstOrNull { it.name == name } }
                 ?: defaults.viewMode,
@@ -93,6 +94,7 @@ public class SettingsStore(private val storePath: Path = defaultStorePath()) {
             setProperty("islands", settings.islands.toString())
             setProperty("focusMode", settings.focusMode.toString())
             setProperty("vimMode", settings.vimMode.toString())
+            setProperty("autoTableOfContents", settings.autoTableOfContents.toString())
             setProperty("viewMode", settings.viewMode.name)
             setProperty("showLineNumbers", settings.showLineNumbers.toString())
             setProperty("editorFontSize", settings.editorFontSize.toString())

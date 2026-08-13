@@ -69,10 +69,21 @@ internal object HtmlRenderer {
         val marker: String? = null,
         /** Checkbox state for a task list item: `null` when the item is not a task. */
         val task: Boolean? = null,
+        /**
+         * Which task this is, counted in reading order across the whole document.
+         *
+         * The number is what makes a preview checkbox clickable: it is the only thing that can be
+         * carried from a rendered box back to a place in the source, and it stays right through
+         * every edit that does not add or remove a task.
+         */
+        val taskIndex: Int = -1,
     )
 
     private class Sink {
         val blocks = mutableListOf<PreviewBlock>()
+
+        /** How many tasks have been seen, which is the next one's index. */
+        private var tasksSeen = 0
 
         fun walk(nodes: List<HtmlNode>, context: Context) {
             // Consecutive inline content between blocks accumulates here and flushes as one
@@ -84,7 +95,14 @@ internal object HtmlRenderer {
                 pending = null
                 val text = InlineBuilder.build(inline)
                 if (text.text.isNotBlank()) {
-                    blocks += PreviewBlock.Paragraph(text, context.indent, context.quote, context.marker, context.task)
+                    blocks += PreviewBlock.Paragraph(
+                        text,
+                        context.indent,
+                        context.quote,
+                        context.marker,
+                        context.task,
+                        context.taskIndex,
+                    )
                 }
             }
 
@@ -176,6 +194,7 @@ internal object HtmlRenderer {
                         indent = context.indent + 1,
                         marker = if (ordered) "${number++}." else "•",
                         task = task,
+                        taskIndex = if (task == null) -1 else tasksSeen++,
                     ),
                 )
             }
@@ -277,6 +296,8 @@ internal sealed interface PreviewBlock {
         override val quote: Int,
         val marker: String?,
         val task: Boolean?,
+        /** This task's position in the document, or -1 when the block is not a task. */
+        val taskIndex: Int = -1,
     ) : PreviewBlock
 
     data class Heading(val level: Int, val text: StyledText, override val quote: Int) : PreviewBlock

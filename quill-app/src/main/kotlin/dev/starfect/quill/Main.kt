@@ -158,6 +158,7 @@ public fun main(arguments: Array<String>) {
                     onPreviewKeyEvent = { event -> handleShortcut(event, controller) },
                 ) {
                     SaveOnFocusLoss(controller, workspace, window)
+                    AcceptDroppedFiles(controller, window)
                     Column(Modifier.fillMaxSize()) {
                         QuillTitleBar(controller, workspace, ::exitApplication)
                         QuillWindowContent(controller, workspace, Modifier.fillMaxSize())
@@ -174,6 +175,7 @@ public fun main(arguments: Array<String>) {
                     onPreviewKeyEvent = { event -> handleShortcut(event, controller) },
                 ) {
                     SaveOnFocusLoss(controller, workspace, window)
+                    AcceptDroppedFiles(controller, window)
                     Column(Modifier.fillMaxSize()) {
                         QuillToolBar(controller, workspace, ::exitApplication)
                         QuillWindowContent(controller, workspace, Modifier.fillMaxSize())
@@ -181,6 +183,36 @@ public fun main(arguments: Array<String>) {
                 }
             }
         }
+    }
+}
+
+/**
+ * Accepts files and images dropped onto the window.
+ *
+ * An AWT `DropTarget` on the window rather than a Compose drag-and-drop modifier, for the same
+ * reason focus loss is handled with an AWT listener: the drop is a property of the *window*, and
+ * this way one target covers the editor, the preview and the panels — dropping a screenshot
+ * anywhere in the window means the same thing.
+ *
+ * The drop goes through exactly the path a paste takes. An image becomes a file beside the document
+ * and a link to it; a Markdown file becomes a link; a file from elsewhere is copied in first. That
+ * is the same behaviour whether it arrived through the clipboard or off the desktop, which is one
+ * fewer thing for anybody to learn.
+ */
+@Composable
+private fun AcceptDroppedFiles(controller: QuillController, window: java.awt.Window) {
+    androidx.compose.runtime.DisposableEffect(window) {
+        val listener = object : java.awt.dnd.DropTargetAdapter() {
+            override fun drop(event: java.awt.dnd.DropTargetDropEvent) {
+                runCatching {
+                    event.acceptDrop(java.awt.dnd.DnDConstants.ACTION_COPY)
+                    controller.dropTransferable(event.transferable)
+                    event.dropComplete(true)
+                }.onFailure { event.dropComplete(false) }
+            }
+        }
+        val target = java.awt.dnd.DropTarget(window, java.awt.dnd.DnDConstants.ACTION_COPY, listener, true)
+        onDispose { target.removeDropTargetListener(listener) }
     }
 }
 

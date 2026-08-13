@@ -13,12 +13,20 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import dev.starfect.quill.QuillController
 import dev.starfect.quill.model.FileNode
@@ -240,6 +248,21 @@ public fun OutlinePanel(controller: QuillController, workspace: WorkspaceState) 
             },
         ) {
             VerticallyScrollableContainer(scrollState = listState, modifier = Modifier.fillMaxSize()) {
+                // Dragging a row moves the whole section -- the heading and everything under it,
+                // subsections included. Reordering a long document by its outline is the one
+                // rearrangement that is genuinely awkward by hand: cutting exactly the right lines
+                // out of the middle of a file and putting them back somewhere else is where
+                // documents lose paragraphs.
+                // The drag is tracked as a distance rather than by hit-testing the row under the
+                // pointer: a LazyColumn recycles its rows, so "which row am I over" is a question
+                // with no stable answer, while "how many row-heights have I moved" is exact.
+                var dragging by remember(outline) { mutableStateOf<Int?>(null) }
+                var dragOffset by remember(outline) { mutableFloatStateOf(0f) }
+                val rowHeight = with(LocalDensity.current) { Tokens.TreeRowHeight.toPx() }
+                val dropTarget = dragging?.let { from ->
+                    (from + Math.round(dragOffset / rowHeight)).coerceIn(0, outline.lastIndex)
+                }
+
                 LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
                     items(outline.size, key = { "${outline[it].line}-$it" }) { index ->
                         val entry = outline[index]
@@ -247,9 +270,27 @@ public fun OutlinePanel(controller: QuillController, workspace: WorkspaceState) 
                             level = entry.level,
                             title = entry.title,
                             selected = index == active,
+                            dragging = dragging == index,
+                            dropBefore = dropTarget == index && dragging != null && dragging != index,
                             onClick = {
                                 cursor = index
                                 documentId?.let { controller.moveCaret(it, entry.offset) }
+                            },
+                            onDragStart = {
+                                dragging = index
+                                dragOffset = 0f
+                            },
+                            onDrag = { delta -> dragOffset += delta },
+                            onDrop = {
+                                val from = dragging
+                                val to = dropTarget
+                                dragging = null
+                                dragOffset = 0f
+                                if (from != null && to != null && from != to) controller.moveSection(from, to)
+                            },
+                            onDragCancel = {
+                                dragging = null
+                                dragOffset = 0f
                             },
                         )
                     }
@@ -260,11 +301,51 @@ public fun OutlinePanel(controller: QuillController, workspace: WorkspaceState) 
 }
 
 @Composable
-private fun OutlineRow(level: Int, title: String, selected: Boolean, onClick: () -> Unit) {
+private fun OutlineRow(
+    level: Int,
+    title: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    dragging: Boolean = false,
+    dropBefore: Boolean = false,
+    onDragStart: () -> Unit = {},
+    onDrag: (Float) -> Unit = {},
+    onDrop: () -> Unit = {},
+    onDragCancel: () -> Unit = {},
+) {
     val shell = LocalShellPalette.current
+    val accent = shell.accent
 
     // A heading's level is its depth, so the outline indents exactly as the document nests.
-    TreeRow(depth = (level - 1).coerceAtLeast(0), onClick = onClick, selected = selected) {
+    TreeRow(
+        depth = (level - 1).coerceAtLeast(0),
+        onClick = onClick,
+        selected = selected,
+        modifier = Modifier
+            // The insertion line is drawn where the section would land, which is the only feedback
+            // that says *where* rather than merely that something is being dragged.
+            .drawBehind {
+                if (dropBefore) {
+                    drawRect(
+                        color = accent,
+                        topLeft = Offset(0f, 0f),
+                        size = Size(size.width, 2f),
+                    )
+                }
+            }
+            .alpha(if (dragging) 0.5f else 1f)
+            .pointerInput(Unit) {
+                detectDragGestures(
+                    onDragStart = { onDragStart() },
+                    onDrag = { change, delta ->
+                        change.consume()
+                        onDrag(delta.y)
+                    },
+                    onDragEnd = { onDrop() },
+                    onDragCancel = { onDragCancel() },
+                )
+            },
+    ) {
         // The structure view badges each symbol with its kind; for a document that is the heading
         // level, which is also the only thing distinguishing two identically-named rows.
         //

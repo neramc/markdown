@@ -268,6 +268,20 @@ private fun EditorPage(settings: QuillSettings, onChange: (QuillSettings) -> Uni
     )
 
     CheckboxRow(
+        text = "Keep the table of contents up to date",
+        checked = settings.autoTableOfContents,
+        onCheckedChange = { onChange(settings.copy(autoTableOfContents = it)) },
+    )
+    Spacer(Modifier.height(4.dp))
+    Text(
+        text = "Rewrites the list between <!-- toc --> and <!-- /toc --> whenever the headings " +
+            "change. A document without those markers is never touched, so this only applies to " +
+            "documents that asked for it.",
+        color = LocalShellPalette.current.mutedText,
+        fontSize = LocalTypeScale.current.medium,
+    )
+
+    CheckboxRow(
         text = "Focus Mode",
         checked = settings.focusMode,
         onCheckedChange = { onChange(settings.copy(focusMode = it)) },

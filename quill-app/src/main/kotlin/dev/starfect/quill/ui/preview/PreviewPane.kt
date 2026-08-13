@@ -28,6 +28,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -119,7 +121,14 @@ public fun PreviewPane(
                         verticalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
                         items(blocks.size, key = { it }) { index ->
-                            RenderBlock(blocks[index], editor, shell, baseSize, highlighter)
+                            RenderBlock(
+                                blocks[index],
+                                editor,
+                                shell,
+                                baseSize,
+                                highlighter,
+                                onToggleTask = controller::toggleTask,
+                            )
                         }
                     }
                 }
@@ -141,11 +150,12 @@ private fun RenderBlock(
     shell: ShellPalette,
     baseSize: androidx.compose.ui.unit.TextUnit,
     highlighter: EngineCodeHighlighter,
+    onToggleTask: ((Int) -> Unit)? = null,
 ) {
     Quoted(block.quote, shell) {
         when (block) {
             is PreviewBlock.Heading -> HeadingBlock(block, editor, shell, baseSize)
-            is PreviewBlock.Paragraph -> ParagraphBlock(block, editor, shell, baseSize)
+            is PreviewBlock.Paragraph -> ParagraphBlock(block, editor, shell, baseSize, onToggleTask)
             is PreviewBlock.Code -> CodeBlock(block, editor, shell, highlighter)
             is PreviewBlock.Table -> TableBlock(block, editor, shell, baseSize)
             is PreviewBlock.ThematicBreak ->
@@ -217,6 +227,7 @@ private fun ParagraphBlock(
     editor: EditorPalette,
     shell: ShellPalette,
     baseSize: androidx.compose.ui.unit.TextUnit,
+    onToggleTask: ((Int) -> Unit)? = null,
 ) {
     val indent = (block.indent * 20).dp
 
@@ -226,7 +237,14 @@ private fun ParagraphBlock(
     ) {
         when {
             block.task != null -> {
-                TaskCheckbox(checked = block.task, shell = shell, editor = editor)
+                TaskCheckbox(
+                    checked = block.task,
+                    shell = shell,
+                    editor = editor,
+                    onToggle = onToggleTask?.takeIf { block.taskIndex >= 0 }?.let {
+                        { it(block.taskIndex) }
+                    },
+                )
                 Spacer(Modifier.width(7.dp))
             }
             block.marker != null -> {
@@ -250,12 +268,34 @@ private fun ParagraphBlock(
     }
 }
 
-/** A task-list checkbox, drawn rather than composed so it matches the preview's own metrics. */
+/**
+ * A task-list checkbox, drawn rather than composed so it matches the preview's own metrics.
+ *
+ * Clicking it edits the source. That is the whole point of it: a checklist you can read and cannot
+ * tick is a picture of a checklist, and every writer who has one ends up switching to the source
+ * pane to change one character.
+ */
 @Composable
-private fun TaskCheckbox(checked: Boolean, shell: ShellPalette, editor: EditorPalette) {
+private fun TaskCheckbox(
+    checked: Boolean,
+    shell: ShellPalette,
+    editor: EditorPalette,
+    onToggle: (() -> Unit)? = null,
+) {
     Box(
         Modifier.padding(top = 3.dp)
             .size(13.dp)
+            .then(
+                if (onToggle == null) {
+                    Modifier
+                } else {
+                    Modifier.pointerHoverIcon(PointerIcon.Hand).clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = onToggle,
+                    )
+                }
+            )
             .clip(RoundedCornerShape(3.dp))
             .background(if (checked) shell.accent else editor.background)
             // `splitter`, not `border`. Border is the shell's *dark* separator — the line drawn

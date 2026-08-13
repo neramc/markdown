@@ -28,6 +28,7 @@ import dev.starfect.quill.model.FindState
 import dev.starfect.quill.model.Notification
 import dev.starfect.quill.model.NotificationSeverity
 import dev.starfect.quill.editing.CleanPaste
+import dev.starfect.quill.editing.DocumentStructure
 import dev.starfect.quill.editing.MarkdownEdits
 import dev.starfect.quill.editing.MarkdownFeatures
 import dev.starfect.quill.editing.Vim
@@ -271,6 +272,76 @@ public class QuillController(
     }
 
     /**
+     * Ticks or unticks the task a preview checkbox stands for.
+     *
+     * The caret is left where it was: ticking a box in the preview is not a reason for the source
+     * pane to jump, and in a split view the writer can see both.
+     */
+    public fun toggleTask(index: Int) {
+        val id = _state.value.activeDocumentId ?: return
+        val session = _state.value.documents.firstOrNull { it.id == id } ?: return
+        val updated = DocumentStructure.toggleTask(session.text.text, index) ?: return
+
+        onTextChanged(id, session.text.copy(text = updated))
+    }
+
+    /**
+     * Moves a whole section — a heading and everything under it — in front of another.
+     *
+     * What dragging a row in the Structure panel does. Reordering a document by its outline is the
+     * one rearrangement that is genuinely hard to do by hand: the text is right there, but cutting
+     * exactly the right lines out of the middle of a long file and putting them back somewhere else
+     * is fiddly, error-prone, and where documents lose paragraphs.
+     */
+    public fun moveSection(from: Int, to: Int) {
+        val id = _state.value.activeDocumentId ?: return
+        val session = _state.value.documents.firstOrNull { it.id == id } ?: return
+
+        val sections = DocumentStructure.sections(session.text.text, session.outline)
+        val moved = DocumentStructure.moveSection(session.text.text, sections, from, to) ?: return
+
+        onTextChanged(id, TextFieldValue(moved, TextRange(0)))
+        update { it.copy(notification = "Moved \"${sections[from].title}\"") }
+    }
+
+    /**
+     * Drops files or an image into the document at the caret.
+     *
+     * The same path a paste takes, because it is the same operation: something arrives from outside
+     * the editor and has to become Markdown. An image is filed beside the document and linked; a
+     * Markdown file is linked where it lies.
+     */
+    public fun dropTransferable(transferable: java.awt.datatransfer.Transferable?) {
+        val id = _state.value.activeDocumentId ?: return
+        val session = _state.value.documents.firstOrNull { it.id == id } ?: return
+
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                CleanPaste.convert(
+                    transferable = transferable,
+                    convertHtml = engine::htmlToMarkdown,
+                    assetDirectory = CleanPaste.assetDirectoryFor(session.path),
+                    linkBase = session.path?.parent,
+                )
+            }
+            if (result.markdown.isEmpty()) {
+                if (result.source == CleanPaste.Source.IMAGE) {
+                    update { it.copy(notification = "Save the document first, so the image has somewhere to go") }
+                }
+                return@launch
+            }
+
+            val current = _state.value.documents.firstOrNull { it.id == id } ?: return@launch
+            onTextChanged(id, CleanPaste.apply(current.text, result.markdown))
+
+            if (result.writtenFiles.isNotEmpty()) {
+                val names = result.writtenFiles.joinToString(", ") { it.fileName.toString() }
+                update { it.copy(notification = "Added $names") }
+            }
+        }
+    }
+
+    /**
      * Inserts a table of contents at the caret, built from the document's own outline.
      *
      * The outline is already derived and on screen in the Structure panel, so this is a formatting
@@ -282,26 +353,32 @@ public class QuillController(
     public fun insertTableOfContents() {
         val id = _state.value.activeDocumentId ?: return
         val session = _state.value.documents.firstOrNull { it.id == id } ?: return
-        val outline = session.outline
 
-        if (outline.isEmpty()) {
+        if (session.outline.isEmpty()) {
             update { it.copy(notification = "This document has no headings to list") }
             return
         }
 
-        // The shallowest heading becomes the top level, so a document whose headings all start at
-        // ## does not get a contents list indented under nothing.
-        val base = outline.minOf { it.level }
-        val contents = outline.joinToString("\n") { entry ->
-            val indent = "  ".repeat((entry.level - base).coerceAtLeast(0))
-            "$indent- [${entry.title}](#${slug(entry.title)})"
-        }
+        // A region rather than a one-off list. The markers are HTML comments, so they show up
+        // nowhere the document is rendered, and they are what lets the list be kept up to date
+        // afterwards instead of going stale the moment a heading is added.
+        edit { DocumentStructure.insertTableOfContentsRegion(it, session.outline) }
+    }
 
-        edit { value ->
-            val caret = value.selection.max
-            val updated = value.text.substring(0, caret) + contents + "\n" + value.text.substring(caret)
-            TextFieldValue(updated, TextRange(caret + contents.length + 1))
-        }
+    /**
+     * Rewrites the marked contents region, when the document has one and the setting is on.
+     *
+     * Called after each derivation, because that is when a fresh outline exists. Returning without
+     * an edit when nothing changed is what keeps this from marking every document modified on every
+     * keystroke.
+     */
+    private fun refreshTableOfContents(id: Long) {
+        if (!_state.value.settings.autoTableOfContents) return
+        val session = _state.value.documents.firstOrNull { it.id == id } ?: return
+        if (session.outline.isEmpty()) return
+
+        val updated = DocumentStructure.updateTableOfContents(session.text.text, session.outline) ?: return
+        onTextChanged(id, session.text.copy(text = updated))
     }
 
     /** GitHub's heading anchor rules, which is where these documents are usually read. */
@@ -453,6 +530,11 @@ public class QuillController(
                     }
                 }
                 .onFailure { failure -> updateDocument(id) { it.copy(loadError = failure.message) } }
+
+            // A fresh outline is the only moment a contents list can be brought up to date. It
+            // returns without an edit unless something actually changed, so this is not a write on
+            // every keystroke.
+            refreshTableOfContents(id)
         }
     }
 
