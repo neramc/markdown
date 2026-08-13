@@ -1,11 +1,15 @@
 package dev.starfect.quill.export
 
+import java.nio.ByteBuffer
+import java.nio.channels.FileChannel
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardOpenOption
 import kotlin.io.path.exists
 import kotlin.io.path.extension
 import kotlin.io.path.isDirectory
 import kotlin.io.path.name
+import kotlin.io.path.nameWithoutExtension
 
 /**
  * Just enough of a TrueType font to embed one in a PDF.
@@ -129,14 +133,16 @@ public class TrueTypeFont private constructor(
             if (bytes.size < 12) return null
             val reader = Reader(bytes)
 
-            var offset = 0
-            val tag = reader.u32(0)
-            // A .ttc collection begins with a header pointing at the first real font.
-            if (tag == 0x74746366L) {
-                if (bytes.size < 16) return null
-                offset = reader.u32(12).toInt()
+            // A .ttc collection holds several fonts in one file. Pull the first one out into a
+            // standalone font before doing anything else, rather than reading its tables in place:
+            // what gets embedded in the PDF is this byte array, and a reader handed a whole
+            // collection rejects it.
+            if (reader.u32(0) == COLLECTION_TAG) {
+                val single = extractFromCollection(bytes) ?: return null
+                return parse(single)
             }
 
+            val offset = 0
             val version = reader.u32(offset)
             // 0x00010000 is TrueType outlines, 'OTTO' is PostScript outlines, 'true' is Apple's.
             val compact = version == 0x4F54544FL
@@ -198,6 +204,160 @@ public class TrueTypeFont private constructor(
                 descender = descender * 1000 / unitsPerEm,
                 isCompactFontFormat = compact,
             )
+        }
+
+        /** `ttcf`, the four bytes a TrueType collection starts with. */
+        private const val COLLECTION_TAG = 0x74746366L
+
+        /**
+         * Rebuilds the first font of a collection as a standalone font file.
+         *
+         * A `.ttc` is several fonts sharing one file and, usually, sharing tables between them —
+         * which is why the format exists, and why it cannot simply be handed to something expecting
+         * one font. A PDF's `FontFile2` must be a single font program: give a reader a stream whose
+         * first four bytes are `ttcf` and it rejects the font, or the whole document.
+         *
+         * That matters well beyond the exotic case. macOS keeps most of its CJK families as
+         * collections — Apple SD Gothic Neo, PingFang, Hiragino — so without this, a Korean document
+         * exported on a Mac finds a font that can draw it and then produces a PDF that will not
+         * open. Failing later and less clearly than not finding a font at all.
+         *
+         * The rebuild copies each of the font's tables out and writes a fresh table directory in
+         * front of them. Table checksums come along unchanged because the bytes do; only the
+         * whole-file adjustment in `head` has to be recomputed, since the file it describes is new.
+         */
+        private fun extractFromCollection(bytes: ByteArray): ByteArray? {
+            val reader = Reader(bytes)
+            if (bytes.size < 16) return null
+
+            val fontOffset = reader.u32(12).toInt()
+            if (fontOffset < 0 || fontOffset + 12 > bytes.size) return null
+
+            val tableCount = reader.u16(fontOffset + 4)
+            if (tableCount <= 0 || tableCount > MAX_TABLES) return null
+
+            // tag, checksum, offset into the collection, length.
+            val records = ArrayList<IntArray>(tableCount)
+            for (index in 0 until tableCount) {
+                val record = fontOffset + 12 + index * 16
+                if (record + 16 > bytes.size) return null
+                val at = reader.u32(record + 8).toInt()
+                val length = reader.u32(record + 12).toInt()
+                if (at < 0 || length < 0 || at.toLong() + length > bytes.size) return null
+                records += intArrayOf(record, at, length)
+            }
+
+            val total = SFNT_HEADER + tableCount * 16 + records.sumOf { aligned(it[2]) }
+            val out = ByteArray(total)
+
+            fun putU16(at: Int, value: Int) {
+                out[at] = (value ushr 8).toByte()
+                out[at + 1] = value.toByte()
+            }
+
+            fun putU32(at: Int, value: Long) {
+                out[at] = (value ushr 24).toByte()
+                out[at + 1] = (value ushr 16).toByte()
+                out[at + 2] = (value ushr 8).toByte()
+                out[at + 3] = value.toByte()
+            }
+
+            // The binary-search hints in an sfnt header are derived from the table count. Readers
+            // largely ignore them and validators do not, so they are computed rather than zeroed.
+            val entrySelector = 31 - Integer.numberOfLeadingZeros(tableCount)
+            val searchRange = (1 shl entrySelector) * 16
+            putU32(0, reader.u32(fontOffset))
+            putU16(4, tableCount)
+            putU16(6, searchRange)
+            putU16(8, entrySelector)
+            putU16(10, tableCount * 16 - searchRange)
+
+            var write = SFNT_HEADER + tableCount * 16
+            var head = -1
+            for ((index, record) in records.withIndex()) {
+                val directory = SFNT_HEADER + index * 16
+                System.arraycopy(bytes, record[0], out, directory, 8) // tag and checksum
+                putU32(directory + 8, write.toLong())
+                putU32(directory + 12, record[2].toLong())
+                System.arraycopy(bytes, record[1], out, write, record[2])
+                if (String(out, directory, 4, Charsets.ISO_8859_1) == "head") head = write
+                write += aligned(record[2])
+            }
+
+            // `head.checkSumAdjustment` is a checksum of the entire file, so the copy needs its own.
+            // The spec's recipe: zero the field, sum the file as big-endian u32s, subtract.
+            if (head >= 0 && head + 12 <= out.size) {
+                putU32(head + 8, 0)
+                var sum = 0L
+                val whole = Reader(out)
+                var at = 0
+                while (at < out.size) {
+                    sum = (sum + whole.u32(at)) and 0xFFFFFFFFL
+                    at += 4
+                }
+                putU32(head + 8, (0xB1B0AFBAL - sum) and 0xFFFFFFFFL)
+            }
+
+            return out
+        }
+
+        /** An sfnt table directory starts after twelve bytes, and every table starts on a word. */
+        private const val SFNT_HEADER = 12
+        private const val MAX_TABLES = 512
+
+        private fun aligned(length: Int) = (length + 3) and 3.inv()
+
+        /**
+         * How many of [codePoints] the font at [path] can draw, or -1 when it is not a font this
+         * can read.
+         *
+         * Answering this without loading the file is the point. Choosing a font means asking the
+         * question of every candidate on the machine, and a system font directory is tens of
+         * megabytes — reading all of it to find out which file has Hangul in it turns an export into
+         * a visible pause. Only the table directory and the character map are read here, which is
+         * kilobytes per font instead of megabytes.
+         */
+        public fun coverage(path: Path, codePoints: IntArray): Int = runCatching {
+            FileChannel.open(path, StandardOpenOption.READ).use { channel ->
+                val start = read(channel, 0, 16) ?: return@use -1
+                val base = if (Reader(start).u32(0) == COLLECTION_TAG) Reader(start).u32(12) else 0L
+
+                val header = read(channel, base, SFNT_HEADER) ?: return@use -1
+                val tableCount = Reader(header).u16(4)
+                if (tableCount <= 0 || tableCount > MAX_TABLES) return@use -1
+
+                val directory = read(channel, base + SFNT_HEADER, tableCount * 16) ?: return@use -1
+                val reader = Reader(directory)
+                var at = -1L
+                var length = 0
+                for (index in 0 until tableCount) {
+                    val record = index * 16
+                    if (String(directory, record, 4, Charsets.ISO_8859_1) != "cmap") continue
+                    at = reader.u32(record + 8)
+                    length = reader.u32(record + 12).toInt()
+                    break
+                }
+                if (at < 0 || length <= 0 || length > MAX_CMAP_BYTES) return@use -1
+
+                val cmap = read(channel, at, length) ?: return@use -1
+                val map = readCharacterMap(Reader(cmap), 0, cmap.size) ?: return@use -1
+                codePoints.count(map::containsKey)
+            }
+        }.getOrDefault(-1)
+
+        /** A character map larger than this is corrupt rather than thorough. */
+        private const val MAX_CMAP_BYTES = 8 shl 20
+
+        private fun read(channel: FileChannel, at: Long, length: Int): ByteArray? {
+            if (at < 0 || length <= 0 || at + length > channel.size()) return null
+            val buffer = ByteBuffer.allocate(length)
+            var position = at
+            while (buffer.hasRemaining()) {
+                val count = channel.read(buffer, position)
+                if (count <= 0) return null
+                position += count
+            }
+            return buffer.array()
         }
 
         /**
@@ -375,15 +535,26 @@ public object FontLibrary {
     /**
      * Names worth trying first, in order.
      *
-     * The CJK fonts lead because they are the case that fails without this whole mechanism: a Latin
-     * font is nearly always found anyway, and a Korean one has to be looked for.
+     * Text faces lead. The search returns the first candidate that can draw the whole document, so
+     * for an English document it stops here — and that is the point of the ordering: a CJK family
+     * placed first would be chosen for English too, and the Latin glyphs in a Chinese font are an
+     * afterthought in a way a reader can see immediately.
+     *
+     * The families that can draw Hangul follow. Nothing has to route a Korean document to them: a
+     * Latin font cannot draw 한, so the search falls through on its own and arrives at the first
+     * font here that can. That is a better mechanism than a name list, which is why the list only
+     * has to be an ordering rather than a decision.
      */
     private val PREFERRED = listOf(
+        "dejavusans", "notosans", "liberationsans", "arial", "helvetica", "roboto", "inter",
+        "segoeui", "calibri", "verdana", "tahoma",
         "notosanscjk", "notoserifcjk", "notosanskr", "sourcehansans", "nanumgothic", "nanummyeongjo",
         "malgun", "applegothic", "applesdgothicneo", "gulim", "batang", "dotum",
         "notosansjp", "notosanssc", "notosanstc", "msgothic", "meiryo", "hiraginosans",
-        "dejavusans", "notosans", "liberationsans", "arial", "helvetica", "roboto", "inter",
-        "segoeui", "calibri", "verdana", "tahoma",
+        // Named because they are what a Linux build image tends to have when it has any CJK font at
+        // all. Without them the search still finds something that covers Hangul -- Unifont, whose
+        // glyphs come from a 16-pixel bitmap and look it at print sizes.
+        "wqyzenhei", "wqymicrohei", "arialunicode",
     )
 
     private val MONOSPACE_PREFERRED = listOf(
@@ -394,6 +565,56 @@ public object FontLibrary {
     private val EXTENSIONS = setOf("ttf", "otf", "ttc", "otc")
 
     /**
+     * Names that say the file is a fixed-width font, whatever family it belongs to.
+     *
+     * Width is checked separately from family because the family names overlap: `dejavusans` is a
+     * prefix of `dejavusansmono`, so matching on family alone offers a code font for body text.
+     */
+    private val MONOSPACE_MARKERS =
+        listOf("mono", "code", "courier", "consol", "inconsolata", "menlo", "typewriter", "d2coding")
+
+    /**
+     * Names that say the file is a particular face rather than the plain one.
+     *
+     * A document set in the bold weight of the right family is the kind of wrong nothing ever
+     * explains — it looks deliberate. The regular face wins whenever the family has one.
+     */
+    private val FACE_MARKERS = listOf(
+        "bold", "italic", "oblique", "light", "thin", "black", "heavy", "medium", "semi", "extra",
+        "ultra", "condensed", "narrow", "retina", "dotted", "slashed",
+    )
+
+    /**
+     * How good a font file's name looks for this document, lower being better.
+     *
+     * Three things, in order of how much they matter. Width first: a proportional document set in a
+     * monospace font is unmistakably wrong, worse than the same document in a different but
+     * reasonable family. Then family, so a Korean document reaches a Korean font before anything
+     * else is opened. Then face, so the regular weight wins over the bold one beside it.
+     *
+     * This only *orders* the search. What decides the outcome is whether the font can draw the text
+     * — the first candidate in this order that covers the document is the one used, so a wrong guess
+     * here costs a few kilobytes of reading, not a broken export.
+     */
+    internal fun rank(fileName: String, monospace: Boolean): Int {
+        val name = fileName.substringBeforeLast('.')
+            .lowercase()
+            .replace("-", "")
+            .replace("_", "")
+            .replace(" ", "")
+        val preferred = if (monospace) MONOSPACE_PREFERRED else PREFERRED
+
+        val family = preferred.indexOfFirst { name.startsWith(it) }.takeIf { it >= 0 } ?: preferred.size
+        val wrongWidth = MONOSPACE_MARKERS.any { it in name } != monospace
+        val face = FACE_MARKERS.any { it in name }
+
+        return (if (wrongWidth) WIDTH_PENALTY else 0) + family * FAMILY_WEIGHT + (if (face) 1 else 0)
+    }
+
+    private const val FAMILY_WEIGHT = 10
+    private const val WIDTH_PENALTY = 100_000
+
+    /**
      * The first font that can draw every character in [sample].
      *
      * @param monospace prefer a fixed-width family, for code blocks.
@@ -401,44 +622,61 @@ public object FontLibrary {
      *   rather than silently produce a document full of empty boxes.
      */
     public fun findCovering(sample: String, monospace: Boolean = false): TrueTypeFont? {
-        val required = sample.codePoints().distinct().toArray()
+        val required = sample.codePoints().distinct()
             .filter { !Character.isWhitespace(it) && it >= ' '.code }
-        val candidates = candidates()
-        val preferred = if (monospace) MONOSPACE_PREFERRED else PREFERRED
+            .toArray()
 
-        // Preferred names first, then whatever else is on the machine.
-        val ordered = candidates.sortedBy { path ->
-            val name = path.name.lowercase().replace("-", "").replace("_", "").replace(" ", "")
-            preferred.indexOfFirst { name.startsWith(it) }.takeIf { it >= 0 } ?: preferred.size
-        }
+        // Ties are broken by name so the same machine always produces the same PDF. Directory order
+        // is whatever the filesystem hands back, which is stable in practice and guaranteed nowhere.
+        val ordered = candidates.sortedWith(
+            compareBy({ rank(it.name, monospace) }, { it.name.lowercase() }),
+        )
 
-        var bestPartial: Pair<TrueTypeFont, Int>? = null
+        var bestPartial: Pair<Path, Int>? = null
 
         for (path in ordered.take(MAX_FONTS_EXAMINED)) {
-            val font = TrueTypeFont.load(path) ?: continue
-            val covered = required.count(font::covers)
-            if (covered == required.size) return font
-            if (bestPartial == null || covered > bestPartial.second) bestPartial = font to covered
+            val covered = TrueTypeFont.coverage(path, required)
+            if (covered < 0) continue
+            if (covered == required.size) return TrueTypeFont.load(path) ?: continue
+            if (bestPartial == null || covered > bestPartial.second) bestPartial = path to covered
         }
 
         // Nothing covers everything: the closest match still draws most of the document, which is
         // better than refusing to export at all. The caller reports what will be missing.
-        return bestPartial?.first
+        return bestPartial?.let { TrueTypeFont.load(it.first) }
     }
 
-    /** How many font files to open before giving up. Parsing one is milliseconds; a system may have thousands. */
-    private const val MAX_FONTS_EXAMINED = 60
+    /**
+     * How many font files to look at before giving up.
+     *
+     * Deliberately larger than a machine is likely to have. The number used to be sixty, chosen when
+     * examining a font meant reading all of it; the effect was that a font directory listing ninety
+     * files had its last thirty never looked at, and on this machine those thirty were where the
+     * only font with Hangul in it lived. Reading a font's character map alone costs kilobytes, so
+     * the budget can be the number that stops a pathological directory rather than the number that
+     * keeps exports quick.
+     */
+    private const val MAX_FONTS_EXAMINED = 500
 
-    private fun candidates(): List<Path> = DIRECTORIES
-        .filter { it.exists() && it.isDirectory() }
-        .flatMap { directory ->
-            runCatching {
-                Files.walk(directory, FONT_SEARCH_DEPTH).use { stream ->
-                    stream.filter { it.extension.lowercase() in EXTENSIONS }.toList()
-                }
-            }.getOrDefault(emptyList())
-        }
-        .distinctBy { it.name.lowercase() }
+    /**
+     * Every font file on the machine, found once.
+     *
+     * Walking the font directories is the only part of choosing a font that touches the whole tree,
+     * and fonts do not appear during a session. An export asks for a body font and a code font, so
+     * without this the walk happens twice for one document.
+     */
+    private val candidates: List<Path> by lazy {
+        DIRECTORIES
+            .filter { it.exists() && it.isDirectory() }
+            .flatMap { directory ->
+                runCatching {
+                    Files.walk(directory, FONT_SEARCH_DEPTH).use { stream ->
+                        stream.filter { it.extension.lowercase() in EXTENSIONS }.toList()
+                    }
+                }.getOrDefault(emptyList())
+            }
+            .distinctBy { it.nameWithoutExtension.lowercase() }
+    }
 
     /** Font directories nest by family; three levels reaches every layout in common use. */
     private const val FONT_SEARCH_DEPTH = 3

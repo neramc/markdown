@@ -71,6 +71,16 @@ dependencies {
 tasks.test {
     useJUnitPlatform()
     jvmArgs("--enable-native-access=ALL-UNNAMED")
+
+    // Print the assertion, not Gradle's stack. A failing build on a CI runner otherwise reports two
+    // hundred lines of org.gradle.internal.execution frames with the one line that says what went
+    // wrong scrolled off the top -- which is how a five-minute diagnosis becomes an hour.
+    testLogging {
+        events("failed")
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        showStackTraces = true
+        showCauses = true
+    }
 }
 
 // The Compose plugin's run and packaging tasks default to the JVM running Gradle, which may be older

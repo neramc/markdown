@@ -301,26 +301,35 @@ class ExportTest {
     fun `Korean text is embedded as glyphs rather than dropped`() {
         // The reason this exporter embeds a font at all. With a base-14 font every one of these
         // characters would be a blank box, and nothing would say so.
+        //
+        // What this can assert depends on the machine, and being careless about which is which is
+        // how a test comes to assert a property of the *runner* rather than of the code. A build
+        // image carrying DejaVu and nothing else is a legitimate machine, and on one the honest
+        // behaviour is a base-14 PDF plus a report saying so -- not a failure.
+        //
+        // So the branch asks the font library exactly the question the exporter asks it: can
+        // anything here draw *this* text. Asking a weaker one -- whether any font at all exists --
+        // gets a "yes" on a Latin-only machine and then asserts a CID font that was never embedded,
+        // which is a green test on a developer laptop and a red one on CI.
+        val heading = "한국어 제목"
+        val paragraph = "한국어 문서입니다."
         val target = temporary("korean.pdf")
-        val report = PdfExport.write(target, "한국어 제목", listOf(element("p", text("한국어 문서입니다."))))
+        val report = PdfExport.write(target, heading, listOf(element("p", text(paragraph))))
         val text = String(target.readBytes(), StandardCharsets.ISO_8859_1)
+
+        if (FontLibrary.findCovering(paragraph + heading) == null) {
+            assertTrue(
+                report.warning?.contains("No embeddable font") == true,
+                "with no font covering Hangul the export must say so, not produce silent blanks: ${report.warning}",
+            )
+            return
+        }
 
         assertTrue(text.contains("/Subtype /Type0"), "the exporter must embed a CID font, not a base-14 one")
         assertTrue(text.contains("/Encoding /Identity-H"), "a CID font needs Identity-H")
         assertTrue(text.contains("/FontFile2") || text.contains("/FontFile3"), "the font must be embedded")
-
-        // Whether the glyphs are actually there depends on what is installed. This container has no
-        // CJK font; a machine that has one produces a PDF with the syllables in it. What must hold
-        // either way is that the outcome is *reported* -- a silent file full of blanks is the one
-        // result this exporter is not allowed to produce.
-        if (report.warning == null) {
-            assertTrue(text.contains("/W ["), "a covering font must carry the widths of the glyphs it drew")
-        } else {
-            assertTrue(
-                report.warning!!.contains("could not draw"),
-                "a font missing glyphs must say which: ${report.warning}",
-            )
-        }
+        assertTrue(text.contains("/W ["), "a covering font must carry the widths of the glyphs it drew")
+        assertEquals(null, report.warning, "a font that covers the document has nothing to warn about")
     }
 
     @Test
