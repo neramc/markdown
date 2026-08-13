@@ -1,0 +1,312 @@
+name: Release
+
+# Releases are cut by pushing a tag. The tag is the trigger *and* the version, which is what keeps
+# "what was released" and "what is in the release" from ever disagreeing -- the gate below refuses
+# to build when the tag and the declared version do not match.
+#
+# `workflow_dispatch` runs the whole pipeline without publishing anything. Every interesting failure
+# in a release pipeline is a platform-specific one that only appears on a runner, and finding those
+# by tagging means deleting tags and releases afterwards. Rehearsing is free.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (rehearsal only; nothing is published)'
+        required: false
+        default: ''
+
+# A release must never be cancelled halfway through: a half-uploaded release is worse than a late
+# one. Deliberately no cancel-in-progress, unlike CI.
+concurrency:
+  group: release-${{ github.ref }}
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  # ---------------------------------------------------------------------------------------- gate
+  #
+  # Everything downstream costs half an hour of runner time across five platforms. This job is the
+  # cheap check that the release is coherent before any of that is spent.
+  gate:
+    name: Gate
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      publish: ${{ steps.resolve.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve and check the version
+        id: resolve
+        run: |
+          set -euo pipefail
+          declared="$(grep -oP '^quill\.version=\K.*' gradle.properties)"
+
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            tagged="${GITHUB_REF_NAME#v}"
+            if [[ "$tagged" != "$declared" ]]; then
+              echo "::error::tag ${GITHUB_REF_NAME} says version '$tagged', but gradle.properties declares '$declared'." >&2
+              echo "::error::Set quill.version=$tagged in gradle.properties, or tag v$declared instead." >&2
+              exit 1
+            fi
+            echo "version=$tagged" >> "$GITHUB_OUTPUT"
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+            echo "Releasing $tagged"
+          else
+            echo "version=$declared" >> "$GITHUB_OUTPUT"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "Rehearsing $declared -- nothing will be published"
+          fi
+
+      # A release with no notes is a release nobody can evaluate. Failing here costs a minute;
+      # discovering it after five platform builds costs the whole pipeline.
+      - name: Check the release notes exist
+        run: |
+          set -euo pipefail
+          tools/release-notes.sh "${{ steps.resolve.outputs.version }}" > /dev/null
+          echo "CHANGELOG.md has a section for ${{ steps.resolve.outputs.version }}"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: quill-core
+
+      - name: Engine checks
+        run: |
+          cargo fmt --manifest-path quill-core/Cargo.toml --check
+          cargo clippy --manifest-path quill-core/Cargo.toml --all-targets -- -D warnings
+          cargo test --manifest-path quill-core/Cargo.toml
+
+  # --------------------------------------------------------------------------------------- build
+  #
+  # One job per platform Quill ships to. Each produces the same two things -- a native package and a
+  # portable archive -- so that every platform's users have both the ordinary route and the one that
+  # needs no installer and no administrator.
+  build:
+    name: ${{ matrix.target }}
+    needs: gate
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      # One platform failing should not hide whether the others would have worked. On a release,
+      # knowing that four of five are fine is most of the diagnosis.
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-x64
+            runner: ubuntu-latest
+          # GitHub's arm64 Linux runners are free for public repositories, which is what makes an
+          # arm64 build worth having rather than a cross-compilation experiment.
+          - target: linux-arm64
+            runner: ubuntu-24.04-arm
+          # `macos-latest` has been Apple Silicon since macOS 14, so this entry is not redundant --
+          # without it every Intel Mac is served a binary whose bundled JVM will not start.
+          - target: macos-x64
+            runner: macos-15-intel
+          - target: macos-arm64
+            runner: macos-latest
+          - target: windows-x64
+            runner: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: quill-core
+
+      - name: Set up a JDK for Gradle
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # jpackage shells out to these to build a .deb and a .rpm. Without them the bundler is skipped
+      # and the task fails with a message that never mentions the missing tool.
+      - name: Install packaging tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y fakeroot binutils rpm
+
+      - name: Build and test
+        run: ./gradlew build --stacktrace
+
+      - name: Build the release application image
+        run: ./gradlew :quill-app:createReleaseDistributable --stacktrace
+
+      - name: Package the portable archive
+        run: ./gradlew :quill-app:packagePortable --stacktrace
+
+      - name: Package for Linux
+        if: runner.os == 'Linux'
+        run: ./gradlew :quill-app:packageReleaseDeb :quill-app:packageReleaseRpm --stacktrace
+
+      - name: Package for macOS
+        if: runner.os == 'macOS'
+        run: ./gradlew :quill-app:packageReleaseDmg --stacktrace
+
+      # Collected under one directory per target so the publish job can rename by target rather than
+      # by guessing which of jpackage's naming conventions produced which file.
+      - name: Collect
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p staging
+          binaries=quill-app/build/compose/binaries/main-release
+          cp quill-app/build/portable/* staging/ 2>/dev/null || true
+          for kind in deb rpm dmg; do
+            [ -d "$binaries/$kind" ] && cp "$binaries/$kind"/* staging/ 2>/dev/null || true
+          done
+          ls -la staging/
+
+      - name: Upload the packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ matrix.target }}
+          path: staging/
+          if-no-files-found: error
+
+      # Only the Windows leg needs its raw application image kept: the setup project consumes it,
+      # and jpackage cannot cross-build one.
+      - name: Upload the Windows application image
+        if: matrix.target == 'windows-x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-image-windows-x64
+          path: quill-app/build/compose/binaries/main-release/app/
+          if-no-files-found: error
+
+  # ------------------------------------------------------------------------------- Windows setup
+  windows-setup:
+    name: Windows installer
+    needs: [gate, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Download the Windows application image
+        uses: actions/download-artifact@v4
+        with:
+          name: app-image-windows-x64
+          path: app-image
+
+      # Publishing cross-compiles from Linux fine; only the *payload* had to be built on Windows.
+      - name: Build the installer and uninstaller
+        run: tools/build-installer.sh --app-image app-image/Quill
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-windows-setup
+          path: |
+            installer-windows/artifacts/installer/QuillSetup.exe
+            installer-windows/artifacts/uninstaller/QuillUninstall.exe
+          if-no-files-found: error
+
+  # ------------------------------------------------------------------------------------- publish
+  publish:
+    name: Publish
+    needs: [gate, build, windows-setup]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download every platform's packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: packages-*
+          path: downloaded
+
+      # The renaming rules and their reasons live in the script, which has a test fixture of real
+      # jpackage output names beside it. Two of the five platforms produce a file called
+      # `Quill-1.0.0.dmg` with no architecture in the name, so copying them into one directory
+      # without renaming silently loses one of them.
+      - name: Assemble the release assets
+        run: tools/assemble-release.sh "${{ needs.gate.outputs.version }}" downloaded release
+
+      - name: Build the release notes
+        id: notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ needs.gate.outputs.version }}"
+          {
+            tools/release-notes.sh "$version"
+            echo
+            echo "---"
+            echo
+            echo "## Which file do I want"
+            echo
+            echo "| Platform | Install | Portable |"
+            echo "|---|---|---|"
+            echo "| Linux x64 | \`Quill-$version-linux-x64.deb\` or \`.rpm\` | \`Quill-$version-linux-x64.tar.gz\` |"
+            echo "| Linux arm64 | \`Quill-$version-linux-arm64.deb\` or \`.rpm\` | \`Quill-$version-linux-arm64.tar.gz\` |"
+            echo "| macOS Apple Silicon | \`Quill-$version-macos-arm64.dmg\` | \`Quill-$version-macos-arm64.tar.gz\` |"
+            echo "| macOS Intel | \`Quill-$version-macos-x64.dmg\` | \`Quill-$version-macos-x64.tar.gz\` |"
+            echo "| Windows x64 | \`QuillSetup-$version-windows-x64.exe\` | \`Quill-$version-windows-x64.zip\` |"
+            echo
+            echo "The portable archives carry their own Java runtime and the Rust engine: unpack"
+            echo "anywhere and run \`bin/Quill\`. Nothing is written outside the folder, so the"
+            echo "uninstall is deleting it."
+            echo
+            echo "**Windows on ARM** runs the x64 build under emulation; there is no separate arm64"
+            echo "Windows package."
+            echo
+            echo "### macOS: the first launch"
+            echo
+            echo "These builds are not signed with an Apple Developer certificate, so Gatekeeper"
+            echo "will refuse the first launch with \"Quill is damaged\". That message is about the"
+            echo "absent signature rather than the download. To clear the quarantine flag:"
+            echo
+            echo '```sh'
+            echo "xattr -dr com.apple.quarantine /Applications/Quill.app"
+            echo '```'
+            echo
+            echo "### Verifying a download"
+            echo
+            echo '```sh'
+            echo "sha256sum --check --ignore-missing SHA256SUMS"
+            echo '```'
+          } > release-notes.md
+          cat release-notes.md
+
+      - name: Publish the release
+        if: needs.gate.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "Quill ${{ needs.gate.outputs.version }}" \
+            --notes-file release-notes.md \
+            release/*
+
+      # A rehearsal keeps everything it built, so the assets can be downloaded and opened before a
+      # tag exists. This is the difference between testing the pipeline and testing the release.
+      - name: Upload the rehearsal assets
+        if: needs.gate.outputs.publish != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-rehearsal
+          path: |
+            release/
+            release-notes.md
+          if-no-files-found: error

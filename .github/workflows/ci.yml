@@ -46,14 +46,30 @@ jobs:
         run: cargo test --manifest-path quill-core/Cargo.toml
 
   # The bridge and the application, on every platform Quill ships to.
+  #
+  # The matrix is the release matrix, deliberately. A break that only appears on an Intel Mac or on
+  # arm64 Linux is one somebody has to find, and finding it on release day means deleting a tag --
+  # so it is found here, on every push, instead. GitHub's arm64 and Intel-Mac runners are free for
+  # public repositories, which is what makes covering all five affordable rather than aspirational.
   jvm:
-    name: JVM (${{ matrix.os }})
+    name: JVM (${{ matrix.target }})
     needs: engine
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - target: linux-x64
+            runner: ubuntu-latest
+          - target: linux-arm64
+            runner: ubuntu-24.04-arm
+          # macos-latest has been Apple Silicon since macOS 14, so this entry is what covers Intel.
+          - target: macos-x64
+            runner: macos-15-intel
+          - target: macos-arm64
+            runner: macos-latest
+          - target: windows-x64
+            runner: windows-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -90,6 +106,11 @@ jobs:
       - name: Build the release application image
         run: ./gradlew :quill-app:createReleaseDistributable --stacktrace
 
+      # The portable archive is a shipped artifact, so it is built on every push rather than only on
+      # a tag: the executable-bit assertion inside the task is a real check and only runs here.
+      - name: Package the portable archive
+        run: ./gradlew :quill-app:packagePortable --stacktrace
+
       - name: Build the Linux packages
         if: runner.os == 'Linux'
         run: ./gradlew :quill-app:packageReleaseDeb :quill-app:packageReleaseRpm --stacktrace
@@ -102,14 +123,14 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ui-renders-${{ matrix.os }}
+          name: ui-renders-${{ matrix.target }}
           path: quill-app/build/test-renders/
           if-no-files-found: warn
 
       - name: Upload the application image
         uses: actions/upload-artifact@v4
         with:
-          name: app-image-${{ matrix.os }}
+          name: app-image-${{ matrix.target }}
           path: quill-app/build/compose/binaries/main-release/app/
           if-no-files-found: error
 
@@ -117,11 +138,12 @@ jobs:
         if: runner.os != 'Windows'
         uses: actions/upload-artifact@v4
         with:
-          name: packages-${{ matrix.os }}
+          name: packages-${{ matrix.target }}
           path: |
             quill-app/build/compose/binaries/main-release/deb/
             quill-app/build/compose/binaries/main-release/rpm/
             quill-app/build/compose/binaries/main-release/dmg/
+            quill-app/build/portable/
           if-no-files-found: warn
 
   # The setup project's own tests need neither Windows nor an application image, so they run on
@@ -164,7 +186,7 @@ jobs:
       - name: Download the Windows application image
         uses: actions/download-artifact@v4
         with:
-          name: app-image-windows-latest
+          name: app-image-windows-x64
           path: app-image
 
       - name: Build the installer and uninstaller

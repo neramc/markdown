@@ -140,3 +140,59 @@ through the whole UI. The screenshots in `docs/images/` are framebuffer captures
 release binary running that way — `Xvfb -fbdir` writes the screen to an XWD file, which decodes to a
 PNG. `quill-app`'s render tests produce equivalent images offscreen through `ImageComposeScene`, and
 those are what CI can check; the captures are what shows the real window.
+
+## Releasing
+
+A release is cut by pushing a tag. The tag is both the trigger and the version:
+
+```bash
+# 1. Set the version and write its section in CHANGELOG.md.
+#    The workflow refuses to build if these disagree with the tag.
+$EDITOR gradle.properties CHANGELOG.md
+
+# 2. Rehearse. This runs the whole pipeline on all five platforms and publishes nothing,
+#    leaving the assets and the generated notes as workflow artifacts to inspect.
+gh workflow run Release
+
+# 3. Cut it.
+git tag v1.2.3 && git push origin v1.2.3
+```
+
+### What the pipeline does
+
+| Job | Where | What |
+|---|---|---|
+| `gate` | Linux | Refuses a tag that disagrees with `quill.version`, refuses a version with no changelog section, then runs the engine's format, lint and test checks. |
+| `build` | five platforms | `build` → `createReleaseDistributable` → `packagePortable`, plus `.deb`/`.rpm` on Linux and `.dmg` on macOS. |
+| `windows-setup` | Linux | Builds `QuillSetup.exe` around the Windows application image the matrix produced. |
+| `publish` | Linux | Renames every asset to one scheme, writes `SHA256SUMS`, and creates the GitHub release from the changelog. |
+
+### Why the gate exists
+
+Both of its checks are for mistakes that are invisible until somebody downloads the result. A tag
+that disagrees with `quill.version` produces a release called 1.2.3 containing binaries that report
+1.2.2 — and the binaries are right, because they were built from the declared version. A version
+with no changelog section produces a release page with nothing on it, which is worse than a late
+release. Both cost a minute here and the whole pipeline anywhere else.
+
+### Why five build jobs rather than cross-compilation
+
+jpackage builds for the machine it runs on: the runtime image it bundles is that platform's JVM, and
+the Rust library beside it is that platform's shared object. Nothing about the pipeline could
+cross-compile without reimplementing both.
+
+That constraint turns out to be the useful shape anyway. Each job is a real build and a real test
+run on that platform, so "does it work on an Intel Mac" is answered on every push rather than by
+the first person who downloads it.
+
+The one deliberate omission is Windows on ARM. GitHub does offer `windows-11-arm` runners, and
+Windows runs x64 binaries on ARM under emulation — so an arm64 Windows package would be a second
+download for the same result, and a second thing to choose between.
+
+### Naming
+
+jpackage names its output three different ways for the same machine — `quill_1.0.0_amd64.deb`,
+`quill-1.0.0-1.x86_64.rpm`, `Quill-1.0.0.dmg` — and the DMG carries no architecture at all. Two
+platforms therefore produce a file with exactly the same name, so collecting them without renaming
+silently loses one. `tools/assemble-release.sh` maps everything onto
+`Quill-<version>-<platform>.<extension>`; its rules and their reasons are in the script.

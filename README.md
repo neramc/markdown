@@ -208,6 +208,42 @@ compile error instead.
 
 Details in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/FFI.md`](docs/FFI.md).
 
+## Installing
+
+Every release carries a native package and a portable archive for each platform, plus a
+`SHA256SUMS` file. Take the latest from the
+[releases page](https://github.com/neramc/quill/releases).
+
+| Platform | Install | Portable |
+|---|---|---|
+| Linux x64 | `.deb` · `.rpm` | `Quill-<version>-linux-x64.tar.gz` |
+| Linux arm64 | `.deb` · `.rpm` | `Quill-<version>-linux-arm64.tar.gz` |
+| macOS Apple Silicon | `.dmg` | `Quill-<version>-macos-arm64.tar.gz` |
+| macOS Intel | `.dmg` | `Quill-<version>-macos-x64.tar.gz` |
+| Windows x64 | `QuillSetup-<version>-windows-x64.exe` | `Quill-<version>-windows-x64.zip` |
+
+The portable archives carry their own Java runtime and the Rust engine — unpack anywhere and run
+`bin/Quill`. Nothing is written outside the folder, so uninstalling is deleting it. They exist
+because every native package assumes something the portable one does not: a package manager, an
+administrator, a writable `/opt`.
+
+**Windows on ARM** runs the x64 build under emulation. There is no separate arm64 Windows package,
+because it would be a download nobody needs to choose between.
+
+**macOS, first launch.** These builds are not signed with an Apple Developer certificate, so
+Gatekeeper refuses the first launch with "Quill is damaged and can't be opened". The message is
+about the missing signature, not the download. Clear the quarantine flag:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/Quill.app
+```
+
+**Verifying a download:**
+
+```sh
+sha256sum --check --ignore-missing SHA256SUMS
+```
+
 ## Building
 
 You need a Rust toolchain. The JDK is provisioned automatically by the Gradle toolchain resolver —
@@ -219,7 +255,13 @@ asks for it by vendor.
 ./gradlew :quill-app:run                     # run it
 ./gradlew :quill-app:createDistributable     # jlink app image
 ./gradlew :quill-app:packageReleaseDeb       # ProGuard + jlink + .deb
+./gradlew :quill-app:packagePortable         # the portable .tar.gz / .zip
 ```
+
+Packaging is per-platform by construction: jpackage builds for the machine it runs on, and the
+bundled runtime and Rust library are native. The release workflow therefore runs one job per
+platform rather than cross-compiling, which is also what makes each one a real test of that
+platform.
 
 The Windows installer is a separate .NET 10 solution:
 

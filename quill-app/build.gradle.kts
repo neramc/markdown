@@ -1,3 +1,7 @@
+import dev.starfect.quill.build.NativePlatform
+import org.gradle.api.tasks.bundling.Compression
+import org.gradle.api.tasks.bundling.Tar
+import org.gradle.api.tasks.bundling.Zip
 import org.gradle.jvm.toolchain.JavaLanguageVersion
 import org.gradle.jvm.toolchain.JavaToolchainService
 import org.gradle.jvm.toolchain.JvmVendorSpec
@@ -135,6 +139,62 @@ compose.desktop {
                 bundleID = "dev.starfect.quill"
                 val icns = rootProject.file("assets/icon.icns")
                 if (icns.exists()) iconFile.set(icns)
+            }
+        }
+    }
+}
+
+// --------------------------------------------------------------------------------- portable build
+
+/**
+ * The application image as a single archive.
+ *
+ * The native packages — `.deb`, `.rpm`, `.dmg`, and the Windows installer — cover the ordinary case,
+ * and each of them assumes something: a package manager, an administrator, a writable `/opt`. None
+ * of that holds for a locked-down work machine, for a distribution that uses neither dpkg nor rpm
+ * (Arch, NixOS, Alpine, Void), or for anybody who simply wants to try an editor without installing
+ * it. Those people are otherwise offered nothing at all, which is why this exists.
+ *
+ * The archive is the jlink image itself, so it carries its own Java runtime and its own copy of the
+ * Rust library: unpack it anywhere and run `bin/Quill`. There is no system-wide state to undo — the
+ * uninstall is `rm -r`.
+ *
+ * Tar on the Unixes and Zip on Windows, because that is what each platform can open without
+ * installing something first. The distinction matters more than it looks: zip has no concept of a
+ * file being executable, so a zipped launcher arrives without its executable bit and does not
+ * start. Tar records the mode, which is why it is the format everywhere the mode means something.
+ */
+val nativePlatform = NativePlatform.current()
+val portableName = "Quill-$quillVersion-${nativePlatform.identifier}"
+val releaseAppImage = layout.buildDirectory.dir("compose/binaries/main-release/app")
+val portableDirectory = layout.buildDirectory.dir("portable")
+
+if (nativePlatform.os == "windows") {
+    tasks.register<Zip>("packagePortable") {
+        group = "distribution"
+        description = "Packages the release application image as a zip archive"
+        dependsOn("createReleaseDistributable")
+        from(releaseAppImage)
+        archiveFileName.set("$portableName.zip")
+        destinationDirectory.set(portableDirectory)
+    }
+} else {
+    tasks.register<Tar>("packagePortable") {
+        group = "distribution"
+        description = "Packages the release application image as a gzipped tar archive"
+        dependsOn("createReleaseDistributable")
+        from(releaseAppImage)
+        archiveFileName.set("$portableName.tar.gz")
+        compression = Compression.GZIP
+        destinationDirectory.set(portableDirectory)
+        // The launcher and every binary in the bundled runtime have to stay executable. Gradle's
+        // archive tasks carry the source permissions through unless told otherwise, and this asserts
+        // that rather than assuming it: an archive that unpacks to a launcher nobody can run is
+        // indistinguishable from a working one until somebody tries it.
+        doLast {
+            val launcher = releaseAppImage.get().asFile.resolve("Quill/bin/Quill")
+            check(launcher.canExecute()) {
+                "the packaged launcher at $launcher is not executable, so the archive will not be either"
             }
         }
     }
