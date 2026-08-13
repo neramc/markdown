@@ -229,6 +229,8 @@ public data class WorkspaceState(
     val activeDocumentId: Long? = null,
     val find: FindState = FindState(),
     val commandPaletteVisible: Boolean = false,
+    /** The Ctrl/Cmd+K list of everything Markdown can do. */
+    val featurePaletteVisible: Boolean = false,
     val leftToolWindow: ToolWindow? = ToolWindow.PROJECT,
     val rightToolWindow: ToolWindow? = ToolWindow.STRUCTURE,
     val bottomToolWindow: ToolWindow? = null,

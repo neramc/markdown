@@ -3,6 +3,7 @@ package dev.starfect.quill.bridge
 import dev.starfect.quill.bridge.internal.QuillBindings
 import dev.starfect.quill.bridge.wire.ColorSpan
 import dev.starfect.quill.bridge.wire.decodeColorSpans
+import dev.starfect.quill.bridge.wire.decodeText
 import java.lang.foreign.MemorySegment
 import java.lang.ref.Cleaner
 import java.util.concurrent.atomic.AtomicBoolean
@@ -105,6 +106,18 @@ public class QuillEngine private constructor(
     public fun highlightCode(code: String, language: String): List<ColorSpan> {
         if (code.isEmpty()) return emptyList()
         return decodeColorSpans(withHandle { QuillBindings.highlightCode(it, code, language) }.require("highlightCode"))
+    }
+
+    /**
+     * Converts an HTML fragment into Markdown.
+     *
+     * What makes a paste from a browser, a word processor or a note-taking app arrive as source
+     * somebody would have typed. Stateless — it neither reads nor touches any open document — but
+     * it lives on the engine because that is where the native library is loaded from.
+     */
+    public fun htmlToMarkdown(html: String): String {
+        if (html.isBlank()) return ""
+        return decodeText(withHandle { QuillBindings.htmlToMarkdown(html) }.require("htmlToMarkdown"))
     }
 
     override fun close() {

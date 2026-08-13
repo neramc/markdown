@@ -96,6 +96,8 @@ public final class QuillBindings {
             handle(
                     "quill_highlight_code",
                     FunctionDescriptor.of(C_INT, PTR, PTR, C_SIZE_T, PTR, C_SIZE_T, PTR));
+    private static final MethodHandle HTML_TO_MARKDOWN =
+            handle("quill_html_to_markdown", FunctionDescriptor.of(C_INT, PTR, C_SIZE_T, PTR));
     private static final MethodHandle LAST_ERROR = handle("quill_last_error", FunctionDescriptor.of(C_INT, PTR));
     private static final MethodHandle BUF_FREE = handle("quill_buf_free", FunctionDescriptor.ofVoid(PTR));
 
@@ -355,6 +357,23 @@ public final class QuillBindings {
             MemorySegment buffer = arena.allocate(QUILL_BUF);
             MemorySegment pointer = utf8(arena, bytes);
             int status = (int) DOC_SEARCH.invokeExact(doc, pointer, (long) bytes.length, flags, buffer);
+            return new Payload(status, status == STATUS_OK ? consume(buffer) : new byte[0]);
+        } catch (Throwable failure) {
+            throw rethrow(failure);
+        }
+    }
+
+    /**
+     * Converts an HTML fragment to Markdown.
+     *
+     * <p>Takes no handle: what is being converted is the clipboard, not an open document.
+     */
+    public static Payload htmlToMarkdown(String html) {
+        byte[] bytes = utf8(html);
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment buffer = arena.allocate(QUILL_BUF);
+            MemorySegment pointer = utf8(arena, bytes);
+            int status = (int) HTML_TO_MARKDOWN.invokeExact(pointer, (long) bytes.length, buffer);
             return new Payload(status, status == STATUS_OK ? consume(buffer) : new byte[0]);
         } catch (Throwable failure) {
             throw rethrow(failure);

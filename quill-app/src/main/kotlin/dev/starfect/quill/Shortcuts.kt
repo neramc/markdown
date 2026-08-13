@@ -33,6 +33,10 @@ internal fun handleShortcut(event: KeyEvent, controller: QuillController): Boole
                     controller.dismissDialog()
                     true
                 }
+                workspace.featurePaletteVisible -> {
+                    controller.setFeaturePaletteVisible(false)
+                    true
+                }
                 workspace.commandPaletteVisible -> {
                     controller.setCommandPaletteVisible(false)
                     true
@@ -87,7 +91,10 @@ internal fun handleShortcut(event: KeyEvent, controller: QuillController): Boole
                 controller.edit { MarkdownEdits.toggleEmphasis(it, "`") }
                 true
             }
-            event.key == Key.K && !event.isShiftPressed -> {
+            // Ctrl+Shift+K inserts a link. Ctrl+K, which most Markdown editors use for it, is
+            // spent on the feature search below -- a better use of the most reachable key in the
+            // editor, since the search is also where somebody finds the link action.
+            event.key == Key.K && event.isShiftPressed -> {
                 controller.edit { MarkdownEdits.insertLink(it) }
                 true
             }
@@ -135,6 +142,19 @@ internal fun handleShortcut(event: KeyEvent, controller: QuillController): Boole
     }
 
     return when {
+        // Ctrl+V is intercepted so a paste goes through the converter rather than through the
+        // text field, which would insert the clipboard's plain-text flavour and lose the structure.
+        event.key == Key.V && !event.isShiftPressed && !event.isAltPressed -> {
+            controller.pasteClean()
+            true
+        }
+        // Ctrl+Shift+V pastes exactly what is on the clipboard, for when the conversion is not
+        // wanted -- copying a Markdown source out of a rendered page, most often.
+        event.key == Key.V && event.isShiftPressed -> false
+        event.key == Key.K && !event.isShiftPressed -> {
+            controller.setFeaturePaletteVisible(!controller.state.value.featurePaletteVisible)
+            true
+        }
         event.key == Key.N && !event.isShiftPressed -> {
             controller.newDocument()
             true

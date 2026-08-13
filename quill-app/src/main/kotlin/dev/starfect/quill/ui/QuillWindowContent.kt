@@ -30,6 +30,7 @@ import dev.starfect.quill.ui.editor.EditorTabs
 import dev.starfect.quill.ui.editor.MarkdownEditorToolbar
 import dev.starfect.quill.ui.editor.SourceEditor
 import dev.starfect.quill.ui.palette.CommandPalette
+import dev.starfect.quill.ui.palette.MarkdownFeaturePalette
 import dev.starfect.quill.ui.preview.PreviewPane
 import dev.starfect.quill.ui.shell.StatusBar
 import dev.starfect.quill.ui.shell.StripeCount
@@ -145,6 +146,10 @@ public fun QuillWindowContent(
 
         if (workspace.commandPaletteVisible) {
             CommandPalette(controller, workspace)
+        }
+
+        if (workspace.featurePaletteVisible) {
+            MarkdownFeaturePalette(controller) { controller.setFeaturePaletteVisible(false) }
         }
 
         when (workspace.dialog) {

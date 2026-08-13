@@ -7,11 +7,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -29,6 +32,9 @@ import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
@@ -48,6 +54,9 @@ import dev.starfect.quill.model.DocumentSession
 import dev.starfect.quill.model.WorkspaceState
 import dev.starfect.quill.ui.theme.EditorPalette
 import dev.starfect.quill.editing.MarkdownEdits
+import dev.starfect.quill.editing.MarkdownFeatures
+import dev.starfect.quill.ui.palette.SlashMenu
+import dev.starfect.quill.ui.palette.navigateFeatureList
 import dev.starfect.quill.ui.theme.Tokens
 import dev.starfect.quill.ui.theme.LocalEditorPalette
 import org.jetbrains.jewel.foundation.theme.JewelTheme
@@ -100,7 +109,37 @@ public fun SourceEditor(
         measurer.measure(AnnotatedString("0"), textStyle).size.width.toFloat()
     }
 
-    Box(modifier.background(palette.background)) {
+    // The `/` menu. Its query is the text already in the document, which is what makes it feel like
+    // typing rather than like opening a dialog: everything the writer types is Markdown until they
+    // choose an entry, and pressing Escape leaves what they typed exactly where it is.
+    val triggerStart = remember(document.text) { MarkdownFeatures.triggerStart(document.text) }
+    var dismissedTrigger by remember(document.id) { mutableStateOf<Int?>(null) }
+    val slashMatches = remember(triggerStart, document.text.text) {
+        if (triggerStart == null) {
+            emptyList()
+        } else {
+            MarkdownFeatures.search(MarkdownFeatures.triggerQuery(document.text, triggerStart))
+        }
+    }
+    var slashSelection by remember(document.id) { mutableIntStateOf(0) }
+    // A changed query means a changed list; the cursor goes back to the top rather than pointing at
+    // whatever now happens to occupy row seven.
+    LaunchedEffect(triggerStart, slashMatches.size) { slashSelection = 0 }
+
+    val slashOpen = triggerStart != null && slashMatches.isNotEmpty() && dismissedTrigger != triggerStart
+
+    // Where the caret is, in the editor Box's own coordinates, so the menu can hang off it.
+    var textAreaOrigin by remember { mutableStateOf(Offset.Zero) }
+    var editorOrigin by remember { mutableStateOf(Offset.Zero) }
+    var editorHeight by remember { mutableIntStateOf(0) }
+
+    Box(
+        modifier.background(palette.background)
+            .onGloballyPositioned {
+                editorOrigin = it.positionInRoot()
+                editorHeight = it.size.height
+            },
+    ) {
         VerticallyScrollableContainer(scrollState = scrollState, modifier = Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxWidth()) {
                 if (settings.showLineNumbers) {
@@ -117,12 +156,27 @@ public fun SourceEditor(
                     value = document.text,
                     onValueChange = { controller.onTextChanged(document.id, it) },
                     modifier = Modifier.weight(1f)
+                        .onGloballyPositioned { textAreaOrigin = it.positionInRoot() }
                         .caretRow(
                             layout = layout.takeIf { settings.highlightCaretRow },
                             caretOffset = document.caretPosition.offset,
                             palette = palette,
                         )
                         .rightMargin(settings.visualGuideColumn, characterWidth, palette)
+                        // The slash menu's keys are read before the tab and Enter handling, so that
+                        // Enter chooses an entry rather than breaking the line under the menu.
+                        .slashMenuKeys(
+                            open = slashOpen,
+                            count = slashMatches.size,
+                            selected = slashSelection,
+                            onSelect = { slashSelection = it },
+                            onAccept = {
+                                slashMatches.getOrNull(slashSelection)?.let { feature ->
+                                    controller.applyFeature(feature, triggerStart)
+                                }
+                            },
+                            onDismiss = { dismissedTrigger = triggerStart },
+                        )
                         .insertSpacesForTab(settings.tabWidth, document.text) { updated ->
                             controller.onTextChanged(document.id, updated)
                         }
@@ -141,6 +195,94 @@ public fun SourceEditor(
                     maxLines = if (settings.wordWrap) Int.MAX_VALUE else 1,
                 )
             }
+        }
+
+        if (slashOpen) {
+            SlashMenu(
+                matches = slashMatches,
+                selected = slashSelection,
+                onPick = { feature -> controller.applyFeature(feature, triggerStart) },
+                modifier = Modifier.offset {
+                    caretMenuOffset(
+                        layout = layout,
+                        caretOffset = triggerStart ?: 0,
+                        textAreaOrigin = textAreaOrigin,
+                        editorOrigin = editorOrigin,
+                        scrollOffset = scrollState.value,
+                        viewportHeight = editorHeight,
+                    )
+                },
+            )
+        }
+    }
+}
+
+/** How tall the slash menu can be, mirroring the value the menu itself uses. */
+private val SlashMenuHeight = 220.dp
+
+/**
+ * Where the slash menu goes: under the line the `/` is on, aligned with it.
+ *
+ * Computed from the text field's own layout rather than from a guess about font metrics, so it
+ * lands correctly with any font, any size, and a wrapped line above it. Two adjustments matter:
+ * the scroll offset, because the layout is in the scrolled content's coordinates and the menu is
+ * drawn in the viewport's; and the flip upwards when there is no room below, without which the menu
+ * is drawn off the bottom of the window exactly when the caret is near it.
+ */
+private fun androidx.compose.ui.unit.Density.caretMenuOffset(
+    layout: TextLayoutResult?,
+    caretOffset: Int,
+    textAreaOrigin: Offset,
+    editorOrigin: Offset,
+    scrollOffset: Int,
+    viewportHeight: Int,
+): IntOffset {
+    val result = layout ?: return IntOffset.Zero
+    val offset = caretOffset.coerceIn(0, result.layoutInput.text.length)
+    val line = runCatching { result.getLineForOffset(offset) }.getOrNull() ?: return IntOffset.Zero
+
+    val left = textAreaOrigin.x - editorOrigin.x + runCatching {
+        result.getHorizontalPosition(offset, usePrimaryDirection = true)
+    }.getOrDefault(0f)
+
+    val lineTop = result.getLineTop(line) + EditorTopPadding.toPx() - scrollOffset
+    val lineBottom = result.getLineBottom(line) + EditorTopPadding.toPx() - scrollOffset
+
+    val height = SlashMenuHeight.toPx()
+    val below = lineBottom + Tokens.Spacing.Tiny.toPx()
+    val top = if (below + height > viewportHeight && lineTop - height > 0f) {
+        lineTop - height - Tokens.Spacing.Tiny.toPx()
+    } else {
+        below
+    }
+
+    return IntOffset(left.coerceAtLeast(0f).toInt(), top.coerceAtLeast(0f).toInt())
+}
+
+/**
+ * Reads the slash menu's keys before the text field sees them.
+ *
+ * Only while the menu is open: with it closed, every one of these keys means what it always means,
+ * and a modifier that swallowed Enter unconditionally would be a broken editor.
+ */
+private fun Modifier.slashMenuKeys(
+    open: Boolean,
+    count: Int,
+    selected: Int,
+    onSelect: (Int) -> Unit,
+    onAccept: () -> Unit,
+    onDismiss: () -> Unit,
+): Modifier = if (!open) {
+    this
+} else {
+    onPreviewKeyEvent { event ->
+        if (event.type != KeyEventType.KeyDown) {
+            false
+        } else if (event.key == Key.Escape) {
+            onDismiss()
+            true
+        } else {
+            navigateFeatureList(event, count, selected, onSelect, onAccept)
         }
     }
 }

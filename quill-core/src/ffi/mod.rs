@@ -462,6 +462,32 @@ pub extern "C" fn quill_doc_stats(doc: *mut QuillDoc, out: *mut QuillBuf) -> i32
     })
 }
 
+/// Converts an HTML fragment to Markdown and writes it into `out` as a text payload.
+///
+/// A free function rather than a document method: what is being converted is the clipboard, not the
+/// open file, and the conversion has to happen before there is anywhere to put the result.
+#[unsafe(no_mangle)]
+pub extern "C" fn quill_html_to_markdown(
+    html: *const u8,
+    html_len: usize,
+    out: *mut QuillBuf,
+) -> i32 {
+    guard(|| {
+        // SAFETY: caller-supplied buffer, validated for UTF-8.
+        let Some(html) = (unsafe { borrow_str(html, html_len) }) else {
+            set_last_error("HTML fragment is null or not valid UTF-8");
+            return status::INVALID_UTF8;
+        };
+        // SAFETY: output validity is the caller's contract.
+        let Some(slot) = (unsafe { out_slot(out) }) else {
+            return null_pointer("output");
+        };
+        let mut encoder = Encoder::new(PayloadKind::Text);
+        encoder.put_str(&crate::import::html_to_markdown(html));
+        write_out(slot, encoder.finish())
+    })
+}
+
 /// Writes search results for `query` into `out`. See [`crate::search::flags`].
 #[unsafe(no_mangle)]
 pub extern "C" fn quill_doc_search(

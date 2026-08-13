@@ -27,13 +27,16 @@ import dev.starfect.quill.model.FileNode
 import dev.starfect.quill.model.FindState
 import dev.starfect.quill.model.Notification
 import dev.starfect.quill.model.NotificationSeverity
+import dev.starfect.quill.editing.CleanPaste
 import dev.starfect.quill.editing.MarkdownEdits
+import dev.starfect.quill.editing.MarkdownFeatures
 import dev.starfect.quill.model.QuillSettings
 import dev.starfect.quill.model.RunConfiguration
 import dev.starfect.quill.model.RunTask
 import dev.starfect.quill.model.ToolWindow
 import dev.starfect.quill.model.ViewMode
 import dev.starfect.quill.model.WorkspaceState
+import java.awt.Toolkit
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
@@ -187,6 +190,70 @@ public class QuillController(
         val session = _state.value.documents.firstOrNull { it.id == id } ?: return
         val updated = transform(session.text) ?: return
         onTextChanged(id, updated)
+    }
+
+    /**
+     * Applies one entry from the Markdown feature catalogue.
+     *
+     * @param triggerStart where the `/query` that opened the list began, so it can be removed first.
+     *   Null when the feature was chosen from the palette, where nothing was typed into the document.
+     */
+    public fun applyFeature(feature: MarkdownFeatures.Feature, triggerStart: Int? = null) {
+        // The contents list is the one entry that cannot be a pure function of the text: it is built
+        // from the outline, which only the controller has. Everything else is self-contained, which
+        // is what keeps the catalogue testable without a controller at all.
+        if (feature.id == "toc") {
+            triggerStart?.let { start -> edit { MarkdownFeatures.removeTrigger(it, start) } }
+            insertTableOfContents()
+            return
+        }
+
+        edit { value ->
+            val base = triggerStart?.let { MarkdownFeatures.removeTrigger(value, it) } ?: value
+            feature.apply(base)
+        }
+    }
+
+    /**
+     * Pastes the clipboard as Markdown.
+     *
+     * The conversion runs off the UI thread because it goes through the engine, and a paste of a
+     * long article is a parse of a long article. Everything after it — inserting the text, moving
+     * the caret — is back on the main dispatcher, because it touches the editor's own state.
+     */
+    public fun pasteClean() {
+        val id = _state.value.activeDocumentId ?: return
+        val session = _state.value.documents.firstOrNull { it.id == id } ?: return
+        val transferable = runCatching {
+            Toolkit.getDefaultToolkit().systemClipboard.getContents(null)
+        }.getOrNull()
+
+        scope.launch {
+            val result = withContext(Dispatchers.Default) {
+                CleanPaste.convert(
+                    transferable = transferable,
+                    convertHtml = engine::htmlToMarkdown,
+                    assetDirectory = CleanPaste.assetDirectoryFor(session.path),
+                    linkBase = session.path?.parent,
+                )
+            }
+
+            if (result.markdown.isEmpty()) {
+                if (result.source == CleanPaste.Source.IMAGE) {
+                    update { it.copy(notification = "Save the document first, so the image has somewhere to go") }
+                }
+                return@launch
+            }
+
+            // Re-read the session: the conversion was suspended, and the writer may have typed.
+            val current = _state.value.documents.firstOrNull { it.id == id } ?: return@launch
+            onTextChanged(id, CleanPaste.apply(current.text, result.markdown))
+
+            if (result.writtenFiles.isNotEmpty()) {
+                val names = result.writtenFiles.joinToString(", ") { it.fileName.toString() }
+                update { it.copy(notification = "Saved $names beside the document") }
+            }
+        }
     }
 
     /**
@@ -701,6 +768,10 @@ public class QuillController(
             Dock.RIGHT -> setRightToolWindow(tool)
             Dock.BOTTOM -> setBottomToolWindow(tool)
         }
+    }
+
+    public fun setFeaturePaletteVisible(visible: Boolean) {
+        update { it.copy(featurePaletteVisible = visible) }
     }
 
     public fun setCommandPaletteVisible(visible: Boolean) {

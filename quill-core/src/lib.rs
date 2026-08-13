@@ -31,6 +31,7 @@ pub mod ffi;
 pub mod flavour;
 pub mod highlight;
 pub mod html;
+pub mod import;
 pub mod inspect;
 pub mod outline;
 pub mod parser;
