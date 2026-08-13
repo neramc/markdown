@@ -11,6 +11,7 @@ import dev.starfect.quill.bridge.wire.MarkdownBlockIr
 import dev.starfect.quill.bridge.wire.OutlineEntry
 import dev.starfect.quill.bridge.wire.SearchMatch
 import dev.starfect.quill.bridge.wire.StyleSpan
+import dev.starfect.quill.editing.Vim
 import dev.starfect.quill.search.ProjectSearch
 import java.nio.file.Path
 
@@ -165,6 +166,16 @@ public data class QuillSettings(
      */
     val islands: Boolean = false,
     val viewMode: ViewMode = ViewMode.SPLIT,
+    /**
+     * Focus Mode: the window with everything but the words taken out of it.
+     *
+     * Not a view mode, because it is orthogonal to one — you can be in focus mode reading or
+     * writing. It hides the panels, the tabs, the toolbar and the status bar, centres the text at a
+     * readable measure, and dims every paragraph but the one the caret is in.
+     */
+    val focusMode: Boolean = false,
+    /** Vim keys in the source editor. */
+    val vimMode: Boolean = false,
     val showLineNumbers: Boolean = true,
     val editorFontSize: Int = 14,
     /**
@@ -247,6 +258,8 @@ public data class WorkspaceState(
     val activeDocumentId: Long? = null,
     val find: FindState = FindState(),
     val projectSearch: ProjectSearchState = ProjectSearchState(),
+    /** Vim's own state: the mode, the pending keys, the register, the undo history. */
+    val vim: Vim.State = Vim.State(),
     val commandPaletteVisible: Boolean = false,
     /** The Ctrl/Cmd+K list of everything Markdown can do. */
     val featurePaletteVisible: Boolean = false,

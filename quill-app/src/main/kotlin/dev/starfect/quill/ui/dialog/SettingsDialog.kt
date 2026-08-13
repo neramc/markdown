@@ -250,6 +250,35 @@ private fun EditorPage(settings: QuillSettings, onChange: (QuillSettings) -> Uni
         checked = settings.wordWrap,
         onCheckedChange = { onChange(settings.copy(wordWrap = it)) },
     )
+
+    Spacer(Modifier.height(10.dp))
+    GroupHeader("Keys and modes")
+    CheckboxRow(
+        text = "Vim mode",
+        checked = settings.vimMode,
+        onCheckedChange = { onChange(settings.copy(vimMode = it)) },
+    )
+    Spacer(Modifier.height(4.dp))
+    Text(
+        text = "Normal, insert, visual and visual-line modes, with counts, operators and motions " +
+            "-- d2w, yyp, ci\", >>. Insert mode is left alone so input methods, dead keys and the " +
+            "clipboard keep working exactly as they do without it.",
+        color = LocalShellPalette.current.mutedText,
+        fontSize = LocalTypeScale.current.medium,
+    )
+
+    CheckboxRow(
+        text = "Focus Mode",
+        checked = settings.focusMode,
+        onCheckedChange = { onChange(settings.copy(focusMode = it)) },
+    )
+    Spacer(Modifier.height(4.dp))
+    Text(
+        text = "One centred column and nothing else: no panels, no tabs, no status bar, and every " +
+            "paragraph but the one you are in dimmed. Escape leaves it.",
+        color = LocalShellPalette.current.mutedText,
+        fontSize = LocalTypeScale.current.medium,
+    )
 }
 
 @Composable

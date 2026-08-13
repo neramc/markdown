@@ -257,6 +257,12 @@ public fun StatusBar(controller: QuillController, workspace: WorkspaceState) {
                 val caret = document.caretPosition
                 val stats = document.stats
 
+                // Vim's mode is the leftmost thing in the status bar and the widest, because it
+                // is the one piece of state that changes what every other key on the keyboard does.
+                if (workspace.settings.vimMode) {
+                    StatusItem(workspace.vim.display, "Vim mode -- Esc returns to normal")
+                }
+
                 StatusItem("${caret.line + 1}:${caret.column + 1}", "Go to line and column")
                 StatusItem("${stats.words} words", "Words in prose, excluding code and front matter")
                 StatusItem(readingTime(stats.readingTimeSeconds), "Estimated reading time at 200 wpm")

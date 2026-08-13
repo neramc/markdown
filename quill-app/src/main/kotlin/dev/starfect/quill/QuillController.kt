@@ -30,6 +30,7 @@ import dev.starfect.quill.model.NotificationSeverity
 import dev.starfect.quill.editing.CleanPaste
 import dev.starfect.quill.editing.MarkdownEdits
 import dev.starfect.quill.editing.MarkdownFeatures
+import dev.starfect.quill.editing.Vim
 import dev.starfect.quill.model.QuillSettings
 import dev.starfect.quill.model.RunConfiguration
 import dev.starfect.quill.model.RunTask
@@ -835,6 +836,75 @@ public class QuillController(
             handles.keys.forEach { derive(it, immediate = true) }
         }
         update { it.copy(settings = updated) }
+    }
+
+    // ---------------------------------------------------------------- modes
+
+    /**
+     * Switches between writing and reading.
+     *
+     * One binding rather than three, because "am I editing or reading" is the question people
+     * actually have; the three-way split, source and preview control is for arranging the window,
+     * not for changing what you are doing with it. Coming back out of reading returns to whichever
+     * arrangement was in use, so the toggle is genuinely a toggle.
+     */
+    public fun toggleReadingMode() {
+        val current = _state.value.settings.viewMode
+        if (current != ViewMode.PREVIEW) lastEditingMode = current
+        updateSettings {
+            it.copy(viewMode = if (current == ViewMode.PREVIEW) lastEditingMode else ViewMode.PREVIEW)
+        }
+    }
+
+    /** Which arrangement reading mode was entered from. */
+    private var lastEditingMode: ViewMode = ViewMode.SPLIT
+
+    /** Turns Focus Mode on or off. */
+    public fun toggleFocusMode() {
+        updateSettings { it.copy(focusMode = !it.focusMode) }
+    }
+
+    /**
+     * Feeds one keystroke to Vim, and reports whether Vim wanted it.
+     *
+     * Everything Vim needs beyond the text — saving, closing, searching — comes back as an effect
+     * rather than being done inside the parser, which is what keeps that parser a pure function of
+     * its keys and testable without a controller.
+     */
+    public fun vimKey(key: Vim.Key): Boolean {
+        val workspace = _state.value
+        if (!workspace.settings.vimMode) return false
+        val id = workspace.activeDocumentId ?: return false
+        val session = workspace.documents.firstOrNull { it.id == id } ?: return false
+
+        val outcome = Vim.handle(workspace.vim, session.text, key)
+        update { it.copy(vim = outcome.state) }
+
+        if (outcome.value.text != session.text.text) {
+            onTextChanged(id, outcome.value)
+        } else if (outcome.value.selection != session.text.selection) {
+            // A pure movement does not need the engine to hear about it.
+            updateDocument(id) { it.copy(text = outcome.value) }
+        }
+
+        when (val effect = outcome.effect) {
+            Vim.Effect.Save -> save(id) { null }
+            Vim.Effect.Close -> closeDocument(id)
+            Vim.Effect.SaveAndClose -> {
+                save(id) { null }
+                closeDocument(id)
+            }
+            Vim.Effect.ClearSearch -> setFindVisible(false)
+            is Vim.Effect.Find -> {
+                setFindVisible(true)
+                updateFind { it.copy(query = effect.query) }
+            }
+            is Vim.Effect.StepMatch -> stepMatch(effect.forward)
+            is Vim.Effect.Report -> update { it.copy(notification = effect.text) }
+            null -> Unit
+        }
+
+        return outcome.consumed
     }
 
     public fun setViewMode(mode: ViewMode) {

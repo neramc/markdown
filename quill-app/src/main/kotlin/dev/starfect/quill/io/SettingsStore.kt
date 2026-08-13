@@ -62,6 +62,8 @@ public class SettingsStore(private val storePath: Path = defaultStorePath()) {
         return QuillSettings(
             darkTheme = bool("darkTheme", defaults.darkTheme),
             islands = bool("islands", defaults.islands),
+            focusMode = bool("focusMode", defaults.focusMode),
+            vimMode = bool("vimMode", defaults.vimMode),
             viewMode = properties.getProperty("viewMode")
                 ?.let { name -> ViewMode.entries.firstOrNull { it.name == name } }
                 ?: defaults.viewMode,
@@ -89,6 +91,8 @@ public class SettingsStore(private val storePath: Path = defaultStorePath()) {
         val properties = Properties().apply {
             setProperty("darkTheme", settings.darkTheme.toString())
             setProperty("islands", settings.islands.toString())
+            setProperty("focusMode", settings.focusMode.toString())
+            setProperty("vimMode", settings.vimMode.toString())
             setProperty("viewMode", settings.viewMode.name)
             setProperty("showLineNumbers", settings.showLineNumbers.toString())
             setProperty("editorFontSize", settings.editorFontSize.toString())

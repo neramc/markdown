@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -72,6 +73,14 @@ public fun QuillWindowContent(
     val shell = LocalShellPalette.current
 
     val surfaces = LocalSurfaceStyle.current
+
+    // Focus Mode is a different window rather than the same window with things hidden. Everything
+    // it removes — the stripes, the docks, the tabs, the status bar — is a place the eye goes when
+    // the sentence is not coming, and leaving any of them in defeats the point.
+    if (workspace.settings.focusMode) {
+        FocusModeContent(controller, workspace, modifier)
+        return
+    }
 
     Box(modifier.background(surfaces.windowBackground)) {
         Column(Modifier.fillMaxSize()) {
@@ -165,6 +174,61 @@ public fun QuillWindowContent(
         }
     }
 }
+
+/**
+ * Focus Mode: one column of text, centred, and nothing else.
+ *
+ * The measure matters more than anything else here. A paragraph running the full width of a
+ * widescreen monitor is genuinely hard to read — the eye loses the line on the way back — and the
+ * reason every serious reading surface is a column rather than a page. 720 points at a normal
+ * editor size is around ninety characters, which is wide for prose and about right for Markdown,
+ * where a line carries syntax as well as words.
+ *
+ * The way out is written on screen, because a mode that hides the entire interface has to say how
+ * to leave it or it is a trap.
+ */
+@Composable
+private fun FocusModeContent(
+    controller: QuillController,
+    workspace: WorkspaceState,
+    modifier: Modifier,
+) {
+    val editor = LocalEditorPalette.current
+    val shell = LocalShellPalette.current
+    val document = workspace.activeDocument
+
+    Box(modifier.fillMaxSize().background(editor.background), contentAlignment = Alignment.TopCenter) {
+        if (document == null) {
+            Text("No document open", color = shell.mutedText)
+        } else {
+            Box(Modifier.widthIn(max = FocusColumnWidth).fillMaxHeight()) {
+                when (workspace.settings.viewMode) {
+                    ViewMode.PREVIEW -> PreviewPane(controller, workspace, document, Modifier.fillMaxSize())
+                    else -> SourceEditor(controller, workspace, document, Modifier.fillMaxSize())
+                }
+            }
+        }
+
+        // Bottom-right, muted, and the only chrome left: what the mode is, and how to leave.
+        Row(
+            modifier = Modifier.align(Alignment.BottomEnd).padding(Tokens.Spacing.Medium),
+            horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.Medium),
+        ) {
+            if (workspace.settings.vimMode) {
+                Text(workspace.vim.display, color = shell.mutedText, fontSize = LocalTypeScale.current.medium)
+            }
+            Text(
+                text = document?.stats?.let { "${it.words} words" }.orEmpty(),
+                color = shell.mutedText,
+                fontSize = LocalTypeScale.current.medium,
+            )
+            Text("Esc to leave Focus Mode", color = shell.mutedText, fontSize = LocalTypeScale.current.medium)
+        }
+    }
+}
+
+/** The measure Focus Mode holds the text to. */
+private val FocusColumnWidth = 720.dp
 
 /** The right dock's panel, which is whichever of its tool windows is open. */
 @Composable

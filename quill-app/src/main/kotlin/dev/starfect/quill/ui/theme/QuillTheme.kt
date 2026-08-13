@@ -103,6 +103,14 @@ public class EditorPalette(
     public val searchMatchBackground: Color,
     /** The right-margin guide, drawn at the configured column. */
     public val rightMargin: Color,
+    /**
+     * What text outside the current paragraph fades to in Focus Mode.
+     *
+     * Chosen to be readable rather than invisible: the surrounding document still has to be
+     * navigable, and text you cannot read is text you scroll past looking for. Roughly the gutter's
+     * own weight, which is the tone this interface already uses for "present but not the point".
+     */
+    public val dimmed: Color,
     private val tokens: Map<Int, EditorTokenStyle>,
 ) {
     public fun styleFor(styleId: Int): EditorTokenStyle? = tokens[styleId]
@@ -165,6 +173,7 @@ public class EditorPalette(
             caretRowBackground = Color(0xFF26282E),
             searchMatchBackground = Color(0xFF32593D),
             rightMargin = Color(0xFF393B40),
+            dimmed = Color(0xFF5A5D66),
             tokens = DARK_TOKENS,
         )
 
@@ -177,6 +186,7 @@ public class EditorPalette(
             caretRowBackground = Color(0xFFF2F5F9),
             searchMatchBackground = Color(0xFFC2E5C2),
             rightMargin = Color(0xFFD3D5DB),
+            dimmed = Color(0xFFA8ACB4),
             tokens = LIGHT_TOKENS,
         )
 

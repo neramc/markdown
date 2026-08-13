@@ -32,6 +32,7 @@ import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.utf16CodePoint
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.IntOffset
@@ -54,6 +55,7 @@ import dev.starfect.quill.model.DocumentSession
 import dev.starfect.quill.model.WorkspaceState
 import dev.starfect.quill.ui.theme.EditorPalette
 import dev.starfect.quill.editing.MarkdownEdits
+import dev.starfect.quill.editing.Vim
 import dev.starfect.quill.editing.MarkdownFeatures
 import dev.starfect.quill.ui.palette.SlashMenu
 import dev.starfect.quill.ui.palette.navigateFeatureList
@@ -84,7 +86,16 @@ public fun SourceEditor(
     val palette = LocalEditorPalette.current
     val settings = workspace.settings
     val scrollState = rememberScrollState()
-    val transformation = remember(document.spans, palette) { MarkdownVisualTransformation(document.spans, palette) }
+
+    // In Focus Mode everything outside the paragraph being written is dimmed rather than hidden.
+    // Hiding it would make the document unnavigable; dimming it leaves the shape of the page while
+    // taking the pull of it away.
+    val focusRange = remember(settings.focusMode, document.text) {
+        if (settings.focusMode) paragraphAround(document.text.text, document.caretPosition.offset) else null
+    }
+    val transformation = remember(document.spans, palette, focusRange) {
+        MarkdownVisualTransformation(document.spans, palette, focusRange)
+    }
 
     val textStyle = JewelTheme.editorTextStyle.copy(
         fontSize = settings.editorFontSize.sp,
@@ -126,7 +137,12 @@ public fun SourceEditor(
     // whatever now happens to occupy row seven.
     LaunchedEffect(triggerStart, slashMatches.size) { slashSelection = 0 }
 
-    val slashOpen = triggerStart != null && slashMatches.isNotEmpty() && dismissedTrigger != triggerStart
+    val slashOpen = triggerStart != null &&
+        slashMatches.isNotEmpty() &&
+        dismissedTrigger != triggerStart &&
+        // Under Vim, `/` in normal mode is the search prompt and `/` in insert mode is a character
+        // somebody is typing on purpose. Neither wants a menu.
+        !settings.vimMode
 
     // Where the caret is, in the editor Box's own coordinates, so the menu can hang off it.
     var textAreaOrigin by remember { mutableStateOf(Offset.Zero) }
@@ -163,6 +179,9 @@ public fun SourceEditor(
                             palette = palette,
                         )
                         .rightMargin(settings.visualGuideColumn, characterWidth, palette)
+                        // Vim comes first when it is on: in normal mode it owns every key, and a
+                        // slash menu opening on `/` would be the search prompt it expects instead.
+                        .vimKeys(enabled = settings.vimMode, onKey = controller::vimKey)
                         // The slash menu's keys are read before the tab and Enter handling, so that
                         // Enter chooses an entry rather than breaking the line under the menu.
                         .slashMenuKeys(
@@ -257,6 +276,86 @@ private fun androidx.compose.ui.unit.Density.caretMenuOffset(
     }
 
     return IntOffset(left.coerceAtLeast(0f).toInt(), top.coerceAtLeast(0f).toInt())
+}
+
+/**
+ * Hands keystrokes to Vim.
+ *
+ * The character comes from `utf16CodePoint` rather than from a table mapping `Key` constants back
+ * to letters, because a keyboard is not a US keyboard: on a French or Korean layout the key that
+ * produces `w` is not `Key.W`, and a Vim mode built on key codes would move by words only for some
+ * of the people using it.
+ *
+ * Insert mode returns false from [onKey], which is what lets every ordinary keystroke — including
+ * everything an input method produces — reach the text field untouched.
+ */
+private fun Modifier.vimKeys(enabled: Boolean, onKey: (Vim.Key) -> Boolean): Modifier = if (!enabled) {
+    this
+} else {
+    onPreviewKeyEvent { event ->
+        if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+
+        val special = when (event.key) {
+            Key.Escape -> Vim.Special.ESCAPE
+            Key.Enter, Key.NumPadEnter -> Vim.Special.ENTER
+            Key.Backspace -> Vim.Special.BACKSPACE
+            Key.Tab -> Vim.Special.TAB
+            else -> null
+        }
+
+        val codePoint = event.utf16CodePoint
+        val character = when {
+            special != null -> null
+            // Control characters and the private-use codes an unmapped key produces are not text.
+            codePoint in 32..0xE000 -> codePoint.toChar()
+            else -> null
+        }
+
+        if (special == null && character == null) {
+            false
+        } else {
+            onKey(Vim.Key(character = character, special = special, ctrl = event.isCtrlPressed))
+        }
+    }
+}
+
+/**
+ * The paragraph the caret is in, which is what Focus Mode leaves undimmed.
+ *
+ * A paragraph rather than a line, because a sentence being written usually spans several lines and
+ * dimming the rest of it as the caret moves would make the text flicker as somebody types.
+ */
+internal fun paragraphAround(text: String, caret: Int): IntRange {
+    val at = caret.coerceIn(0, text.length)
+
+    var start = at
+    while (start > 0) {
+        val lineStart = text.lastIndexOf('\n', (start - 1).coerceAtLeast(0)).let { if (it < 0) 0 else it + 1 }
+        // A blank line ends the paragraph above it.
+        if (lineStart == start - 1 && start >= 1) break
+        if (lineStart == 0) {
+            start = 0
+            break
+        }
+        start = lineStart
+        if (start >= 1 && text[start - 1] == '\n' && (start < 2 || text[start - 2] == '\n')) break
+    }
+
+    var end = at
+    while (end < text.length) {
+        val lineEnd = text.indexOf('\n', end).let { if (it < 0) text.length else it }
+        if (lineEnd >= text.length) {
+            end = text.length
+            break
+        }
+        if (lineEnd + 1 >= text.length || text[lineEnd + 1] == '\n') {
+            end = lineEnd
+            break
+        }
+        end = lineEnd + 1
+    }
+
+    return start.coerceAtMost(end) until end.coerceAtLeast(start).coerceAtMost(text.length) + 1
 }
 
 /**
@@ -491,10 +590,12 @@ private fun DrawScope.drawLineNumbers(
 internal class MarkdownVisualTransformation(
     private val spans: List<StyleSpan>,
     private val palette: EditorPalette,
+    /** In Focus Mode, the paragraph to leave at full strength; everything else is dimmed. */
+    private val focusRange: IntRange? = null,
 ) : VisualTransformation {
 
     override fun filter(text: AnnotatedString): TransformedText {
-        if (spans.isEmpty()) {
+        if (spans.isEmpty() && focusRange == null) {
             return TransformedText(text, OffsetMapping.Identity)
         }
 
@@ -516,13 +617,25 @@ internal class MarkdownVisualTransformation(
                 end,
             )
         }
+        // Focus dimming is applied last, over the syntax colouring, so a heading outside the
+        // current paragraph recedes with everything else rather than staying bright.
+        focusRange?.let { range ->
+            val before = range.first.coerceIn(0, length)
+            val after = (range.last + 1).coerceIn(before, length)
+            if (before > 0) builder.addStyle(SpanStyle(color = palette.dimmed), 0, before)
+            if (after < length) builder.addStyle(SpanStyle(color = palette.dimmed), after, length)
+        }
+
         // The transformation only adds styling, never changes character positions, so offsets map
         // one to one and the caret stays where the user put it.
         return TransformedText(builder.toAnnotatedString(), OffsetMapping.Identity)
     }
 
     override fun equals(other: Any?): Boolean =
-        other is MarkdownVisualTransformation && other.spans == spans && other.palette === palette
+        other is MarkdownVisualTransformation &&
+            other.spans == spans &&
+            other.palette === palette &&
+            other.focusRange == focusRange
 
-    override fun hashCode(): Int = 31 * spans.hashCode() + palette.hashCode()
+    override fun hashCode(): Int = 31 * (31 * spans.hashCode() + palette.hashCode()) + focusRange.hashCode()
 }

@@ -50,6 +50,12 @@ internal fun handleShortcut(event: KeyEvent, controller: QuillController): Boole
                     controller.setFindVisible(false)
                     true
                 }
+                // Last, because a mode that hides the interface must not be the first thing Escape
+                // closes -- but it does have to be something Escape closes.
+                workspace.settings.focusMode -> {
+                    controller.toggleFocusMode()
+                    true
+                }
                 else -> false
             }
 
@@ -222,6 +228,16 @@ internal fun handleShortcut(event: KeyEvent, controller: QuillController): Boole
         }
         event.key == Key.T && event.isShiftPressed -> {
             controller.toggleTheme()
+            true
+        }
+        // Ctrl+Shift+M switches between writing and reading, which is the question people have.
+        event.key == Key.M && event.isShiftPressed -> {
+            controller.toggleReadingMode()
+            true
+        }
+        // Ctrl+Shift+D is distraction-free writing.
+        event.key == Key.D && event.isShiftPressed -> {
+            controller.toggleFocusMode()
             true
         }
         event.key == Key.Six && event.isShiftPressed -> {
