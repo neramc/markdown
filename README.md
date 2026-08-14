@@ -109,7 +109,7 @@ absence of a result should never read as proof the project has none.
 | Format | What it is for |
 |---|---|
 | **HTML** | A standalone page with the styling baked in. |
-| **PDF** | Fixed pages with the font embedded — including a CJK font when the document needs one, so Korean is glyphs rather than empty boxes. |
+| **PDF** | Fixed pages with the font embedded — including a CJK font when the document needs one, so Korean is glyphs rather than empty boxes. Only the glyphs the page draws are embedded, so a page of Korean is tens of kilobytes rather than the size of the font; the text stays selectable and searchable. |
 | **Word** | Headings, lists and tables as real Word *styles*, so the document can be navigated and restyled. |
 | **EPUB** | A reflowable book with a table of contents. |
 | **Confluence** | Storage format: a code block is a macro, a callout is a macro, a task list is a first-class element. |
