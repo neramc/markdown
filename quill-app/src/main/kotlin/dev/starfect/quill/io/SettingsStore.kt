@@ -1,7 +1,7 @@
 package dev.starfect.quill.io
 
 import dev.starfect.quill.model.QuillSettings
-import dev.starfect.quill.model.ViewMode
+import dev.starfect.quill.model.SettingsRegistry
 import java.io.IOException
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
@@ -27,6 +27,38 @@ import java.util.Properties
 public class SettingsStore(private val storePath: Path = defaultStorePath()) {
 
     public companion object {
+        /**
+         * What each setting used to be called, so an existing installation keeps its preferences.
+         *
+         * The keys became dotted when the registry arrived — `darkTheme` is now
+         * `workbench.darkTheme` — and a rename that silently resets everybody's settings is a worse
+         * outcome than the flat names were. Read-only: nothing is ever written under the old name,
+         * so the file converts itself the first time it is saved.
+         */
+        private val LEGACY_KEYS: Map<String, String> = mapOf(
+            "workbench.darkTheme" to "darkTheme",
+            "workbench.islands" to "islands",
+            "workbench.fontSize" to "uiFontSize",
+            "workbench.focusMode" to "focusMode",
+            "workbench.leftPanelWidth" to "leftToolWindowWidth",
+            "workbench.rightPanelWidth" to "rightToolWindowWidth",
+            "editor.fontSize" to "editorFontSize",
+            "editor.lineNumbers" to "showLineNumbers",
+            "editor.wordWrap" to "wordWrap",
+            "editor.highlightCurrentLine" to "highlightCaretRow",
+            "editor.rulerColumn" to "visualGuideColumn",
+            "editor.tabSize" to "tabWidth",
+            "editor.vimMode" to "vimMode",
+            "editor.syncScrolling" to "syncScrolling",
+            "files.saveOnFocusChange" to "saveOnFocusLoss",
+            "files.trimTrailingWhitespace" to "trimTrailingWhitespaceOnSave",
+            "files.insertFinalNewline" to "ensureNewlineOnSave",
+            "markdown.autoTableOfContents" to "autoTableOfContents",
+            "markdown.inspections" to "inspectionsEnabled",
+            "markdown.weakWarnings" to "showWeakWarnings",
+            "preview.viewMode" to "viewMode",
+        )
+
         private fun defaultStorePath(): Path {
             val configured = System.getProperty("quill.config.dir")
             if (!configured.isNullOrBlank()) return Path.of(configured).resolve("settings.properties")
@@ -47,70 +79,22 @@ public class SettingsStore(private val storePath: Path = defaultStorePath()) {
 
     /** Reads the stored settings, falling back to the default for anything missing or malformed. */
     public fun load(): QuillSettings {
-        val defaults = QuillSettings()
-        val properties = read() ?: return defaults
+        val properties = read() ?: return QuillSettings()
 
-        fun bool(key: String, fallback: Boolean) =
-            properties.getProperty(key)?.toBooleanStrictOrNull() ?: fallback
-
-        fun int(key: String, fallback: Int, range: IntRange) =
-            properties.getProperty(key)?.toIntOrNull()?.takeIf { it in range } ?: fallback
-
-        fun width(key: String, fallback: Float) =
-            properties.getProperty(key)?.toFloatOrNull()?.takeIf { it in 150f..640f } ?: fallback
-
-        return QuillSettings(
-            darkTheme = bool("darkTheme", defaults.darkTheme),
-            islands = bool("islands", defaults.islands),
-            focusMode = bool("focusMode", defaults.focusMode),
-            vimMode = bool("vimMode", defaults.vimMode),
-            autoTableOfContents = bool("autoTableOfContents", defaults.autoTableOfContents),
-            viewMode = properties.getProperty("viewMode")
-                ?.let { name -> ViewMode.entries.firstOrNull { it.name == name } }
-                ?: defaults.viewMode,
-            showLineNumbers = bool("showLineNumbers", defaults.showLineNumbers),
-            editorFontSize = int("editorFontSize", defaults.editorFontSize, 8..48),
-            uiFontSize = int("uiFontSize", defaults.uiFontSize, 8..32),
-            wordWrap = bool("wordWrap", defaults.wordWrap),
-            highlightCaretRow = bool("highlightCaretRow", defaults.highlightCaretRow),
-            showWeakWarnings = bool("showWeakWarnings", defaults.showWeakWarnings),
-            inspectionsEnabled = bool("inspectionsEnabled", defaults.inspectionsEnabled),
-            syncScrolling = bool("syncScrolling", defaults.syncScrolling),
-            saveOnFocusLoss = bool("saveOnFocusLoss", defaults.saveOnFocusLoss),
-            trimTrailingWhitespaceOnSave =
-                bool("trimTrailingWhitespaceOnSave", defaults.trimTrailingWhitespaceOnSave),
-            ensureNewlineOnSave = bool("ensureNewlineOnSave", defaults.ensureNewlineOnSave),
-            visualGuideColumn = int("visualGuideColumn", defaults.visualGuideColumn, 0..300),
-            tabWidth = int("tabWidth", defaults.tabWidth, 1..16),
-            leftToolWindowWidth = width("leftToolWindowWidth", defaults.leftToolWindowWidth),
-            rightToolWindowWidth = width("rightToolWindowWidth", defaults.rightToolWindowWidth),
-        )
+        // One pass over the registry. A setting whose key is absent, or whose value will not parse,
+        // simply keeps its default — which is what makes a file written by a newer version, or
+        // hand-edited into nonsense, still start the application.
+        return SettingsRegistry.ALL.fold(QuillSettings()) { settings, setting ->
+            val stored = properties.getProperty(setting.key)
+                ?: LEGACY_KEYS[setting.key]?.let(properties::getProperty)
+            if (stored == null) settings else setting.withText(settings, stored)
+        }
     }
 
     /** Writes [settings], replacing whatever was there. Failure is silent and non-fatal. */
     public fun save(settings: QuillSettings) {
         val properties = Properties().apply {
-            setProperty("darkTheme", settings.darkTheme.toString())
-            setProperty("islands", settings.islands.toString())
-            setProperty("focusMode", settings.focusMode.toString())
-            setProperty("vimMode", settings.vimMode.toString())
-            setProperty("autoTableOfContents", settings.autoTableOfContents.toString())
-            setProperty("viewMode", settings.viewMode.name)
-            setProperty("showLineNumbers", settings.showLineNumbers.toString())
-            setProperty("editorFontSize", settings.editorFontSize.toString())
-            setProperty("uiFontSize", settings.uiFontSize.toString())
-            setProperty("wordWrap", settings.wordWrap.toString())
-            setProperty("highlightCaretRow", settings.highlightCaretRow.toString())
-            setProperty("showWeakWarnings", settings.showWeakWarnings.toString())
-            setProperty("inspectionsEnabled", settings.inspectionsEnabled.toString())
-            setProperty("syncScrolling", settings.syncScrolling.toString())
-            setProperty("saveOnFocusLoss", settings.saveOnFocusLoss.toString())
-            setProperty("trimTrailingWhitespaceOnSave", settings.trimTrailingWhitespaceOnSave.toString())
-            setProperty("ensureNewlineOnSave", settings.ensureNewlineOnSave.toString())
-            setProperty("visualGuideColumn", settings.visualGuideColumn.toString())
-            setProperty("tabWidth", settings.tabWidth.toString())
-            setProperty("leftToolWindowWidth", settings.leftToolWindowWidth.toString())
-            setProperty("rightToolWindowWidth", settings.rightToolWindowWidth.toString())
+            SettingsRegistry.ALL.forEach { setting -> setProperty(setting.key, setting.textOf(settings)) }
         }
 
         try {
