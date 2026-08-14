@@ -143,7 +143,13 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y fakeroot binutils rpm
 
       - name: Build and test
-        run: ./gradlew build --stacktrace
+        run: ./gradlew build
+
+      # A release that fails on one platform is exactly when the failure has to be readable.
+      - name: Say which tests failed
+        if: failure()
+        shell: bash
+        run: tools/show-test-failures.sh
 
       - name: Build the release application image
         run: ./gradlew :quill-app:createReleaseDistributable --stacktrace

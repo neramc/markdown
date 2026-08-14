@@ -98,7 +98,14 @@ jobs:
 
       # The UI tests compose offscreen through Skia and need no display server.
       - name: Build and test
-        run: ./gradlew build --stacktrace
+        run: ./gradlew build
+
+      # Gradle buries the one line that says what went wrong. The reasons, and why this is a script
+      # rather than a link to a report, are in the script.
+      - name: Say which tests failed
+        if: failure()
+        shell: bash
+        run: tools/show-test-failures.sh
 
       # createReleaseDistributable is the one packaging task that exists on every platform. The
       # native installers are per-OS and are built in the steps below, because there is no Windows
