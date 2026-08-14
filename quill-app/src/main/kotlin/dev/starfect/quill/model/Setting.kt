@@ -163,6 +163,15 @@ public class IntSetting(
         // JSON has one number type, so an integer arrives as a Double.
         is Number -> value.toInt().coerceIn(range)
         is String -> value.trim().toIntOrNull()?.coerceIn(range)
+        // `editor.rulers` is a list, and may hold objects rather than plain numbers. Quill draws
+        // one guide, so the first column wins.
+        is List<*> -> value.firstNotNullOfOrNull { entry ->
+            when (entry) {
+                is Number -> entry.toInt()
+                is Map<*, *> -> (entry["column"] as? Number)?.toInt()
+                else -> null
+            }
+        }?.coerceIn(range)
         else -> null
     }
 }

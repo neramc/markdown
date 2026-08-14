@@ -26,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import dev.starfect.quill.QuillController
 import dev.starfect.quill.model.QuillSettings
@@ -51,6 +52,7 @@ private enum class SettingsPage(val title: String) {
     EDITOR("Editor"),
     INSPECTIONS("Inspections"),
     SAVING("Saving"),
+    IMPORT("Import"),
 }
 
 /**
@@ -66,6 +68,7 @@ private enum class SettingsPage(val title: String) {
 public fun SettingsDialog(controller: QuillController, workspace: WorkspaceState) {
     var draft by remember(workspace.settings) { mutableStateOf(workspace.settings) }
     var page by remember { mutableStateOf(SettingsPage.APPEARANCE) }
+    var query by remember { mutableStateOf(TextFieldValue("")) }
 
     IdeDialog(
         title = "Settings",
@@ -83,15 +86,30 @@ public fun SettingsDialog(controller: QuillController, workspace: WorkspaceState
 
             Column(
                 Modifier.weight(1f).fillMaxHeight()
-                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = 18.dp, vertical = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                when (page) {
-                    SettingsPage.APPEARANCE -> AppearancePage(draft) { draft = it }
-                    SettingsPage.EDITOR -> EditorPage(draft) { draft = it }
-                    SettingsPage.INSPECTIONS -> InspectionsPage(draft) { draft = it }
-                    SettingsPage.SAVING -> SavingPage(draft) { draft = it }
+                // Searching crosses the categories, so it replaces the page rather than filtering
+                // within one. A setting nobody remembers the category of is exactly the setting
+                // somebody is searching for.
+                SettingsSearchField(query, { query = it })
+                Spacer(Modifier.height(10.dp))
+
+                Column(
+                    Modifier.weight(1f)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    if (query.text.isNotBlank()) {
+                        SettingsSearchResults(query.text, draft) { draft = it }
+                    } else {
+                        when (page) {
+                            SettingsPage.APPEARANCE -> AppearancePage(draft) { draft = it }
+                            SettingsPage.EDITOR -> EditorPage(draft) { draft = it }
+                            SettingsPage.INSPECTIONS -> InspectionsPage(draft) { draft = it }
+                            SettingsPage.SAVING -> SavingPage(draft) { draft = it }
+                            SettingsPage.IMPORT -> VsCodeImportPage(draft) { draft = it }
+                        }
+                    }
                 }
             }
         }
