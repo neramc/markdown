@@ -27,6 +27,7 @@ import dev.starfect.quill.model.FileNode
 import dev.starfect.quill.model.FindState
 import dev.starfect.quill.model.Notification
 import dev.starfect.quill.model.NotificationSeverity
+import dev.starfect.quill.editing.AutoPairs
 import dev.starfect.quill.editing.CleanPaste
 import dev.starfect.quill.editing.DocumentStructure
 import dev.starfect.quill.editing.MarkdownEdits
@@ -418,8 +419,21 @@ public class QuillController(
      * replacement, so the engine patches its rope instead of rebuilding it. A caret move or a pure
      * selection change produces no engine call at all.
      */
-    public fun onTextChanged(id: Long, value: TextFieldValue) {
+    public fun onTextChanged(id: Long, incoming: TextFieldValue) {
         val session = _state.value.documents.firstOrNull { it.id == id } ?: return
+        val settings = _state.value.settings
+
+        // Auto-closing and wrapping happen here rather than in the editor, because this is the one
+        // funnel every edit passes through: a keystroke, a paste, an input method's commit and a
+        // programmatic edit all arrive as a finished value, and comparing against the previous one
+        // is the only way to know which it was.
+        val value = AutoPairs.apply(
+            before = session.text,
+            after = incoming,
+            closeBrackets = settings.autoClosingBrackets,
+            surroundSelection = settings.autoSurround,
+        )
+
         val previous = session.text.text
         val current = value.text
 

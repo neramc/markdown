@@ -212,6 +212,14 @@ public data class QuillSettings(
     val visualGuideColumn: Int = 0,
     /** Tab width in spaces. */
     val tabWidth: Int = 4,
+    /** Typing an opening bracket, backtick or quote inserts its partner. */
+    val autoClosingBrackets: Boolean = true,
+    /** Typing a pair character with a selection wraps it rather than replacing it. */
+    val autoSurround: Boolean = true,
+    /** Save a modified document a moment after typing stops. */
+    val autoSaveAfterDelay: Boolean = false,
+    /** How long "a moment" is, in milliseconds. */
+    val autoSaveDelayMillis: Int = 1000,
     /**
      * Docked tool window widths, in dp, as the user has dragged them.
      *

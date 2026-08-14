@@ -41,6 +41,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.jetbrains.jewel.window.DecoratedWindow
 
@@ -190,6 +191,7 @@ public fun main(arguments: Array<String>) {
                     onPreviewKeyEvent = { event -> handleShortcut(event, controller) },
                 ) {
                     SaveOnFocusLoss(controller, workspace, window)
+                    AutoSaveAfterDelay(controller, workspace)
                     AcceptDroppedFiles(controller, window)
                     Column(Modifier.fillMaxSize()) {
                         QuillTitleBar(controller, workspace, ::exitApplication)
@@ -207,6 +209,7 @@ public fun main(arguments: Array<String>) {
                     onPreviewKeyEvent = { event -> handleShortcut(event, controller) },
                 ) {
                     SaveOnFocusLoss(controller, workspace, window)
+                    AutoSaveAfterDelay(controller, workspace)
                     AcceptDroppedFiles(controller, window)
                     Column(Modifier.fillMaxSize()) {
                         QuillToolBar(controller, workspace, ::exitApplication)
@@ -283,6 +286,28 @@ private fun SaveOnFocusLoss(controller: QuillController, workspace: WorkspaceSta
             window.removeWindowFocusListener(listener)
             window.removeWindowListener(listener)
         }
+    }
+}
+
+/**
+ * Saves a document once typing stops, if the setting is on.
+ *
+ * Keyed on the text of every modified document, so each keystroke cancels the pending save and
+ * starts the wait again — which is what "after a delay" means, and what stops a save firing in the
+ * middle of a sentence. A document with no file is skipped rather than prompting: a file dialog that
+ * appears because somebody paused to think is worse than not saving.
+ */
+@Composable
+private fun AutoSaveAfterDelay(controller: QuillController, workspace: WorkspaceState) {
+    if (!workspace.settings.autoSaveAfterDelay) return
+
+    val pending = workspace.documents.filter { it.isModified && it.path != null }
+    val signature = pending.joinToString("|") { "${it.id}:${it.text.text.length}:${it.text.text.hashCode()}" }
+
+    LaunchedEffect(signature, workspace.settings.autoSaveDelayMillis) {
+        if (pending.isEmpty()) return@LaunchedEffect
+        delay(workspace.settings.autoSaveDelayMillis.toLong())
+        pending.forEach { document -> controller.save(document.id) { null } }
     }
 }
 

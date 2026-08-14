@@ -138,6 +138,61 @@ public object SettingsRegistry {
         vsCode = "editor.tabSize",
     )
 
+    public val AutoClosingBrackets: BooleanSetting = BooleanSetting(
+        key = "editor.autoClosingBrackets",
+        title = "Close brackets and quotes",
+        description =
+            "Typing an opening bracket, backtick or quote inserts its partner. Asterisks and " +
+                "underscores are left alone, because a line starting with one is a bullet.",
+        category = SettingCategory.TYPING,
+        default = true,
+        read = { it.autoClosingBrackets },
+        write = { settings, value -> settings.copy(autoClosingBrackets = value) },
+        vsCode = "editor.autoClosingBrackets",
+        trueWords = setOf("always", "languagedefined", "beforewhitespace"),
+        falseWords = setOf("never"),
+    )
+
+    public val AutoSurround: BooleanSetting = BooleanSetting(
+        key = "editor.autoSurround",
+        title = "Wrap the selection",
+        description =
+            "Typing a bracket, quote, backtick, asterisk or underscore with text selected wraps " +
+                "it rather than replacing it.",
+        category = SettingCategory.TYPING,
+        default = true,
+        read = { it.autoSurround },
+        write = { settings, value -> settings.copy(autoSurround = value) },
+        vsCode = "editor.autoSurround",
+        trueWords = setOf("languagedefined", "quotes", "brackets"),
+        falseWords = setOf("never"),
+    )
+
+    public val AutoSaveAfterDelay: BooleanSetting = BooleanSetting(
+        key = "files.autoSaveAfterDelay",
+        title = "Save automatically while typing",
+        description = "Write a modified document to disk once you have stopped typing for a moment.",
+        category = SettingCategory.FILES,
+        default = false,
+        read = { it.autoSaveAfterDelay },
+        write = { settings, value -> settings.copy(autoSaveAfterDelay = value) },
+        vsCode = "files.autoSave",
+        trueWords = setOf("afterdelay"),
+        falseWords = setOf("off", "onfocuschange", "onwindowchange"),
+    )
+
+    public val AutoSaveDelayMillis: IntSetting = IntSetting(
+        key = "files.autoSaveDelay",
+        title = "Auto-save delay",
+        description = "How long to wait after the last keystroke before saving, in milliseconds.",
+        category = SettingCategory.FILES,
+        default = 1000,
+        range = 200..60_000,
+        read = { it.autoSaveDelayMillis },
+        write = { settings, value -> settings.copy(autoSaveDelayMillis = value) },
+        vsCode = "files.autoSaveDelay",
+    )
+
     public val VimMode: BooleanSetting = BooleanSetting(
         key = "editor.vimMode",
         title = "Vim mode",
@@ -289,8 +344,12 @@ public object SettingsRegistry {
         HighlightCaretRow,
         VisualGuideColumn,
         TabWidth,
+        AutoClosingBrackets,
+        AutoSurround,
         VimMode,
         SaveOnFocusLoss,
+        AutoSaveAfterDelay,
+        AutoSaveDelayMillis,
         TrimTrailingWhitespaceOnSave,
         EnsureNewlineOnSave,
         AutoTableOfContents,
