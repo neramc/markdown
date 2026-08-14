@@ -197,6 +197,25 @@ platforms therefore produce a file with exactly the same name, so collecting the
 silently loses one. `tools/assemble-release.sh` maps everything onto
 `Quill-<version>-<platform>.<extension>`; its rules and their reasons are in the script.
 
+### The two ways to cut a release
+
+Both produce the same thing — one release, one tag, both naming a commit that was built and tested
+on all five platforms — and both pass the same gate.
+
+**Push a tag.** `git tag -a v1.2.3 && git push origin v1.2.3`. The tag names the version and the
+gate refuses to build when it disagrees with `gradle.properties`.
+
+**Bump the version on main.** Change `quill.version` in `gradle.properties`, update `CHANGELOG.md`,
+push to main. The gate asks GitHub whether that version already has a release; if it does not, this
+push cuts it, and `gh release create --target` makes the tag as part of publishing.
+
+The second route exists because creating a tag is a permission not every hand on a repository has —
+a token scoped to push branches is common, and it makes the first route impossible while leaving the
+release itself perfectly legitimate. It is also why the gate asks about the *release* rather than
+looking for a tag: the release is the thing people download, and it is the thing that must not be
+made twice. An ordinary push to main stops at the gate in about a minute, so the five platform
+builds only run when there is something to release.
+
 ### What each platform actually verifies
 
 Four of the five platforms run the whole suite, screenshot tests included: the interface is composed

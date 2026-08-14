@@ -7,10 +7,25 @@ name: Release
 # `workflow_dispatch` runs the whole pipeline without publishing anything. Every interesting failure
 # in a release pipeline is a platform-specific one that only appears on a runner, and finding those
 # by tagging means deleting tags and releases afterwards. Rehearsing is free.
+#
+# There are two ways in, and they agree on what a release is.
+#
+#   1. Push a tag. The tag names the version, and the gate refuses to build when it disagrees with
+#      gradle.properties.
+#   2. Push to main having changed `quill.version`. The gate notices that the declared version has
+#      no release yet and cuts one, creating the tag itself.
+#
+# The second exists because not every hand on this repository can create a tag -- a token scoped to
+# push branches is common, and it makes the first route impossible while leaving the release itself
+# perfectly legitimate. It costs nothing when unused: on an ordinary push the gate finds the release
+# already there and everything downstream is skipped, so the five platform builds only run when
+# there is actually something to release.
 on:
   push:
     tags:
       - 'v*'
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       version:
@@ -42,11 +57,14 @@ jobs:
     outputs:
       version: ${{ steps.resolve.outputs.version }}
       publish: ${{ steps.resolve.outputs.publish }}
+      proceed: ${{ steps.resolve.outputs.proceed }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Resolve and check the version
         id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           declared="$(grep -oP '^quill\.version=\K.*' gradle.properties)"
@@ -58,32 +76,60 @@ jobs:
               echo "::error::Set quill.version=$tagged in gradle.properties, or tag v$declared instead." >&2
               exit 1
             fi
-            echo "version=$tagged" >> "$GITHUB_OUTPUT"
-            echo "publish=true" >> "$GITHUB_OUTPUT"
-            echo "Releasing $tagged"
+            version="$tagged"
+            publish=true
+            proceed=true
+            echo "Releasing $version, from the tag"
+          elif [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+            # A push to main. The declared version having no release is what says "this is a
+            # release" -- so an ordinary commit costs one minute here and nothing downstream, and
+            # a version bump cuts the release. Asking GitHub rather than looking for a tag is
+            # deliberate: the release is the thing people download, and it is what must not be
+            # made twice.
+            version="$declared"
+            if gh release view "v$declared" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+              publish=false
+              proceed=false
+              echo "v$declared is already released; nothing to do"
+            else
+              publish=true
+              proceed=true
+              echo "v$declared has no release yet, so this push cuts it"
+            fi
           else
-            echo "version=$declared" >> "$GITHUB_OUTPUT"
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-            echo "Rehearsing $declared -- nothing will be published"
+            version="$declared"
+            publish=false
+            proceed=true
+            echo "Rehearsing $version -- nothing will be published"
           fi
+
+          {
+            echo "version=$version"
+            echo "publish=$publish"
+            echo "proceed=$proceed"
+          } >> "$GITHUB_OUTPUT"
 
       # A release with no notes is a release nobody can evaluate. Failing here costs a minute;
       # discovering it after five platform builds costs the whole pipeline.
       - name: Check the release notes exist
+        if: steps.resolve.outputs.proceed == 'true'
         run: |
           set -euo pipefail
           tools/release-notes.sh "${{ steps.resolve.outputs.version }}" > /dev/null
           echo "CHANGELOG.md has a section for ${{ steps.resolve.outputs.version }}"
 
       - uses: dtolnay/rust-toolchain@stable
+        if: steps.resolve.outputs.proceed == 'true'
         with:
           components: clippy, rustfmt
 
       - uses: Swatinem/rust-cache@v2
+        if: steps.resolve.outputs.proceed == 'true'
         with:
           workspaces: quill-core
 
       - name: Engine checks
+        if: steps.resolve.outputs.proceed == 'true'
         run: |
           cargo fmt --manifest-path quill-core/Cargo.toml --check
           cargo clippy --manifest-path quill-core/Cargo.toml --all-targets -- -D warnings
@@ -97,6 +143,9 @@ jobs:
   build:
     name: ${{ matrix.target }}
     needs: gate
+    # An ordinary push to main stops at the gate, so the five platform builds cost nothing until
+    # there is something to release.
+    if: needs.gate.outputs.proceed == 'true'
     runs-on: ${{ matrix.runner }}
     strategy:
       # One platform failing should not hide whether the others would have worked. On a release,
@@ -207,6 +256,7 @@ jobs:
   windows-setup:
     name: Windows installer
     needs: [gate, build]
+    if: needs.gate.outputs.proceed == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -238,6 +288,7 @@ jobs:
   publish:
     name: Publish
     needs: [gate, build, windows-setup]
+    if: needs.gate.outputs.proceed == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -301,16 +352,23 @@ jobs:
           } > release-notes.md
           cat release-notes.md
 
+      # `gh release create` makes the tag when one does not exist, pointed at `--target`. That is
+      # what lets the version-bump route produce exactly the same result as the tag route: one
+      # release, one tag, both naming the commit that was built and tested here. Coming in from a
+      # tag, the tag already exists and --target is ignored.
       - name: Publish the release
         if: needs.gate.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.gate.outputs.version }}
         run: |
           set -euo pipefail
-          gh release create "${GITHUB_REF_NAME}" \
-            --title "Quill ${{ needs.gate.outputs.version }}" \
+          gh release create "v${VERSION}" \
+            --target "${GITHUB_SHA}" \
+            --title "Quill ${VERSION}" \
             --notes-file release-notes.md \
             release/*
+          echo "Published: $(gh release view "v${VERSION}" --json url --jq .url)"
 
       # A rehearsal keeps everything it built, so the assets can be downloaded and opened before a
       # tag exists. This is the difference between testing the pipeline and testing the release.
