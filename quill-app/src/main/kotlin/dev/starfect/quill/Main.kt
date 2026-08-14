@@ -32,6 +32,8 @@ import dev.starfect.quill.ui.welcome.WelcomeContent
 import java.awt.FileDialog
 import java.awt.Frame
 import java.nio.file.Path
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionException
 import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isRegularFile
@@ -39,49 +41,79 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.withContext
 import org.jetbrains.jewel.window.DecoratedWindow
 
 /**
  * Quill's entry point.
  *
- * The engine is created before the window so a missing or mismatched native library is reported in a
- * readable dialog rather than as a stack trace on a blank screen — the failure a user of a
- * two-language application is most likely to hit.
+ * **Two slow things happen here, and they happen at the same time.** Loading the native engine and
+ * bringing up the window are independent — one is a shared library and a set of downcall handles,
+ * the other is Skia and a Compose scene — and doing them in sequence, as this used to, costs the sum
+ * of two waits where the longer of the two would do. The engine is started on another thread and
+ * joined at the first point anything needs it, which is after the window has begun to exist.
+ *
+ * A missing or mismatched native library is still reported in a readable dialog rather than as a
+ * stack trace on a blank screen — the failure a user of a two-language application is most likely to
+ * hit. It arrives a moment later than it used to, which nobody will mind.
+ *
+ * Settings are read here, before the window, rather than in an effect after the first frame. It is a
+ * small file and the alternative is visible: the window opens in the default theme and then corrects
+ * itself, which reads as a bug even when it lasts one frame.
  *
  * Launched with a path, Quill opens it. Launched with nothing, it shows the welcome window, which is
  * what an IDE does: opening whatever directory the process happened to start in is a shell habit,
  * not a desktop application's.
  */
 public fun main(arguments: Array<String>) {
-    val engine = try {
-        QuillEngine.create(darkTheme = true)
-    } catch (failure: QuillNativeLibraryException) {
-        application { StartupFailureWindow(failure, ::exitApplication) }
-        return
-    }
+    val engineTask = CompletableFuture.supplyAsync { QuillEngine.create(darkTheme = true) }
 
+    val settingsStore = SettingsStore()
+    val restored = settingsStore.load()
     val requested = arguments.map(Path::of).filter { it.exists() }
 
     application {
+        val started: Result<QuillEngine> = remember {
+            try {
+                Result.success(engineTask.join())
+            } catch (wrapped: CompletionException) {
+                // `join` wraps whatever the thread threw. The dialog wants the real failure.
+                Result.failure(wrapped.cause ?: wrapped)
+            }
+        }
+
+        started.exceptionOrNull()?.let { failure ->
+            if (failure !is QuillNativeLibraryException) throw failure
+            StartupFailureWindow(failure, ::exitApplication)
+            return@application
+        }
+        val engine = started.getOrThrow()
+
         val scope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Default) }
-        val controller = remember { QuillController(scope, engine) }
+        val controller = remember { QuillController(scope, engine).apply { applySettings(restored) } }
         val recentProjects = remember { RecentProjects() }
-        val settingsStore = remember { SettingsStore() }
 
         val workspace by controller.state
 
-        // Restore before the first frame, so the window opens in the theme it was closed in rather
-        // than opening in the default and then visibly correcting itself.
-        LaunchedEffect(Unit) { controller.applySettings(settingsStore.load()) }
-
         // Persist on change rather than on exit: a window closed by the OS, or a crash, should not
         // cost the reader their preferences.
-        LaunchedEffect(workspace.settings) { settingsStore.save(workspace.settings) }
+        LaunchedEffect(workspace.settings) {
+            if (workspace.settings != restored) {
+                withContext(Dispatchers.IO) { settingsStore.save(workspace.settings) }
+            }
+        }
 
         // A project is "open" once something is on screen to edit; until then the welcome window
         // stands in for the main window, exactly as the IDE's does.
         var projectOpen by remember { mutableStateOf(requested.isNotEmpty()) }
-        var recents by remember { mutableStateOf(recentProjects.load()) }
+
+        // The recent list is up to thirty directories, each of which has to be checked for still
+        // existing. That is thirty round trips to the filesystem, and doing them during the first
+        // composition means the welcome window cannot paint until they finish. It paints first and
+        // fills in instead — which is invisible when the list is warm and the difference between a
+        // prompt launch and a stalled one when it is not.
+        var recents by remember { mutableStateOf(emptyList<RecentProject>()) }
+        LaunchedEffect(Unit) { recents = withContext(Dispatchers.IO) { recentProjects.load() } }
 
         DisposableEffect(Unit) {
             onDispose {
