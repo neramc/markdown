@@ -196,3 +196,20 @@ jpackage names its output three different ways for the same machine — `quill_1
 platforms therefore produce a file with exactly the same name, so collecting them without renaming
 silently loses one. `tools/assemble-release.sh` maps everything onto
 `Quill-<version>-<platform>.<extension>`; its rules and their reasons are in the script.
+
+### What each platform actually verifies
+
+Four of the five platforms run the whole suite, screenshot tests included: the interface is composed
+onto a real canvas and the pixels are asserted on.
+
+**Linux on ARM is the exception.** Skia's native library does not load on GitHub's `ubuntu-24.04-arm`
+image — installing the X, OpenGL and fontconfig client libraries it links against is not enough, and
+the failure arrives as `LibraryLoadException` before anything is drawn. So the render tests *skip*
+there, with the load error in the skip message, and the other 275 tests run normally. The build, the
+packaging, the engine, the bridge and every export path are covered on arm64; the drawing is not.
+
+That is a deliberate trade rather than an oversight. Failing would mean no release could be cut
+whenever a runner happens to be headless, for a reason with nothing to do with the release. Passing
+quietly would mean nobody notices a platform going untested. A skip says what happened, where
+somebody reading the results will see it. The distinction is worth keeping in mind when a change
+touches the interface: on arm64 Linux, CI will not catch it.
