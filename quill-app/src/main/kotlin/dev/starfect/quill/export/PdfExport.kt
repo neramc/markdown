@@ -6,6 +6,7 @@ import java.io.ByteArrayOutputStream
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.zip.Deflater
 
 /**
  * PDF, laid out and written here rather than delegated.
@@ -54,6 +55,12 @@ public object PdfExport {
 
     /** Heading sizes, largest first, matching the six levels. */
     private val HEADING_SIZES = floatArrayOf(21f, 17f, 14.5f, 12.5f, 11.5f, 11f)
+
+    /** How much is deflated at a time. Streams here are a font or a page, so this is one pass. */
+    private const val DEFLATE_BUFFER = 64 * 1024
+
+    /** A `bfchar` section may hold a hundred entries; past that, readers stop reading it. */
+    private const val BFCHAR_LIMIT = 100
 
     private const val INDENT_STEP = 18f
     private const val QUOTE_RULE_INSET = 8f
@@ -701,11 +708,8 @@ public object PdfExport {
 
             for (index in 0 until pageCount) {
                 val stream = pages.getOrElse(index) { "" }
-                val bytes = stream.toByteArray(StandardCharsets.ISO_8859_1)
                 startObject(firstContent + index)
-                write("<< /Length ${bytes.size} >>\nstream\n")
-                out.write(bytes)
-                write("\nendstream\nendobj\n")
+                writeStream(out, "", stream.toByteArray(StandardCharsets.ISO_8859_1))
             }
 
             writeFont(out, offsets, fontBase, body, "F1")
@@ -720,8 +724,47 @@ public object PdfExport {
             return Document(out.toByteArray(), pageCount)
         }
 
-        /** How many objects one font takes: the type-0, the descendant, the descriptor and the file. */
-        private fun fontObjectCount() = if (body == null) 1 else 4
+        /**
+         * How many objects one font takes: the type-0, the descendant, the descriptor, the font
+         * file and the map back to Unicode.
+         */
+        private fun fontObjectCount() = if (body == null) 1 else 5
+
+        /**
+         * Writes a stream object's dictionary and body, compressed.
+         *
+         * Every stream in the file goes through here, which is why the whole file is compressed
+         * rather than the part somebody remembered. It matters most for the one stream that is
+         * large: an embedded font. [extras] carries whatever the object needs beyond the length and
+         * the filter — `/Length1` for a font program, which the specification defines as the
+         * *uncompressed* size and is therefore taken before packing.
+         */
+        private fun writeStream(out: ByteArrayOutputStream, extras: String, bytes: ByteArray) {
+            val packed = deflate(bytes)
+            out.write("<< /Length ${packed.size} /Filter /FlateDecode$extras >>\nstream\n".latin1())
+            out.write(packed)
+            out.write("\nendstream\nendobj\n".latin1())
+        }
+
+        private fun deflate(bytes: ByteArray): ByteArray {
+            val deflater = Deflater(Deflater.BEST_COMPRESSION)
+            return try {
+                deflater.setInput(bytes)
+                deflater.finish()
+                val out = ByteArrayOutputStream(bytes.size / 4 + 64)
+                val buffer = ByteArray(DEFLATE_BUFFER)
+                while (!deflater.finished()) {
+                    val count = deflater.deflate(buffer)
+                    if (count <= 0) break
+                    out.write(buffer, 0, count)
+                }
+                out.toByteArray()
+            } finally {
+                deflater.end()
+            }
+        }
+
+        private fun String.latin1() = toByteArray(StandardCharsets.ISO_8859_1)
 
         /**
          * Writes a font, either as a base-14 reference or as an embedded CID font.
@@ -755,7 +798,7 @@ public object PdfExport {
             startObject(base)
             write(
                 "<< /Type /Font /Subtype /Type0 /BaseFont /$name /Encoding /Identity-H " +
-                    "/DescendantFonts [${base + 1} 0 R] >>\nendobj\n"
+                    "/DescendantFonts [${base + 1} 0 R] /ToUnicode ${base + 4} 0 R >>\nendobj\n"
             )
 
             startObject(base + 1)
@@ -775,15 +818,65 @@ public object PdfExport {
                     "/StemV 80 /$fileKey ${base + 3} 0 R >>\nendobj\n"
             )
 
+            // Only the glyphs the document draws. A CJK font is eleven megabytes and a page of
+            // Korean uses perhaps forty shapes out of it, so embedding the file whole produces a
+            // one-page letter larger than most people's mail will accept.
             startObject(base + 3)
-            val program = font.program
-            if (font.isCompactFontFormat) {
-                write("<< /Length ${program.size} /Subtype /OpenType >>\nstream\n")
-            } else {
-                write("<< /Length ${program.size} /Length1 ${program.size} >>\nstream\n")
+            val program = font.subset(usedGlyphs(font))
+            val extras = if (font.isCompactFontFormat) " /Subtype /OpenType" else " /Length1 ${program.size}"
+            writeStream(out, extras, program)
+
+            // Identity-H means the bytes in the content stream are glyph numbers, which is what
+            // makes an arbitrary font usable without inventing an encoding for it -- and what makes
+            // the text unreadable to anything that did not draw it. Without this map, selecting a
+            // paragraph in a reader and copying it yields nonsense, and searching the document finds
+            // nothing. The map says which character each glyph came from.
+            startObject(base + 4)
+            writeStream(out, "", toUnicodeCMap(font).latin1())
+        }
+
+        /** Every glyph the document draws in this font. */
+        private fun usedGlyphs(font: TrueTypeFont): Set<Int> = buildSet {
+            add(0)
+            for (text in drawn) {
+                var index = 0
+                while (index < text.length) {
+                    val codePoint = text.codePointAt(index)
+                    add(font.glyph(codePoint))
+                    index += Character.charCount(codePoint)
+                }
             }
-            out.write(program)
-            write("\nendstream\nendobj\n")
+        }
+
+        /**
+         * The `ToUnicode` CMap: for each glyph the document uses, the character it stands for.
+         *
+         * A PostScript program, which is what the format is, in the shape every producer writes it.
+         */
+        private fun toUnicodeCMap(font: TrueTypeFont): String {
+            val pairs = font.toUnicodeMap(drawn)
+
+            return buildString {
+                append("/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n")
+                append("/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n")
+                append("/CMapName /Adobe-Identity-UCS def\n/CMapType 2 def\n")
+                append("1 begincodespacerange\n<0000> <FFFF>\nendcodespacerange\n")
+
+                // A `bfchar` section may hold a hundred entries; more than that and readers stop.
+                for (chunk in pairs.chunked(BFCHAR_LIMIT)) {
+                    append(chunk.size).append(" beginbfchar\n")
+                    for ((glyph, codePoint) in chunk) {
+                        append("<%04X> <".format(glyph))
+                        // Beyond the Basic Multilingual Plane a character is two UTF-16 units, and
+                        // the map is defined in UTF-16 rather than in code points.
+                        for (unit in Character.toChars(codePoint)) append("%04X".format(unit.code))
+                        append(">\n")
+                    }
+                    append("endbfchar\n")
+                }
+
+                append("endcmap\nCMapName currentdict /CMap defineresource pop\nend\nend\n")
+            }
         }
 
         /**

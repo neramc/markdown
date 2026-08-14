@@ -5,6 +5,7 @@ import dev.starfect.quill.bridge.wire.HtmlNode
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.zip.Inflater
 import java.util.zip.ZipFile
 import java.util.zip.ZipInputStream
 import kotlin.io.path.readBytes
@@ -65,6 +66,44 @@ class ExportTest {
         ZipFile(path.toFile()).use { zip ->
             for (entry in zip.entries()) {
                 put(entry.name, zip.getInputStream(entry).readBytes().toString(StandardCharsets.UTF_8))
+            }
+        }
+    }
+
+    /**
+     * Every stream in a PDF, inflated.
+     *
+     * The drawing operators are inside compressed streams, so asserting on the file's bytes finds
+     * nothing whether the operators are there or not — which is the failure mode worth avoiding, a
+     * test that passes for the wrong reason.
+     */
+    private fun contentStreams(path: Path): String {
+        val bytes = path.readBytes()
+        val text = String(bytes, StandardCharsets.ISO_8859_1)
+        return buildString {
+            var at = text.indexOf("stream\n")
+            while (at >= 0) {
+                val start = at + "stream\n".length
+                val end = text.indexOf("endstream", start)
+                if (end < 0) break
+                val body = bytes.copyOfRange(start, end)
+                runCatching {
+                    val inflater = Inflater()
+                    try {
+                        inflater.setInput(body)
+                        val buffer = ByteArray(1 shl 16)
+                        val out = StringBuilder()
+                        while (!inflater.finished()) {
+                            val count = inflater.inflate(buffer)
+                            if (count <= 0) break
+                            out.append(String(buffer, 0, count, StandardCharsets.ISO_8859_1))
+                        }
+                        out.toString()
+                    } finally {
+                        inflater.end()
+                    }
+                }.onSuccess { append(it) }
+                at = text.indexOf("stream\n", end)
             }
         }
     }
@@ -303,33 +342,49 @@ class ExportTest {
         // characters would be a blank box, and nothing would say so.
         //
         // What this can assert depends on the machine, and being careless about which is which is
-        // how a test comes to assert a property of the *runner* rather than of the code. A build
-        // image carrying DejaVu and nothing else is a legitimate machine, and on one the honest
-        // behaviour is a base-14 PDF plus a report saying so -- not a failure.
+        // how a test comes to assert a property of the *runner* rather than of the code. There are
+        // three machines to be right on, and the exporter behaves differently on each: one with a
+        // Korean font, one with only Latin fonts, and one with no readable font at all. The last
+        // two are legitimate -- most Linux build images are the middle one.
         //
-        // So the branch asks the font library exactly the question the exporter asks it: can
-        // anything here draw *this* text. Asking a weaker one -- whether any font at all exists --
-        // gets a "yes" on a Latin-only machine and then asserts a CID font that was never embedded,
-        // which is a green test on a developer laptop and a red one on CI.
+        // So the branch follows the font the library actually chose. Note that it hands back the
+        // closest partial match rather than nothing when it cannot cover the text, which is the
+        // distinction the earlier version of this test missed: "a font was found" and "the document
+        // can be drawn" are different questions, and only the second one licenses asserting that
+        // there is nothing to warn about.
         val heading = "한국어 제목"
         val paragraph = "한국어 문서입니다."
         val target = temporary("korean.pdf")
         val report = PdfExport.write(target, heading, listOf(element("p", text(paragraph))))
         val text = String(target.readBytes(), StandardCharsets.ISO_8859_1)
 
-        if (FontLibrary.findCovering(paragraph + heading) == null) {
+        val chosen = FontLibrary.findCovering(paragraph + heading)
+        if (chosen == null) {
             assertTrue(
                 report.warning?.contains("No embeddable font") == true,
-                "with no font covering Hangul the export must say so, not produce silent blanks: ${report.warning}",
+                "with no readable font the export must say so, not produce silent blanks: ${report.warning}",
             )
             return
         }
 
+        // Whatever was chosen is embedded. A base-14 font here would mean the Hangul was dropped on
+        // a machine that had something to draw it with.
         assertTrue(text.contains("/Subtype /Type0"), "the exporter must embed a CID font, not a base-14 one")
         assertTrue(text.contains("/Encoding /Identity-H"), "a CID font needs Identity-H")
         assertTrue(text.contains("/FontFile2") || text.contains("/FontFile3"), "the font must be embedded")
-        assertTrue(text.contains("/W ["), "a covering font must carry the widths of the glyphs it drew")
-        assertEquals(null, report.warning, "a font that covers the document has nothing to warn about")
+        assertTrue(text.contains("/W ["), "an embedded font must carry the widths of the glyphs it drew")
+
+        val hangul = (paragraph + heading).codePoints().filter { !Character.isWhitespace(it) }.toArray()
+        if (hangul.all(chosen::covers)) {
+            assertEquals(null, report.warning, "a font that covers the document has nothing to warn about")
+        } else {
+            // The honest outcome on a Latin-only machine: the closest font, plus a report of what it
+            // could not draw. What is not allowed is a file full of blanks and silence.
+            assertTrue(
+                report.warning?.contains("could not draw") == true,
+                "a font missing glyphs must name them rather than drop them quietly: ${report.warning}",
+            )
+        }
     }
 
     @Test
@@ -340,8 +395,11 @@ class ExportTest {
 
         assertTrue(Files.exists(target), "a document with unusual characters should still export")
         // Either every glyph was available, or the caller was told which were not.
-        assertTrue(report.warning == null || report.warning!!.contains("could not draw") ||
-            report.warning!!.contains("No embeddable font"))
+        assertTrue(
+            report.warning == null ||
+                report.warning.contains("could not draw") ||
+                report.warning.contains("No embeddable font"),
+        )
     }
 
     @Test
@@ -350,8 +408,9 @@ class ExportTest {
         val report = PdfExport.write(target, "Rich", sample)
         assertTrue(report.pages >= 1)
         // The content stream is the evidence: a shaded rectangle for the code panel, and the
-        // stroked rules a table draws under each row.
-        val text = String(target.readBytes(), StandardCharsets.ISO_8859_1)
+        // stroked rules a table draws under each row. It is compressed, like every stream in the
+        // file, so the drawing operators have to be inflated rather than read out of the bytes.
+        val text = contentStreams(target)
         assertTrue(text.contains(" re f"), "the code block's panel should be filled")
         assertTrue(text.contains(" l S"), "the table's rules should be stroked")
     }

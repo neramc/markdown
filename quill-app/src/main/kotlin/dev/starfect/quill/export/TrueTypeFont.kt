@@ -1,5 +1,6 @@
 package dev.starfect.quill.export
 
+import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 import java.nio.file.Files
@@ -35,7 +36,7 @@ import kotlin.io.path.nameWithoutExtension
  * rejected rather than half-read.
  */
 public class TrueTypeFont private constructor(
-    /** The font file's bytes, embedded in the PDF as-is. */
+    /** The font file's bytes. */
     public val program: ByteArray,
     public val postScriptName: String,
     private val unitsPerEm: Int,
@@ -48,6 +49,10 @@ public class TrueTypeFont private constructor(
     public val descender: Int,
     /** Whether the file is OpenType with PostScript outlines, which PDF names differently. */
     public val isCompactFontFormat: Boolean,
+    /** Where each table lives in [program]: name to offset and length. */
+    private val tables: Map<String, Pair<Int, Int>>,
+    /** Whether `loca` holds two-byte or four-byte offsets. */
+    private val longLoca: Boolean,
 ) {
 
     /** The glyph for a code point, or 0 — the "missing glyph" box every font has at index 0. */
@@ -98,6 +103,143 @@ public class TrueTypeFont private constructor(
             index += Character.charCount(codePoint)
         }
         return out.copyOf(position)
+    }
+
+    /**
+     * The font reduced to the glyphs in [glyphs], as a font file.
+     *
+     * This is the difference between a usable export and one nobody would send anybody. A CJK font
+     * is a large object — WenQuanYi Zen Hei is eleven megabytes, Noto Sans CJK is more — and
+     * embedding it whole turns a one-page Korean letter into a file bigger than the photographs in
+     * it. What the page actually needs is the few dozen shapes it draws.
+     *
+     * **Glyph numbering is left exactly as it was.** Every unused glyph becomes an empty entry
+     * rather than being squeezed out, which is what makes this safe: the PDF addresses glyphs by
+     * their id through `Identity-H` and `CIDToGIDMap /Identity`, so a subsetter that renumbered
+     * would have to rewrite every string in the document to match, and would silently draw the
+     * wrong letters wherever it did not. Empty entries cost four bytes each.
+     *
+     * Composite glyphs — an accented letter is usually a reference to a letter plus a reference to
+     * an accent — drag in the glyphs they are built from, so the closure is walked before anything
+     * is dropped. Missing that is how a subset ends up drawing an 'e' where 'é' should be.
+     *
+     * Tables the subset does not need go too: the character map (the PDF addresses glyphs directly),
+     * the layout tables, the names. Returns the program unchanged for OpenType/CFF fonts, whose
+     * outlines are in a format this does not read.
+     */
+    public fun subset(glyphs: Set<Int>): ByteArray {
+        if (isCompactFontFormat) return program
+        return runCatching { buildSubset(glyphs) }.getOrDefault(program)
+    }
+
+    private fun buildSubset(glyphs: Set<Int>): ByteArray {
+        val reader = Reader(program)
+        val (locaAt, locaLength) = tables["loca"] ?: return program
+        val (glyfAt, _) = tables["glyf"] ?: return program
+
+        // Where each glyph's outline starts and ends, from `loca`.
+        val entries = if (longLoca) locaLength / 4 else locaLength / 2
+        if (entries < glyphCount + 1) return program
+        val bounds = IntArray(glyphCount + 1) { index ->
+            if (longLoca) reader.u32(locaAt + index * 4).toInt() else reader.u16(locaAt + index * 2) * 2
+        }
+
+        // Glyph 0 is the "missing glyph" box, which a font is required to have and a reader may
+        // draw at any time.
+        val keep = sortedSetOf(0)
+        val pending = ArrayDeque(glyphs.filter { it in 0 until glyphCount })
+        while (pending.isNotEmpty()) {
+            val glyph = pending.removeFirst()
+            if (!keep.add(glyph)) continue
+            for (component in componentsOf(reader, glyfAt, bounds, glyph)) {
+                if (component in 0 until glyphCount && component !in keep) pending.addLast(component)
+            }
+        }
+
+        val last = keep.last()
+        val count = last + 1
+
+        // `glyf` and a matching `loca`, in the long format so no offset can overflow.
+        val outlines = ByteArrayOutputStream()
+        val loca = ByteArray((count + 1) * 4)
+        for (glyph in 0 until count) {
+            putU32(loca, glyph * 4, outlines.size().toLong())
+            if (glyph in keep) {
+                val from = glyfAt + bounds[glyph]
+                val length = bounds[glyph + 1] - bounds[glyph]
+                if (length > 0 && from + length <= program.size) {
+                    outlines.write(program, from, length)
+                    while (outlines.size() % 4 != 0) outlines.write(0)
+                }
+            }
+        }
+        putU32(loca, count * 4, outlines.size().toLong())
+
+        val head = tables["head"]?.first ?: return program
+        val hhea = tables["hhea"]?.first ?: return program
+        val maxp = tables["maxp"]?.first ?: return program
+        val hmtx = tables["hmtx"]?.first ?: return program
+        val metrics = reader.u16(hhea + 34)
+
+        // One advance and side bearing per remaining glyph. Reading past the original's metric
+        // count is not an error: a font stops repeating the advance once it is constant.
+        val widths = ByteArray(count * 4)
+        for (glyph in 0 until count) {
+            val source = hmtx + minOf(glyph, metrics - 1).coerceAtLeast(0) * 4
+            putU16(widths, glyph * 4, reader.u16(source))
+            putU16(widths, glyph * 4 + 2, if (glyph < metrics) reader.u16(source + 2) else 0)
+        }
+
+        fun copy(name: String): ByteArray? = tables[name]?.let { (at, length) ->
+            if (at + length > program.size) null else program.copyOfRange(at, at + length)
+        }
+
+        val newHead = copy("head") ?: return program
+        putU16(newHead, 50, 1) // indexToLocFormat: long
+        val newHhea = copy("hhea") ?: return program
+        putU16(newHhea, 34, count)
+        val newMaxp = copy("maxp") ?: return program
+        putU16(newMaxp, 4, count)
+
+        val subset = buildList {
+            add("head" to newHead)
+            add("hhea" to newHhea)
+            add("maxp" to newMaxp)
+            add("hmtx" to widths)
+            add("loca" to loca)
+            add("glyf" to outlines.toByteArray())
+            // The hinting tables come along when the font has them: without `prep` and `fpgm` a
+            // hinted font's instructions refer to programs that are no longer there.
+            for (name in listOf("cvt ", "fpgm", "prep", "gasp")) copy(name)?.let { add(name to it) }
+        }
+
+        return buildSfnt(reader.u32(0), subset) ?: program
+    }
+
+    /** The glyphs a composite glyph is assembled from, or nothing for a simple one. */
+    private fun componentsOf(reader: Reader, glyfAt: Int, bounds: IntArray, glyph: Int): List<Int> {
+        if (glyph + 1 >= bounds.size) return emptyList()
+        val start = glyfAt + bounds[glyph]
+        if (bounds[glyph + 1] - bounds[glyph] < COMPOSITE_HEADER) return emptyList()
+        if (reader.i16(start) >= 0) return emptyList() // a positive contour count means simple
+
+        val components = mutableListOf<Int>()
+        var at = start + COMPOSITE_HEADER
+        while (true) {
+            val flags = reader.u16(at)
+            components += reader.u16(at + 2)
+            at += 4
+            at += if (flags and ARGS_ARE_WORDS != 0) 4 else 2
+            at += when {
+                flags and HAS_TWO_BY_TWO != 0 -> 8
+                flags and HAS_X_AND_Y_SCALE != 0 -> 4
+                flags and HAS_SCALE != 0 -> 2
+                else -> 0
+            }
+            if (flags and MORE_COMPONENTS == 0) break
+            if (components.size > MAX_COMPONENTS) break
+        }
+        return components
     }
 
     /** Every (glyph, code point) pair actually used by [texts], for the PDF's `ToUnicode` map. */
@@ -203,6 +345,8 @@ public class TrueTypeFont private constructor(
                 ascender = ascender * 1000 / unitsPerEm,
                 descender = descender * 1000 / unitsPerEm,
                 isCompactFontFormat = compact,
+                tables = tables,
+                longLoca = indexToLocFormat == 1,
             )
         }
 
@@ -236,74 +380,110 @@ public class TrueTypeFont private constructor(
             val tableCount = reader.u16(fontOffset + 4)
             if (tableCount <= 0 || tableCount > MAX_TABLES) return null
 
-            // tag, checksum, offset into the collection, length.
-            val records = ArrayList<IntArray>(tableCount)
+            val tables = ArrayList<Pair<String, ByteArray>>(tableCount)
             for (index in 0 until tableCount) {
                 val record = fontOffset + 12 + index * 16
                 if (record + 16 > bytes.size) return null
                 val at = reader.u32(record + 8).toInt()
                 val length = reader.u32(record + 12).toInt()
                 if (at < 0 || length < 0 || at.toLong() + length > bytes.size) return null
-                records += intArrayOf(record, at, length)
+                tables += String(bytes, record, 4, Charsets.ISO_8859_1) to bytes.copyOfRange(at, at + length)
             }
 
-            val total = SFNT_HEADER + tableCount * 16 + records.sumOf { aligned(it[2]) }
-            val out = ByteArray(total)
+            return buildSfnt(reader.u32(fontOffset), tables)
+        }
 
-            fun putU16(at: Int, value: Int) {
-                out[at] = (value ushr 8).toByte()
-                out[at + 1] = value.toByte()
-            }
+        /**
+         * Assembles named tables into a font file.
+         *
+         * Both things that produce a font here — pulling one out of a collection, and cutting one
+         * down to the glyphs a document uses — end up needing the same thing: a table directory in
+         * front of some table data. Checksums are computed rather than carried over, because in one
+         * of those two cases the data is new.
+         */
+        private fun buildSfnt(version: Long, tables: List<Pair<String, ByteArray>>): ByteArray? {
+            if (tables.isEmpty() || tables.size > MAX_TABLES) return null
+            if (tables.any { it.first.length != 4 }) return null
 
-            fun putU32(at: Int, value: Long) {
-                out[at] = (value ushr 24).toByte()
-                out[at + 1] = (value ushr 16).toByte()
-                out[at + 2] = (value ushr 8).toByte()
-                out[at + 3] = value.toByte()
-            }
+            // A table directory is required to be sorted by tag, and readers do binary-search it.
+            val sorted = tables.sortedBy { it.first }
+            val count = sorted.size
+            val out = ByteArray(SFNT_HEADER + count * 16 + sorted.sumOf { aligned(it.second.size) })
 
             // The binary-search hints in an sfnt header are derived from the table count. Readers
             // largely ignore them and validators do not, so they are computed rather than zeroed.
-            val entrySelector = 31 - Integer.numberOfLeadingZeros(tableCount)
+            val entrySelector = 31 - Integer.numberOfLeadingZeros(count)
             val searchRange = (1 shl entrySelector) * 16
-            putU32(0, reader.u32(fontOffset))
-            putU16(4, tableCount)
-            putU16(6, searchRange)
-            putU16(8, entrySelector)
-            putU16(10, tableCount * 16 - searchRange)
+            putU32(out, 0, version)
+            putU16(out, 4, count)
+            putU16(out, 6, searchRange)
+            putU16(out, 8, entrySelector)
+            putU16(out, 10, count * 16 - searchRange)
 
-            var write = SFNT_HEADER + tableCount * 16
+            var write = SFNT_HEADER + count * 16
             var head = -1
-            for ((index, record) in records.withIndex()) {
+            for ((index, table) in sorted.withIndex()) {
+                val (name, data) = table
                 val directory = SFNT_HEADER + index * 16
-                System.arraycopy(bytes, record[0], out, directory, 8) // tag and checksum
-                putU32(directory + 8, write.toLong())
-                putU32(directory + 12, record[2].toLong())
-                System.arraycopy(bytes, record[1], out, write, record[2])
-                if (String(out, directory, 4, Charsets.ISO_8859_1) == "head") head = write
-                write += aligned(record[2])
+                for (character in 0 until 4) out[directory + character] = name[character].code.toByte()
+                putU32(out, directory + 4, checksum(data))
+                putU32(out, directory + 8, write.toLong())
+                putU32(out, directory + 12, data.size.toLong())
+                System.arraycopy(data, 0, out, write, data.size)
+                if (name == "head") head = write
+                write += aligned(data.size)
             }
 
-            // `head.checkSumAdjustment` is a checksum of the entire file, so the copy needs its own.
-            // The spec's recipe: zero the field, sum the file as big-endian u32s, subtract.
+            // `head.checkSumAdjustment` is a checksum of the whole file, so a new file needs a new
+            // one. The specification's recipe: zero the field, sum the file, subtract from a magic
+            // number that exists for no reason beyond being agreed on.
             if (head >= 0 && head + 12 <= out.size) {
-                putU32(head + 8, 0)
-                var sum = 0L
-                val whole = Reader(out)
-                var at = 0
-                while (at < out.size) {
-                    sum = (sum + whole.u32(at)) and 0xFFFFFFFFL
-                    at += 4
-                }
-                putU32(head + 8, (0xB1B0AFBAL - sum) and 0xFFFFFFFFL)
+                putU32(out, head + 8, 0)
+                putU32(out, head + 8, (0xB1B0AFBAL - checksum(out)) and 0xFFFFFFFFL)
             }
 
             return out
         }
 
+        /** A table's checksum: its bytes read as big-endian words, zero-padded, added up. */
+        private fun checksum(bytes: ByteArray): Long {
+            val reader = Reader(bytes)
+            var sum = 0L
+            var at = 0
+            // Reader returns zero past the end, which is exactly the padding the sum is defined over.
+            while (at < bytes.size) {
+                sum = (sum + reader.u32(at)) and 0xFFFFFFFFL
+                at += 4
+            }
+            return sum
+        }
+
+        internal fun putU16(bytes: ByteArray, at: Int, value: Int) {
+            bytes[at] = (value ushr 8).toByte()
+            bytes[at + 1] = value.toByte()
+        }
+
+        internal fun putU32(bytes: ByteArray, at: Int, value: Long) {
+            bytes[at] = (value ushr 24).toByte()
+            bytes[at + 1] = (value ushr 16).toByte()
+            bytes[at + 2] = (value ushr 8).toByte()
+            bytes[at + 3] = value.toByte()
+        }
+
         /** An sfnt table directory starts after twelve bytes, and every table starts on a word. */
         private const val SFNT_HEADER = 12
         private const val MAX_TABLES = 512
+
+        /** A composite glyph's own header, before the first component. */
+        private const val COMPOSITE_HEADER = 10
+        private const val ARGS_ARE_WORDS = 0x0001
+        private const val HAS_SCALE = 0x0008
+        private const val MORE_COMPONENTS = 0x0020
+        private const val HAS_X_AND_Y_SCALE = 0x0040
+        private const val HAS_TWO_BY_TWO = 0x0080
+
+        /** A guard against a corrupt glyph claiming to be built from thousands of others. */
+        private const val MAX_COMPONENTS = 256
 
         private fun aligned(length: Int) = (length + 3) and 3.inv()
 

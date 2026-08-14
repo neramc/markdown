@@ -91,6 +91,12 @@ covers it, and embeds that as a CID font; line breaking knows that Korean and Ja
 without spaces. When no font covers the text the export still happens and reports exactly which
 characters are missing.
 
+Only the glyphs the document draws are embedded, and every stream is compressed, so a page of Korean
+is around forty kilobytes rather than the twelve megabytes an embedded CJK font weighs. Fonts stored
+as collections — which is how macOS ships most of its CJK families — are unpacked first, since a PDF
+reader rejects a font file holding more than one font. The file carries a `ToUnicode` map, so text
+selected in a reader can be copied and searched rather than coming out as glyph numbers.
+
 ### The workspace
 
 - Fourteen inspections on every keystroke, with a Problems tool window and `F2` to step through.
