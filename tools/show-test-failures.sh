@@ -39,10 +39,20 @@ for case in tree.getroot().iter("testcase"):
         message = (bad.get("message") or "").strip()
         if message:
             print(message[:2000])
-        # The first few frames of the body carry the test's own line number, which the message
-        # does not; the rest is the framework and is dropped.
-        body = [line for line in (bad.text or "").splitlines() if line.strip().startswith("at ")]
-        for line in body[:4]:
+        # Two things are worth keeping out of the body. The frames, because the message does not
+        # carry the test's own line number and the first few frames do. And every "Caused by",
+        # because the message of an ExceptionInInitializerError is empty and the sentence that
+        # says what actually went wrong is three levels down the chain -- which is exactly the
+        # case this script was written for.
+        lines = (bad.text or "").splitlines()
+        frames = [line for line in lines if line.strip().startswith("at ")]
+        causes = [
+            line for index, line in enumerate(lines)
+            if line.strip().startswith("Caused by") or (index and lines[index - 1].strip().startswith("Caused by"))
+        ]
+        for line in causes[:8]:
+            print(line.rstrip()[:2000])
+        for line in frames[:4]:
             print(line.rstrip())
         print()
 PY

@@ -94,7 +94,23 @@ jobs:
       # fails with a message that says nothing about the missing tool.
       - name: Install packaging tools
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y fakeroot binutils rpm
+        run: |
+          sudo apt-get update
+          # fakeroot, binutils and rpm are what jpackage shells out to for a .deb and a .rpm.
+          #
+          # The rest is what Skia needs to load at all. The render tests compose the interface onto
+          # a real canvas, and libskiko links against the X and OpenGL client libraries plus
+          # fontconfig; GitHub's arm64 image ships without them, so the library fails to load and
+          # thirteen render tests fail with no explanation beyond "could not initialize class". The
+          # x64 image happens to have them, which is why this only ever broke on one platform.
+          #
+          # fonts-dejavu-core is here for a different reason: with no font on the machine the PDF
+          # exporter takes its "nothing can draw this" path, so the export tests assert the fallback
+          # instead of the thing worth testing.
+          sudo apt-get install -y \
+            fakeroot binutils rpm \
+            libgl1 libglx-mesa0 libxrender1 libxtst6 libxi6 libxext6 \
+            libfontconfig1 libfreetype6 fonts-dejavu-core
 
       # The UI tests compose offscreen through Skia and need no display server.
       - name: Build and test

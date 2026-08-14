@@ -326,6 +326,8 @@ class ShellRenderTest {
         awaitDerivedDocument(file)
         afterOpen()
 
+        SkiaAvailability.require()
+
         val encoded = ImageComposeScene(width = WIDTH, height = HEIGHT, density = Density(1f)).use { scene ->
             scene.setContent {
                 QuillTheme(dark = dark) {

@@ -119,6 +119,8 @@ class WelcomeRenderTest {
     )
 
     private fun render(fileName: String, dark: Boolean, recents: List<RecentProject>): BufferedImage {
+        SkiaAvailability.require()
+
         val encoded = ImageComposeScene(width = WIDTH, height = HEIGHT, density = Density(1f)).use { scene ->
             scene.setContent {
                 QuillTheme(dark = dark) {
