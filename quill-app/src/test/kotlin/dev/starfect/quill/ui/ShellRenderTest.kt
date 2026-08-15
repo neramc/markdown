@@ -187,6 +187,19 @@ class ShellRenderTest {
     }
 
     @Test
+    fun `the minimap draws the shape of the document down the right edge`() {
+        val without = renderShell("minimap-off.png", dark = true, viewMode = ViewMode.EDITOR)
+        val with = renderShell("minimap-on.png", dark = true, viewMode = ViewMode.EDITOR) {
+            controller.updateSettings { settings -> settings.copy(minimap = true) }
+        }
+
+        assertTrue(
+            differingPixelRatio(without, with) > 0.002,
+            "turning the minimap on should change what is on screen",
+        )
+    }
+
+    @Test
     fun `the Settings dialog renders over the shell`() {
         val plain = renderShell("split-plain.png", dark = true, viewMode = ViewMode.SPLIT)
         val dialog = renderShell("settings-dialog.png", dark = true, viewMode = ViewMode.SPLIT) {

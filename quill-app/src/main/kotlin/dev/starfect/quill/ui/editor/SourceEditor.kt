@@ -5,6 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
@@ -159,7 +161,8 @@ public fun SourceEditor(
                 editorWidth = it.size.width
             },
     ) {
-        VerticallyScrollableContainer(scrollState = scrollState, modifier = Modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxSize()) {
+        VerticallyScrollableContainer(scrollState = scrollState, modifier = Modifier.weight(1f).fillMaxHeight()) {
             Row(Modifier.fillMaxWidth()) {
                 if (settings.showLineNumbers) {
                     LineGutter(
@@ -237,7 +240,42 @@ public fun SourceEditor(
                 },
             )
         }
+
+            if (settings.minimap) {
+                Minimap(document.text.text, scrollState, palette)
+            }
+        }
+
+        // Drawn over the scrolling content rather than above it in the column, so the text keeps
+        // the full height of the editor and slides underneath -- which is what makes it read as
+        // pinned rather than as another toolbar.
+        if (settings.stickyHeadings) {
+            StickyHeadings(
+                outline = document.outline,
+                firstVisibleLine = firstVisibleLine(layout, document.text.text, scrollState.value),
+                palette = palette,
+                modifier = Modifier.align(Alignment.TopStart),
+            )
+        }
     }
+}
+
+/**
+ * The first logical line showing in the viewport.
+ *
+ * Taken from the layout the text field produced rather than from a line height, because a wrapped
+ * line occupies several visual rows and a document with any wrapping in it would otherwise report a
+ * line number that drifts further out the further you scroll.
+ */
+private fun firstVisibleLine(layout: TextLayoutResult?, text: String, scrollOffset: Int): Int {
+    val result = layout ?: return 0
+    if (scrollOffset <= 0) return 0
+
+    val visualLine = runCatching { result.getLineForVerticalPosition(scrollOffset.toFloat()) }
+        .getOrNull() ?: return 0
+    val offset = runCatching { result.getLineStart(visualLine) }.getOrNull() ?: return 0
+
+    return text.take(offset.coerceIn(0, text.length)).count { it == '\n' }
 }
 
 /** How tall the slash menu can be, mirroring the value the menu itself uses. */

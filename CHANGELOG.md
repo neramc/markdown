@@ -6,6 +6,50 @@ The sections here are the source of the release notes on GitHub: the publish wor
 section matching the tag it was triggered by, so a release whose notes are wrong is a changelog
 whose notes are wrong, and there is only one place to fix it.
 
+## 1.1.0
+
+### Faster to start
+
+The engine's shared library is five and a half megabytes and used to be inflated out of the jar and
+written to a temporary file on every single launch, then deleted at exit so the next launch could do
+it again. It is now extracted once into the user's cache directory and simply opened thereafter.
+Loading the engine and bringing up the window also no longer wait for each other — they are
+independent, and doing them in sequence cost the sum of two waits where the longer would do.
+
+Settings are read before the window opens rather than after the first frame, so it no longer appears
+in the default theme and then corrects itself. The recent-projects list moved the other way: it
+checks up to thirty directories for still existing, which the welcome window now paints without
+waiting for.
+
+### Settings
+
+Every setting is declared in one place, and the settings file, the dialog, the search and the VS Code
+import are all derived from that declaration. The dialog gained a search box that covers every
+setting by name, by key, or by what it does.
+
+Settings written by 1.0.0 are still read, so nothing is lost on upgrade.
+
+### Import from VS Code
+
+Settings → Import finds VS Code, Insiders, VSCodium, Cursor and Windsurf, and copies across the
+settings that mean the same thing in both editors — font size, tab width, word wrap, line numbers,
+rulers, the save behaviours. Anything without a fair equivalent is listed rather than guessed at.
+
+Language-scoped blocks win over the global value: somebody who wrote `"[markdown]": { … }` has said
+something specific about editing Markdown, which is the only thing Quill does. The file is parsed as
+the JSON-with-comments that VS Code actually writes, so a settings file with comments and a trailing
+comma reads correctly rather than failing.
+
+### Editing
+
+- **Sticky headings.** The headings you are underneath stay pinned above the text as it scrolls, so
+  a long document always says which section you are in.
+- **Minimap.** The whole document in miniature down the right edge; click or drag it to move.
+- **Closing pairs and wrapping.** Typing `(` gives `()`. Selecting a word and typing a backtick
+  gives `` `word` ``. Asterisks and underscores wrap a selection but never close themselves, because
+  `* ` at the start of a line is a bullet.
+- **Save after a pause.** A modified file writes itself once you stop typing, if you ask it to.
+
 ## 1.0.0
 
 The first release.

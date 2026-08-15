@@ -212,6 +212,10 @@ public data class QuillSettings(
     val visualGuideColumn: Int = 0,
     /** Tab width in spaces. */
     val tabWidth: Int = 4,
+    /** Keep the enclosing headings pinned above the text as it scrolls. */
+    val stickyHeadings: Boolean = true,
+    /** Show the whole document in miniature down the right edge. */
+    val minimap: Boolean = false,
     /** Typing an opening bracket, backtick or quote inserts its partner. */
     val autoClosingBrackets: Boolean = true,
     /** Typing a pair character with a selection wraps it rather than replacing it. */

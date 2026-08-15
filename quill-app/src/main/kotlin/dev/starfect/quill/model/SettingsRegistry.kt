@@ -138,6 +138,31 @@ public object SettingsRegistry {
         vsCode = "editor.tabSize",
     )
 
+    public val StickyHeadings: BooleanSetting = BooleanSetting(
+        key = "editor.stickyScroll",
+        title = "Sticky headings",
+        description =
+            "Keep the headings you are underneath pinned above the text while you scroll, so a " +
+                "long document always says which section you are in.",
+        category = SettingCategory.EDITOR,
+        default = true,
+        read = { it.stickyHeadings },
+        write = { settings, value -> settings.copy(stickyHeadings = value) },
+        vsCode = "editor.stickyScroll.enabled",
+    )
+
+    public val Minimap: BooleanSetting = BooleanSetting(
+        key = "editor.minimap",
+        title = "Minimap",
+        description =
+            "Show the whole document in miniature down the right edge. Click or drag it to move.",
+        category = SettingCategory.EDITOR,
+        default = false,
+        read = { it.minimap },
+        write = { settings, value -> settings.copy(minimap = value) },
+        vsCode = "editor.minimap.enabled",
+    )
+
     public val AutoClosingBrackets: BooleanSetting = BooleanSetting(
         key = "editor.autoClosingBrackets",
         title = "Close brackets and quotes",
@@ -343,6 +368,8 @@ public object SettingsRegistry {
         WordWrap,
         HighlightCaretRow,
         VisualGuideColumn,
+        StickyHeadings,
+        Minimap,
         TabWidth,
         AutoClosingBrackets,
         AutoSurround,
