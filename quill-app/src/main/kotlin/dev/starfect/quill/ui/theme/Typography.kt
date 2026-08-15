@@ -23,6 +23,13 @@ import java.io.File
  * packaged against bundles them in its own `lib/fonts`, so they travel with the jlink image at no
  * extra size. On a stock JDK they are absent and the scale falls back to the platform default, which
  * is the right outcome: a missing font should change how the window looks, not stop it opening.
+ *
+ * The runtime carries forty-three faces and this uses nine, so packaging deletes the rest — six and
+ * a half megabytes that shipped on every platform and were never opened. That makes [FACES] a
+ * contract rather than an implementation detail: the packaging step keeps exactly the files named
+ * here, so a face added below without being added there would be deleted on its way into the
+ * package, and the application would silently fall back to the platform default. `UiFontsTest`
+ * pins the list; the build fails if a face it names is not in the runtime.
  */
 public object UiFonts {
 
@@ -32,7 +39,33 @@ public object UiFonts {
             ?.let { File(it, "lib/fonts") }
             ?.takeIf { it.isDirectory }
 
-    private fun family(vararg faces: Triple<String, FontWeight, FontStyle>): FontFamily? {
+    /**
+     * The Inter faces the interface uses.
+     *
+     * Only regular and semibold, because those are the only two weights the type scale asks for.
+     * Compose synthesises anything else, and a synthesised bold is better than shipping a weight
+     * nothing references.
+     */
+    private val UI_FACES = listOf(
+        Triple("Inter-Regular.otf", FontWeight.Normal, FontStyle.Normal),
+        Triple("Inter-Italic.otf", FontWeight.Normal, FontStyle.Italic),
+        Triple("Inter-SemiBold.otf", FontWeight.SemiBold, FontStyle.Normal),
+        Triple("Inter-SemiBoldItalic.otf", FontWeight.SemiBold, FontStyle.Italic),
+    )
+
+    /** The JetBrains Mono faces the editor uses. */
+    private val EDITOR_FACES = listOf(
+        Triple("JetBrainsMono-Regular.ttf", FontWeight.Normal, FontStyle.Normal),
+        Triple("JetBrainsMono-Italic.ttf", FontWeight.Normal, FontStyle.Italic),
+        Triple("JetBrainsMono-Bold.ttf", FontWeight.Bold, FontStyle.Normal),
+        Triple("JetBrainsMono-BoldItalic.ttf", FontWeight.Bold, FontStyle.Italic),
+        Triple("JetBrainsMono-Medium.ttf", FontWeight.Medium, FontStyle.Normal),
+    )
+
+    /** Every font file this needs from the runtime, and the only ones packaging keeps. */
+    public val FACES: List<String> = (UI_FACES + EDITOR_FACES).map { it.first }
+
+    private fun family(faces: List<Triple<String, FontWeight, FontStyle>>): FontFamily? {
         val directory = fontDirectory ?: return null
         val loaded = faces.mapNotNull { (name, weight, style) ->
             directory.resolve(name).takeIf { it.isFile }?.let { Font(it, weight, style) }
@@ -40,28 +73,11 @@ public object UiFonts {
         return loaded.takeIf { it.isNotEmpty() }?.let { FontFamily(it) }
     }
 
-    /**
-     * The UI family: Inter.
-     *
-     * Only regular and semibold are loaded, because those are the only two weights the type scale
-     * uses. Compose synthesises anything else, and a synthesised bold is better than shipping a
-     * weight nothing asks for.
-     */
-    public val Ui: FontFamily = family(
-        Triple("Inter-Regular.otf", FontWeight.Normal, FontStyle.Normal),
-        Triple("Inter-Italic.otf", FontWeight.Normal, FontStyle.Italic),
-        Triple("Inter-SemiBold.otf", FontWeight.SemiBold, FontStyle.Normal),
-        Triple("Inter-SemiBoldItalic.otf", FontWeight.SemiBold, FontStyle.Italic),
-    ) ?: FontFamily.Default
+    /** The UI family: Inter. */
+    public val Ui: FontFamily = family(UI_FACES) ?: FontFamily.Default
 
     /** The editor family: JetBrains Mono. */
-    public val Editor: FontFamily = family(
-        Triple("JetBrainsMono-Regular.ttf", FontWeight.Normal, FontStyle.Normal),
-        Triple("JetBrainsMono-Italic.ttf", FontWeight.Normal, FontStyle.Italic),
-        Triple("JetBrainsMono-Bold.ttf", FontWeight.Bold, FontStyle.Normal),
-        Triple("JetBrainsMono-BoldItalic.ttf", FontWeight.Bold, FontStyle.Italic),
-        Triple("JetBrainsMono-Medium.ttf", FontWeight.Medium, FontStyle.Normal),
-    ) ?: FontFamily.Monospace
+    public val Editor: FontFamily = family(EDITOR_FACES) ?: FontFamily.Monospace
 
     /** Whether the bundled families were found, which the About dialog reports. */
     public val bundled: Boolean = Ui !== FontFamily.Default

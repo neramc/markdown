@@ -36,4 +36,9 @@ opt-level = 3
 lto = "thin"
 codegen-units = 1
 panic = "unwind" # required: extern "C" entry points rely on catch_unwind
-strip = "debuginfo"
+
+# Symbols as well as debug info. A cdylib keeps its dynamic symbol table either way -- that is what
+# the JVM's dlsym reads, and all 27 exported entry points are still there -- so what goes is the
+# static table nothing in a shipped library consults. Half a megabyte, in a file that ships inside
+# the jar on all five platforms.
+strip = "symbols"

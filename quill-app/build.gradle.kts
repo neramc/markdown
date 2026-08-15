@@ -154,6 +154,149 @@ compose.desktop {
     }
 }
 
+// ------------------------------------------------------------------------------------------ size
+
+/*
+ * An installed Quill was 157 MB, and roughly none of that was Quill.
+ *
+ * The three biggest items were the bundled Java runtime's module image (55 MB), Skia (28 MB) and
+ * the JVM itself (28 MB) — so the way to make the application smaller was to stop shipping so much
+ * of other people's software uncompressed and unstripped. Three changes below, each measured on the
+ * real image:
+ *
+ *   compress the runtime  101 MB → 71 MB
+ *   strip the natives      -9 MB
+ *   drop unused fonts    -6.7 MB
+ *
+ * Nothing here changes what the application does; every byte removed is either a duplicate of what
+ * a decompressor can regenerate, a symbol table, or a font nothing asks for.
+ */
+
+/**
+ * Turns on jlink's zip compression for the bundled runtime.
+ *
+ * The Compose plugin models this — `AbstractJLinkTask` has a `compressionLevel` property, and passes
+ * it through to `jlink --compress` — but never sets it and does not expose it in the DSL, so the
+ * runtime ships uncompressed. On this module list that is the single largest saving available:
+ * `lib/modules` goes from 55 MB to 26 MB and the whole runtime from 101 MB to 71 MB, for a runtime
+ * that behaves identically. (`--strip-debug` the plugin *does* pass, which is why the uncompressed
+ * image is 55 MB rather than the 65 MB plain jlink produces.)
+ *
+ * Reaching an internal property by reflection is not free, so it fails loudly rather than quietly:
+ * a plugin upgrade that renames this would otherwise put 30 MB back into every release with nothing
+ * to notice it. `ZIP` maps to `jlink --compress 2`, which is zip-6 — zip-9 measured identically on
+ * this image and costs link time for nothing.
+ */
+fun compressBundledRuntime(task: Task) {
+    val levels = Class.forName(
+        "org.jetbrains.compose.desktop.application.internal.RuntimeCompressionLevel",
+        false,
+        task.javaClass.classLoader,
+    )
+    val zip = levels.enumConstants.first { (it as Enum<*>).name == "ZIP" }
+    val accessor = task.javaClass.methods.firstOrNull { it.name.startsWith("getCompressionLevel") }
+        ?: error(
+            "The Compose plugin's jlink task no longer exposes a compression level. Without it the " +
+                "bundled runtime ships uncompressed and every package grows by about 30 MB — find " +
+                "the replacement in AbstractJLinkTask rather than removing this.",
+        )
+
+    @Suppress("UNCHECKED_CAST")
+    (accessor.invoke(task) as org.gradle.api.provider.Property<Any>).set(zip)
+}
+
+tasks.withType(org.jetbrains.compose.desktop.application.tasks.AbstractJLinkTask::class.java)
+    .configureEach { compressBundledRuntime(this) }
+
+/**
+ * The fonts Quill asks for, which is nine of the forty-three the JetBrains Runtime carries.
+ *
+ * `UiFonts` loads Inter for the interface and JetBrains Mono for the editor out of the runtime's own
+ * `lib/fonts`. Everything else there — Droid Sans, Droid Serif, Fira Code, Inconsolata and eight
+ * JetBrains Mono weights nothing references — is 6.7 MB that ships in every package on every
+ * platform and is never opened.
+ *
+ * This list and `UiFonts.FACES` have to say the same thing, and both directions of drift are silent:
+ * a face added to `UiFonts` and not here is deleted on its way into the package, and one removed
+ * from `UiFonts` and left here just wastes space. `UiFontsTest` compares the two and names this file
+ * when they disagree — a test rather than a clever read of the Kotlin source, because a build script
+ * that parses code is a second thing to get wrong.
+ *
+ * [shrinkAppImage] covers the third case: a runtime that no longer carries a face named here.
+ */
+val bundledFonts = listOf(
+    "Inter-Regular.otf", "Inter-Italic.otf", "Inter-SemiBold.otf", "Inter-SemiBoldItalic.otf",
+    "JetBrainsMono-Regular.ttf", "JetBrainsMono-Italic.ttf", "JetBrainsMono-Bold.ttf",
+    "JetBrainsMono-BoldItalic.ttf", "JetBrainsMono-Medium.ttf",
+)
+
+/**
+ * Strips symbol tables from the bundled native libraries.
+ *
+ * Skia and the JVM arrive carrying full symbol tables — 9 MB between them on Linux — which nothing
+ * in a shipped application reads. The cost is that a native crash log names fewer frames, which is
+ * the trade every distributed JVM already makes; JBR is unusual in not making it.
+ *
+ * Best effort by design. `strip` is a build tool, not a dependency: if it is missing, or refuses a
+ * particular file, the package is a few megabytes larger and still correct. Failing a release build
+ * over a size optimisation would be the wrong trade in the other direction.
+ */
+fun shrinkAppImage(image: File, logger: org.gradle.api.logging.Logger) {
+    if (!image.isDirectory) return
+
+    val fonts = image.walkTopDown().firstOrNull { it.isDirectory && it.path.endsWith("lib/fonts") }
+    if (fonts != null) {
+        val present = fonts.listFiles().orEmpty().map { it.name }.toSet()
+        val missing = bundledFonts.filterNot { it in present }
+        check(missing.isEmpty()) {
+            "the runtime no longer carries ${missing.joinToString()}, which UiFonts loads by name — " +
+                "update both this list and UiFonts, or the application ships with a fallback font"
+        }
+        fonts.listFiles().orEmpty().filter { it.name !in bundledFonts }.forEach { it.delete() }
+    }
+
+    val stripper = when {
+        org.gradle.internal.os.OperatingSystem.current().isLinux -> listOf("strip", "--strip-unneeded")
+        // Apple's strip needs -x: a plain strip of a shared library removes symbols the dynamic
+        // linker still needs and produces a dylib that will not load.
+        org.gradle.internal.os.OperatingSystem.current().isMacOsX -> listOf("strip", "-x", "-S")
+        // Windows keeps debug information in separate .pdb files that are not shipped anyway.
+        else -> return
+    }
+
+    var saved = 0L
+    image.walkTopDown()
+        .filter { it.isFile && (it.name.endsWith(".so") || it.name.endsWith(".dylib")) }
+        .forEach { library ->
+            val before = library.length()
+            val result = runCatching {
+                providers.exec {
+                    commandLine(stripper + library.absolutePath)
+                    isIgnoreExitValue = true
+                }.result.get().exitValue
+            }
+            if (result.isSuccess && result.getOrNull() == 0) saved += before - library.length()
+        }
+
+    if (saved > 0) {
+        logger.lifecycle("Stripped ${saved / 1024 / 1024} MB of symbols from the bundled libraries")
+    } else {
+        logger.info("strip produced no saving; the packaged libraries keep their symbol tables")
+    }
+}
+
+tasks.withType(org.jetbrains.compose.desktop.application.tasks.AbstractJPackageTask::class.java)
+    .configureEach {
+        val log = logger
+        doLast {
+            // The app image directory, whatever the task called it. Only app-image builds have one;
+            // the .deb/.rpm/.dmg tasks package an image that has already been through this.
+            destinationDir.get().asFile.listFiles().orEmpty()
+                .filter { it.isDirectory }
+                .forEach { shrinkAppImage(it, log) }
+        }
+    }
+
 // --------------------------------------------------------------------------------- portable build
 
 /**

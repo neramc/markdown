@@ -75,6 +75,53 @@ The jlink module list is explicit (`java.base`, `java.desktop`, `java.logging`, 
 `java.management`, `jdk.unsupported`). Leaving the plugin to infer it either bloats the runtime
 image or omits something that only fails at runtime.
 
+## Size
+
+An installed Quill is 112 MB, down from 157 MB, and almost none of either number is Quill. Three
+steps in `quill-app/build.gradle.kts`, each measured on the real image:
+
+| | before | after |
+|---|---|---|
+| `lib/runtime/lib/modules` | 55 MB | 25 MB |
+| bundled native libraries | — | −8.5 MB |
+| `lib/runtime/lib/fonts` | 9.2 MB | 2.5 MB |
+| `libquill_core.so` (in the bridge jar) | 5.6 MB | 5.0 MB |
+| **installed** | **157 MB** | **112 MB** |
+
+**The runtime is compressed.** The Compose plugin's jlink task models a compression level and passes
+it to `jlink --compress`, but never sets it and does not expose it in the DSL, so the runtime shipped
+uncompressed. `compressBundledRuntime` sets it by reflection and fails the build loudly if the
+property ever moves — a silent failure here puts 30 MB back into every package with nothing to
+notice it. (`--strip-debug` the plugin does pass, which is why the uncompressed image was 55 MB
+rather than the 65 MB plain jlink produces.)
+
+**This is a real trade, not a free win.** Compressed classes are inflated on every load, and Quill
+ships no CDS archive to skip that. On a benchmark that loads a broad slice of `java.base` and
+`java.desktop` — the classes a first frame needs — the cost measured **+21 ms** (79 ms → 101 ms).
+Only JDK classes are affected; everything in `lib/app` is read from ordinary jars either way. Thirty
+megabytes of permanent disk for twenty-odd milliseconds of one-time work is the right side of that
+trade, but it is a trade. `-J-Dquill.startup.trace=true` prints time-to-first-frame if you want to
+re-measure it.
+
+The compression also does **not** make the download smaller — it makes it slightly larger, because
+`gzip` was already doing this work on the way to disk and now has nothing left to squeeze
+(`lib/modules` through gzip: 17 MB before, 24 MB after). The other two steps roughly cancel that out.
+What changes is what the machine keeps.
+
+**Native libraries are stripped.** Skia and the JVM arrive with full symbol tables, 8.5 MB between
+them, which nothing in a shipped application reads. A native crash log names fewer frames as a
+result — the trade every distributed JVM already makes. Best effort: if `strip` is missing the
+package is bigger and still correct, because failing a release over a size optimisation is the wrong
+trade in the other direction. Windows is skipped, where debug information lives in `.pdb` files that
+are not shipped anyway.
+
+**Unused fonts are dropped.** The JetBrains Runtime carries 43 faces; `UiFonts` loads 9 of them
+(Inter and JetBrains Mono). The rest were 6.7 MB shipped to every platform and never opened. The
+list lives in two places — `bundledFonts` in the build and `UiFonts.FACES` in the application — and
+`UiFontsTest` fails if they disagree, because the failure is otherwise invisible: a face added to
+one and not the other is deleted on its way into the package and the UI quietly falls back to the
+platform default.
+
 ## ProGuard
 
 The release build shrinks and optimises but **does not obfuscate**. Renaming buys nothing for a

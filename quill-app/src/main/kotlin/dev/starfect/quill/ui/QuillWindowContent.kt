@@ -78,6 +78,10 @@ public fun QuillWindowContent(
 
     val surfaces = LocalSurfaceStyle.current
 
+    // The first time this composes is the first time there is anything to look at, which is what
+    // "started" means to somebody waiting for it. See Startup.
+    androidx.compose.runtime.SideEffect { dev.starfect.quill.Startup.firstFrame() }
+
     // Focus Mode is a different window rather than the same window with things hidden. Everything
     // it removes — the stripes, the docks, the tabs, the status bar — is a place the eye goes when
     // the sentence is not coming, and leaving any of them in defeats the point.

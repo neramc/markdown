@@ -77,6 +77,7 @@ public fun main(arguments: Array<String>) {
         return
     }
 
+    Startup.begin()
     val engineTask = CompletableFuture.supplyAsync { QuillEngine.create(darkTheme = true) }
 
     val settingsStore = SettingsStore()
