@@ -65,7 +65,18 @@ public sealed class InstallEngine(IPlatformIntegration platform)
             .ConfigureAwait(false);
 
         var executablePath = Path.Combine(root, ProductInfo.ExecutableRelativePath.Replace('\\', Path.DirectorySeparatorChar));
-        var uninstallerPath = Path.Combine(root, ProductInfo.UninstallerFileName);
+
+        // Everything after this point — both shortcuts, the file association, the Apps & features
+        // icon and the uninstall command — is built from this one path. If the payload does not
+        // actually contain it, every one of those points at nothing, and the installer would report
+        // success while leaving an installation that cannot be launched or removed. Failing here
+        // instead means a mismatched payload is caught the first time anybody runs setup.
+        if (!File.Exists(executablePath))
+        {
+            throw new InvalidDataException(
+                $"The payload does not contain '{ProductInfo.ExecutableRelativePath}'. It was built " +
+                "from something that is not a Windows application image.");
+        }
 
         progress?.Report(new InstallProgress("Registering with Windows", index.TotalBytes, index.TotalBytes));
 
@@ -97,8 +108,10 @@ public sealed class InstallEngine(IPlatformIntegration platform)
             DisplayVersion: index.Version,
             Publisher: ProductInfo.Publisher,
             InstallLocation: root,
-            UninstallCommand: $"\"{uninstallerPath}\"",
-            QuietUninstallCommand: $"\"{uninstallerPath}\" /S",
+            // Apps & features runs the application itself, which knows how to remove the
+            // installation it is part of. Nothing extra is installed for this to work.
+            UninstallCommand: $"\"{executablePath}\" {ProductInfo.UninstallSwitch}",
+            QuietUninstallCommand: $"\"{executablePath}\" {ProductInfo.UninstallSwitch} /S",
             DisplayIcon: executablePath,
             HelpLink: ProductInfo.HelpLink,
             EstimatedSizeKilobytes: Math.Max(1, index.TotalBytes / 1024)));

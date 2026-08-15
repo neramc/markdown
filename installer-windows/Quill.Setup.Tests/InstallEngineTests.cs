@@ -26,7 +26,7 @@ public sealed class InstallEngineTests
         var result = await engine.InstallAsync(payload, workspace.Options());
 
         Assert.False(result.WasUpgrade);
-        Assert.True(File.Exists(Path.Combine(workspace.InstallRoot, "bin", "Quill.exe")));
+        Assert.True(File.Exists(Path.Combine(workspace.InstallRoot, ProductInfo.ExecutableRelativePath)));
         Assert.True(File.Exists(result.ManifestPath));
 
         var manifest = result.Manifest;
@@ -43,7 +43,7 @@ public sealed class InstallEngineTests
     }
 
     [Fact]
-    public async Task The_uninstall_entry_points_at_the_installed_uninstaller()
+    public async Task The_uninstall_entry_runs_the_application_itself()
     {
         using var workspace = new TemporaryWorkspace();
         workspace.AddDefaultAppImage();
@@ -58,10 +58,15 @@ public sealed class InstallEngineTests
         Assert.Equal("Quill", entry.DisplayName);
         Assert.Equal("4.5.6", entry.DisplayVersion);
         Assert.Equal(workspace.InstallRoot, entry.InstallLocation);
-        Assert.Contains(ProductInfo.UninstallerFileName, entry.UninstallCommand, StringComparison.Ordinal);
+        // Uninstall runs the installed application, not a separate remover. Nothing else is placed
+        // in the install root for this, which is the whole point: there is no second executable to
+        // ship, to keep in step with the app, or to go missing.
+        Assert.Equal(
+            $"\"{Path.Combine(workspace.InstallRoot, ProductInfo.ExecutableRelativePath)}\" {ProductInfo.UninstallSwitch}",
+            entry.UninstallCommand);
 
-        // Apps & features runs QuietUninstallString for a silent removal; without /S the uninstaller
-        // would pop a window during an unattended uninstall.
+        // Apps & features runs QuietUninstallString for a silent removal; without /S the application
+        // would pop a confirmation during an unattended uninstall.
         Assert.EndsWith("/S\"", entry.QuietUninstallCommand + "\"", StringComparison.Ordinal);
         Assert.True(entry.EstimatedSizeKilobytes > 0);
     }
@@ -81,7 +86,9 @@ public sealed class InstallEngineTests
 
         Assert.Equal(2, result.Manifest.Shortcuts.Count);
         Assert.All(platform.Shortcuts, shortcut =>
-            Assert.Equal(Path.Combine(workspace.InstallRoot, "bin", "Quill.exe"), shortcut.TargetPath));
+            Assert.Equal(
+                Path.Combine(workspace.InstallRoot, ProductInfo.ExecutableRelativePath),
+                shortcut.TargetPath));
         Assert.All(result.Manifest.Shortcuts, path => Assert.True(File.Exists(path)));
     }
 
@@ -132,7 +139,7 @@ public sealed class InstallEngineTests
     }
 
     [Fact]
-    public async Task The_path_entry_is_the_launcher_directory_not_the_install_root()
+    public async Task The_path_entry_is_the_directory_the_launcher_is_in()
     {
         using var workspace = new TemporaryWorkspace();
         workspace.AddDefaultAppImage();
@@ -142,7 +149,10 @@ public sealed class InstallEngineTests
         await using var payload = workspace.OpenPayload();
         var result = await new InstallEngine(platform).InstallAsync(payload, workspace.Options(path: true));
 
-        var expected = Path.Combine(workspace.InstallRoot, "bin");
+        // In jpackage's Windows layout the launcher sits at the root, so that is what goes on
+        // PATH. Deriving it from the executable rather than hard-coding a subdirectory is what
+        // keeps this correct either way.
+        var expected = workspace.InstallRoot;
         Assert.Equal(expected, result.Manifest.PathEntry);
         Assert.Equal([expected], platform.PathEntries(InstallScope.CurrentUser));
     }
@@ -181,6 +191,34 @@ public sealed class InstallEngineTests
         Assert.Equal(InstallScope.AllUsers, result.Manifest.Scope);
         Assert.NotNull(platform.UninstallEntryFor(InstallScope.AllUsers));
         Assert.Null(platform.UninstallEntryFor(InstallScope.CurrentUser));
+    }
+
+    [Fact]
+    public async Task A_payload_without_the_launcher_is_refused_instead_of_registered()
+    {
+        // Everything Windows learns about Quill is built from one path. When that path is not in the
+        // payload — a payload packed from the Linux app image, say, where the launcher is under
+        // bin/ — the old behaviour was to install happily and register two shortcuts, a file
+        // handler and an uninstall command that all pointed at a file that was never there. Setup
+        // said "Finished" and left something that could neither be launched nor removed.
+        using var workspace = new TemporaryWorkspace();
+        workspace.AddSourceFile("bin/Quill", "an app image for the wrong platform");
+        workspace.AddSourceFile("lib/app/quill-app.jar", "PK fake jar");
+        await workspace.BuildPayloadAsync();
+
+        var platform = workspace.CreatePlatform();
+        await using var payload = workspace.OpenPayload();
+
+        var failure = await Assert.ThrowsAsync<InvalidDataException>(
+            () => new InstallEngine(platform).InstallAsync(payload, workspace.Options()));
+
+        Assert.Contains(ProductInfo.ExecutableRelativePath, failure.Message, StringComparison.Ordinal);
+
+        // Nothing was registered, so there is no entry in Apps & features pointing at a broken
+        // installation and no shortcut on the desktop that does nothing.
+        Assert.Null(platform.UninstallEntryFor(InstallScope.CurrentUser));
+        Assert.Empty(platform.Shortcuts);
+        Assert.Empty(platform.Associations);
     }
 
     [Fact]

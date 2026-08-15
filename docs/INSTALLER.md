@@ -12,16 +12,15 @@ footprint and the elevation model — all of which an MSI decides for you.
 
 | Project | Target | What it is |
 |---|---|---|
-| `Quill.Setup.Core` | `net10.0` + `net10.0-windows` | Install and uninstall engines, manifest, payload format, platform abstraction. |
+| `Quill.Setup.Core` | `net10.0` + `net10.0-windows` | Install engine, manifest, payload format, platform abstraction. |
 | `Quill.Installer` | `net10.0` + `net10.0-windows` | The Avalonia wizard → `QuillSetup.exe`. |
-| `Quill.Uninstaller` | `net10.0` + `net10.0-windows` | The remover → `QuillUninstall.exe`. |
 | `Quill.Setup.Pack` | `net10.0` | Build-time tool that packs an app image into a payload archive. |
-| `Quill.Setup.Tests` | `net10.0` | xUnit tests for the engines. |
+| `Quill.Setup.Tests` | `net10.0` | xUnit tests for the engine. |
 | `Quill.Setup.UiTests` | `net10.0` | Headless Avalonia tests that render the real windows. |
 
 The dual targeting is deliberate. Everything except the Windows integration compiles into plain
-`net10.0`, which is what lets the install and uninstall sequences be tested — and the wizard be
-developed and screenshotted — on a machine that is not Windows. The shipped binaries are always
+`net10.0`, which is what lets the install sequence be tested — and the wizard be developed and
+screenshotted — on a machine that is not Windows. The shipped binaries are always
 published from `net10.0-windows`.
 
 ## Installing is recorded, not inferred
@@ -87,20 +86,35 @@ Install: files → manifest → shortcuts, associations, PATH → uninstall entr
 partway, what exists on disk is a prefix of a valid installation rather than a shortcut aiming at
 nothing, and everything that did complete is already recorded.
 
-Uninstall is the reverse: uninstall entry → associations → PATH → shortcuts → files → directories,
-deepest first. The uninstaller runs from inside the folder it is deleting and cannot remove its own
-running image, so a root that could not be emptied is handed to a detached `cmd` that removes it
-after the process exits.
+### Uninstall is not part of this solution
+
+There is no uninstaller executable. Quill removes itself: the registered `UninstallString` is
+`"<root>\bin\Quill.exe" --uninstall`, and the removal lives in the application, in
+`dev.starfect.quill.install.Uninstall`.
+
+This deleted a hundred and three megabytes — a self-contained .NET application whose only job was to
+delete files, shipped in every release and then left in the install folder forever, larger than the
+editor it removed. It also removed a whole class of failure: the remover can no longer be missing,
+be the wrong version, or disagree with what it is removing, because it *is* what it is removing.
+
+The order is the install order backwards — uninstall entry → associations → PATH → shortcuts →
+files → directories, deepest first — but it happens in two halves, because Windows will not unlink a
+running executable or a loaded DLL and an installed Quill is a JVM, a Skia library and forty
+megabytes of open class files. The registrations and shortcuts go immediately; the files are handed
+to a script in `%TEMP%` that waits for Quill's process to exit and then removes them. Directories go
+with plain `rd`, never `rd /s`, so a user who installed into a folder holding their own files keeps
+those files.
 
 ## Command line
 
-Both executables accept `/S` for a silent run, which is the convention Apps & features invokes.
+`QuillSetup.exe` and `Quill.exe --uninstall` both accept `/S` for a silent run, which is the
+convention Apps & features invokes.
 
 ```
 QuillSetup.exe /S                                  # per-user, default components
 QuillSetup.exe /S --all-users --target "C:\Apps\Quill"
 QuillSetup.exe /S --start-menu --associate         # only these components
-QuillUninstall.exe /S
+Quill.exe --uninstall /S
 ```
 
 Passing no component switch means "use the defaults"; passing any means the absent ones are off.

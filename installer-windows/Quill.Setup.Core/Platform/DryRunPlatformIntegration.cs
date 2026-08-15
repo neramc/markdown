@@ -68,9 +68,6 @@ public sealed class DryRunPlatformIntegration : IPlatformIntegration
     /// <summary>What <see cref="RelaunchElevatedAsync"/> returns.</summary>
     public bool ElevationAccepted { get; set; } = true;
 
-    /// <summary>Directory handed to <see cref="ScheduleSelfDelete"/>, if any.</summary>
-    public string? ScheduledSelfDelete { get; private set; }
-
     /// <inheritdoc />
     public string GetDefaultInstallRoot(InstallScope scope) => scope switch
     {
@@ -100,20 +97,9 @@ public sealed class DryRunPlatformIntegration : IPlatformIntegration
         _shortcuts[shortcut.ShortcutPath] = shortcut;
 
         // A real .lnk cannot be written portably, but writing *something* means a test can assert
-        // the uninstaller cleaned the file system up as well as the in-memory state.
+        // the shortcut reached the file system as well as the in-memory state.
         Directory.CreateDirectory(Path.GetDirectoryName(shortcut.ShortcutPath)!);
         File.WriteAllText(shortcut.ShortcutPath, shortcut.TargetPath);
-    }
-
-    /// <inheritdoc />
-    public void DeleteShortcut(string shortcutPath)
-    {
-        Record($"DeleteShortcut {shortcutPath}");
-        _shortcuts.TryRemove(shortcutPath, out _);
-        if (File.Exists(shortcutPath))
-        {
-            File.Delete(shortcutPath);
-        }
     }
 
     /// <inheritdoc />
@@ -122,13 +108,6 @@ public sealed class DryRunPlatformIntegration : IPlatformIntegration
         ArgumentNullException.ThrowIfNull(entry);
         Record($"WriteUninstallEntry {scope} {entry.DisplayName} {entry.DisplayVersion}");
         _uninstallEntries[scope] = entry;
-    }
-
-    /// <inheritdoc />
-    public void DeleteUninstallEntry(InstallScope scope)
-    {
-        Record($"DeleteUninstallEntry {scope}");
-        _uninstallEntries.TryRemove(scope, out _);
     }
 
     /// <inheritdoc />
@@ -141,20 +120,6 @@ public sealed class DryRunPlatformIntegration : IPlatformIntegration
         ArgumentNullException.ThrowIfNull(association);
         Record($"RegisterFileAssociation {scope} {association.Extension} -> {association.ProgId}");
         _associations[association.Extension] = association;
-    }
-
-    /// <inheritdoc />
-    public void UnregisterFileAssociation(InstallScope scope, string extension, string progId)
-    {
-        Record($"UnregisterFileAssociation {scope} {extension} ({progId})");
-
-        // Only remove our own registration: another editor may have taken the extension over since
-        // installation, and stealing it back on uninstall would be worse than leaving it.
-        if (_associations.TryGetValue(extension, out var existing) &&
-            string.Equals(existing.ProgId, progId, StringComparison.OrdinalIgnoreCase))
-        {
-            _associations.TryRemove(extension, out _);
-        }
     }
 
     /// <inheritdoc />
@@ -172,19 +137,6 @@ public sealed class DryRunPlatformIntegration : IPlatformIntegration
     }
 
     /// <inheritdoc />
-    public void RemoveFromPath(InstallScope scope, string directory)
-    {
-        Record($"RemoveFromPath {scope} {directory}");
-        if (_paths.TryGetValue(scope, out var entries))
-        {
-            lock (entries)
-            {
-                entries.RemoveAll(entry => string.Equals(entry, directory, StringComparison.OrdinalIgnoreCase));
-            }
-        }
-    }
-
-    /// <inheritdoc />
     public void NotifyShellOfChanges() => Record("NotifyShellOfChanges");
 
     /// <inheritdoc />
@@ -194,13 +146,6 @@ public sealed class DryRunPlatformIntegration : IPlatformIntegration
     {
         Record($"RelaunchElevated [{string.Join(' ', arguments)}]");
         return Task.FromResult(ElevationAccepted);
-    }
-
-    /// <inheritdoc />
-    public void ScheduleSelfDelete(string directory)
-    {
-        Record($"ScheduleSelfDelete {directory}");
-        ScheduledSelfDelete = directory;
     }
 
     private void Record(string operation)

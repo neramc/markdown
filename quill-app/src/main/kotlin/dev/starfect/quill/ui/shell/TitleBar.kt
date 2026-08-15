@@ -487,6 +487,19 @@ private fun MenuScope.mainMenu(
 
         passiveItem { MenuSeparator() }
 
+        // Under Help rather than hidden in Settings, and phrased as what it does. An application
+        // that can be removed from inside itself is the reason there is no separate uninstaller in
+        // the install folder or in the release.
+        selectableItem(
+            selected = false,
+            onClick = {
+                dismiss()
+                controller.showDialog(Dialog.UNINSTALL)
+            },
+        ) { Text("Uninstall Quill…") }
+
+        passiveItem { MenuSeparator() }
+
         selectableItem(
             selected = false,
             onClick = {

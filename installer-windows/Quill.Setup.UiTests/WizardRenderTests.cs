@@ -11,12 +11,12 @@ using Quill.Setup.Core;
 namespace Quill.Setup.UiTests;
 
 /// <summary>
-/// Renders the installer wizard and the uninstaller offscreen and checks that they draw.
+/// Renders the installer offscreen and checks that it draws.
 /// </summary>
 /// <remarks>
-/// The windows under test are the shipped ones, constructed with the shipped view models against a
+/// The window under test is the shipped one, constructed with the shipped view model against a
 /// dry-run integration. What is being verified is that the XAML loads, every resource key resolves,
-/// compiled bindings find their properties, and each page produces pixels — the class of failure
+/// compiled bindings find their properties, and each state produces pixels — the class of failure
 /// that only shows up when the window is actually shown, and that a Windows-only manual test would
 /// otherwise be the only way to catch.
 /// </remarks>
@@ -155,73 +155,6 @@ public sealed class WizardRenderTests : IDisposable
         viewModel.TargetDirectory = Path.Combine(_root, "custom");
         viewModel.AllUsers = false;
         Assert.Equal(Path.Combine(_root, "custom"), viewModel.TargetDirectory);
-    }
-
-    [AvaloniaFact]
-    public async Task The_uninstaller_renders_a_real_installation_and_its_result()
-    {
-        // Against a real installation, not an empty directory: the confirmation page's whole job is
-        // to summarise what is about to be deleted, and a page rendered with nothing to delete would
-        // prove only that the window opens.
-        var platform = new DryRunPlatformIntegration(_root);
-        var installRoot = await InstallSampleAsync(platform);
-
-        var viewModel = new Quill.Uninstaller.ViewModels.MainWindowViewModel(platform, installRoot);
-        await viewModel.LoadAsync();
-
-        Assert.True(viewModel.IsConfirm);
-        Assert.True(viewModel.CanRemove);
-        Assert.Contains(installRoot, viewModel.Detail, StringComparison.Ordinal);
-
-        var window = new Quill.Uninstaller.Views.MainWindow { DataContext = viewModel };
-        var confirm = Render(window, "uninstaller-1-confirm.png");
-        Assert.True(confirm.Distinct > 32, "the uninstaller confirmation rendered blank");
-
-        var result = await viewModel.RemoveAsync();
-        Assert.NotNull(result);
-        Assert.True(result.Complete, string.Join("; ", result.FilesLeftBehind));
-
-        var finished = Render(window, "uninstaller-2-finished.png");
-        Assert.True(Difference(confirm, finished) > 0.01, "the uninstaller result looks like its confirmation");
-        Assert.False(Directory.Exists(installRoot));
-    }
-
-    [AvaloniaFact]
-    public void The_uninstaller_says_so_when_there_is_no_manifest_to_reverse()
-    {
-        var platform = new DryRunPlatformIntegration(_root);
-        var viewModel = new Quill.Uninstaller.ViewModels.MainWindowViewModel(
-            platform,
-            Path.Combine(_root, "not-an-installation"));
-
-        var window = new Quill.Uninstaller.Views.MainWindow { DataContext = viewModel };
-        var frame = Render(window, "uninstaller-0-nothing.png");
-
-        Assert.True(frame.Distinct > 32);
-        Assert.True(viewModel.IsFinished);
-        Assert.False(viewModel.CanRemove);
-    }
-
-    /// <summary>Packs a small app image and installs it, so a test has something real to remove.</summary>
-    private async Task<string> InstallSampleAsync(IPlatformIntegration platform)
-    {
-        var image = Path.Combine(_root, "image");
-        Directory.CreateDirectory(Path.Combine(image, "bin"));
-        Directory.CreateDirectory(Path.Combine(image, "lib", "app"));
-        await File.WriteAllTextAsync(Path.Combine(image, "bin", "Quill.exe"), "MZ fake launcher");
-        await File.WriteAllTextAsync(Path.Combine(image, "lib", "app", "quill-app.jar"), "PK fake jar");
-        await File.WriteAllTextAsync(Path.Combine(image, "README.txt"), "Quill");
-
-        var archive = Path.Combine(_root, "payload.zip");
-        await PayloadBuilder.CreateAsync(image, archive, "1.2.3");
-
-        var installRoot = Path.Combine(_root, "install", "Quill");
-        await using var payload = File.OpenRead(archive);
-        await new InstallEngine(platform).InstallAsync(
-            payload,
-            new InstallOptions(InstallScope.CurrentUser, installRoot));
-
-        return installRoot;
     }
 
     /// <summary>A wizard view model whose payload assembly embeds nothing, deterministically.</summary>

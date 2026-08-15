@@ -126,7 +126,7 @@ inspection.
 2. **`jvm`** — a Linux/macOS/Windows matrix running `./gradlew build` and
    `packageReleaseDistributionForCurrentOS`, uploading each app image.
 3. **`installer`** — downloads the Windows app image and runs `tools/build-installer.sh`, producing
-   `QuillSetup.exe` and `QuillUninstall.exe`.
+   `QuillSetup.exe`. There is no uninstaller to build: Quill removes itself.
 
 ## Known environment limitations
 

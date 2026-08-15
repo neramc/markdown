@@ -67,14 +67,8 @@ public interface IPlatformIntegration
     /// <summary>Creates or replaces a shortcut.</summary>
     void CreateShortcut(ShortcutDefinition shortcut);
 
-    /// <summary>Removes a shortcut, tolerating one that is already gone.</summary>
-    void DeleteShortcut(string shortcutPath);
-
     /// <summary>Writes the Apps &amp; features entry.</summary>
     void WriteUninstallEntry(InstallScope scope, UninstallEntry entry);
-
-    /// <summary>Removes the Apps &amp; features entry, tolerating one that is already gone.</summary>
-    void DeleteUninstallEntry(InstallScope scope);
 
     /// <summary>Finds an existing installation, for upgrade and repair detection.</summary>
     InstalledProduct? FindInstalledProduct(InstallScope scope);
@@ -82,14 +76,8 @@ public interface IPlatformIntegration
     /// <summary>Registers a file type.</summary>
     void RegisterFileAssociation(InstallScope scope, FileAssociation association);
 
-    /// <summary>Unregisters a file type, leaving another application's registration alone.</summary>
-    void UnregisterFileAssociation(InstallScope scope, string extension, string progId);
-
     /// <summary>Appends a directory to the scope's PATH if it is not already there.</summary>
     void AddToPath(InstallScope scope, string directory);
-
-    /// <summary>Removes a directory from the scope's PATH.</summary>
-    void RemoveFromPath(InstallScope scope, string directory);
 
     /// <summary>Tells the shell that environment or association state changed.</summary>
     void NotifyShellOfChanges();
@@ -99,13 +87,4 @@ public interface IPlatformIntegration
     /// </summary>
     /// <returns><see langword="true"/> when the elevated process started; false when the user declined.</returns>
     Task<bool> RelaunchElevatedAsync(IReadOnlyList<string> arguments, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Arranges for <paramref name="directory"/> to be removed after this process exits.
-    /// </summary>
-    /// <remarks>
-    /// The uninstaller lives inside the directory it is deleting and cannot remove its own running
-    /// image, so the last step has to outlive the process.
-    /// </remarks>
-    void ScheduleSelfDelete(string directory);
 }

@@ -49,14 +49,23 @@ public sealed class TemporaryWorkspace : IDisposable
         File.WriteAllText(absolute, contents);
     }
 
-    /// <summary>Populates the image with a plausible jpackage layout: launcher, runtime, resources.</summary>
+    /// <summary>
+    /// Populates the image with jpackage's <em>Windows</em> layout: launcher, runtime, resources.
+    /// </summary>
+    /// <remarks>
+    /// The launcher is at the root with <c>app\</c> and <c>runtime\</c> beside it, which is what
+    /// jpackage produces on Windows and what the payload is always built from. This fixture used to
+    /// use the Linux layout — <c>bin/Quill</c> and <c>lib/app</c> — which matched a
+    /// <see cref="ProductInfo.ExecutableRelativePath"/> that was also wrong, so the two agreed with
+    /// each other and with nothing that ships.
+    /// </remarks>
     public void AddDefaultAppImage()
     {
-        AddSourceFile("bin/Quill.exe", "MZ fake launcher");
-        AddSourceFile("lib/app/quill-app.jar", "PK fake jar");
-        AddSourceFile("lib/app/quill_core.dll", "fake native engine");
-        AddSourceFile("lib/runtime/bin/java.exe", "fake runtime");
-        AddSourceFile("lib/runtime/lib/modules", "fake modules");
+        AddSourceFile("Quill.exe", "MZ fake launcher");
+        AddSourceFile("app/quill-app.jar", "PK fake jar");
+        AddSourceFile("app/quill_core.dll", "fake native engine");
+        AddSourceFile("runtime/bin/java.exe", "fake runtime");
+        AddSourceFile("runtime/lib/modules", "fake modules");
         AddSourceFile("README.txt", "Quill");
     }
 

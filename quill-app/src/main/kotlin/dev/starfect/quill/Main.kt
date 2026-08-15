@@ -18,11 +18,13 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import dev.starfect.quill.bridge.QuillEngine
 import dev.starfect.quill.bridge.QuillNativeLibraryException
+import dev.starfect.quill.install.Uninstall
 import dev.starfect.quill.io.RecentProject
 import dev.starfect.quill.io.RecentProjects
 import dev.starfect.quill.io.SettingsStore
 import dev.starfect.quill.model.WorkspaceState
 import dev.starfect.quill.ui.QuillWindowContent
+import dev.starfect.quill.ui.dialog.UninstallDialog
 import dev.starfect.quill.ui.shell.QuillTitleBar
 import dev.starfect.quill.ui.shell.QuillToolBar
 import dev.starfect.quill.ui.shell.StartupFailureWindow
@@ -67,6 +69,14 @@ import org.jetbrains.jewel.window.DecoratedWindow
  * not a desktop application's.
  */
 public fun main(arguments: Array<String>) {
+    // Apps & features runs `Quill.exe --uninstall`, and that route must not start an editor: there
+    // is no document, no engine to load and nothing to be slow about. It returns before any of the
+    // rest of this happens.
+    if (arguments.any { it.equals("--uninstall", ignoreCase = true) }) {
+        runUninstaller(silent = arguments.any { it == "/S" || it.equals("--silent", ignoreCase = true) })
+        return
+    }
+
     val engineTask = CompletableFuture.supplyAsync { QuillEngine.create(darkTheme = true) }
 
     val settingsStore = SettingsStore()
@@ -195,7 +205,7 @@ public fun main(arguments: Array<String>) {
                     AcceptDroppedFiles(controller, window)
                     Column(Modifier.fillMaxSize()) {
                         QuillTitleBar(controller, workspace, ::exitApplication)
-                        QuillWindowContent(controller, workspace, Modifier.fillMaxSize())
+                        QuillWindowContent(controller, workspace, Modifier.fillMaxSize(), ::exitApplication)
                     }
                 }
             } else {
@@ -213,7 +223,7 @@ public fun main(arguments: Array<String>) {
                     AcceptDroppedFiles(controller, window)
                     Column(Modifier.fillMaxSize()) {
                         QuillToolBar(controller, workspace, ::exitApplication)
-                        QuillWindowContent(controller, workspace, Modifier.fillMaxSize())
+                        QuillWindowContent(controller, workspace, Modifier.fillMaxSize(), ::exitApplication)
                     }
                 }
             }
@@ -308,6 +318,49 @@ private fun AutoSaveAfterDelay(controller: QuillController, workspace: Workspace
         if (pending.isEmpty()) return@LaunchedEffect
         delay(workspace.settings.autoSaveDelayMillis.toLong())
         pending.forEach { document -> controller.save(document.id) { null } }
+    }
+}
+
+/**
+ * `Quill.exe --uninstall`, which is what Apps & features runs.
+ *
+ * This is the entire uninstaller. There is no second executable, no copy of one in the install
+ * folder, and nothing in the release to download — the application removes itself, so it can never
+ * be missing, never be the wrong version, and never be a hundred megabytes.
+ *
+ * `/S` skips the confirmation, which is the convention Windows uninstallers follow and what
+ * `QuietUninstallString` promises. Without it a small window asks first, because "are you sure"
+ * belongs on the one action here that cannot be undone.
+ *
+ * Nothing but the settings file is read on this path: no engine, no project, no window until the
+ * decision needs one.
+ */
+private fun runUninstaller(silent: Boolean) {
+    if (silent) {
+        val root = Uninstall.locateInstallRoot() ?: return
+        val manifest = Uninstall.readManifest(root).getOrNull() ?: return
+        val state = runCatching { Uninstall.readState(manifest, Uninstall.SystemRegistry) }
+            .getOrDefault(Uninstall.RegistryState())
+        Uninstall.execute(Uninstall.plan(manifest, state))
+        return
+    }
+
+    val dark = runCatching { SettingsStore().load().darkTheme }.getOrDefault(true)
+
+    application {
+        QuillTheme(dark = dark) {
+            Window(
+                onCloseRequest = ::exitApplication,
+                state = rememberWindowState(size = DpSize(560.dp, 380.dp)),
+                title = "Uninstall Quill",
+                icon = painterResource("icons/icon.png"),
+            ) {
+                // The same dialog the Help menu opens. One screen, one decision, one implementation
+                // — an uninstall that behaved differently depending on how it was started would be
+                // two uninstallers again, which is the thing this replaced.
+                UninstallDialog(onDismiss = ::exitApplication, onFinished = ::exitApplication)
+            }
+        }
     }
 }
 

@@ -64,23 +64,6 @@ public sealed partial class WindowsPlatformIntegration : IPlatformIntegration
     public void CreateShortcut(ShortcutDefinition shortcut) => ShellLink.Create(shortcut);
 
     /// <inheritdoc />
-    public void DeleteShortcut(string shortcutPath)
-    {
-        try
-        {
-            if (File.Exists(shortcutPath))
-            {
-                File.Delete(shortcutPath);
-            }
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            // A shortcut that will not delete must not abort the rest of the uninstall; the caller
-            // reports what was left behind.
-        }
-    }
-
-    /// <inheritdoc />
     public void WriteUninstallEntry(InstallScope scope, UninstallEntry entry)
     {
         ArgumentNullException.ThrowIfNull(entry);
@@ -101,14 +84,6 @@ public sealed partial class WindowsPlatformIntegration : IPlatformIntegration
         key.SetValue("InstallDate", DateTimeOffset.UtcNow.ToString("yyyyMMdd"));
         key.SetValue("NoModify", 1, RegistryValueKind.DWord);
         key.SetValue("NoRepair", 1, RegistryValueKind.DWord);
-    }
-
-    /// <inheritdoc />
-    public void DeleteUninstallEntry(InstallScope scope)
-    {
-        using var root = OpenScopeRoot(scope, writable: true);
-        using var uninstall = root.OpenSubKey(UninstallKeyPath, writable: true);
-        uninstall?.DeleteSubKeyTree(ProductInfo.RegistryKeyName, throwOnMissingSubKey: false);
     }
 
     /// <inheritdoc />
@@ -148,8 +123,9 @@ public sealed partial class WindowsPlatformIntegration : IPlatformIntegration
 
         using var extension = classes.CreateSubKey(association.Extension, writable: true);
 
-        // The previous handler is preserved so uninstall can hand the extension back rather than
-        // leaving the user with a file type nothing opens.
+        // The previous handler is preserved so that uninstalling can hand the extension back rather
+        // than leaving the user with a file type nothing opens. Quill reads this value itself when
+        // it removes its own installation.
         if (extension.GetValue(null) is string previous &&
             !string.Equals(previous, association.ProgId, StringComparison.OrdinalIgnoreCase) &&
             extension.GetValue("Quill.Backup") is null)
@@ -161,46 +137,6 @@ public sealed partial class WindowsPlatformIntegration : IPlatformIntegration
 
         using var openWith = extension.CreateSubKey(@"OpenWithProgids", writable: true);
         openWith.SetValue(association.ProgId, Array.Empty<byte>(), RegistryValueKind.None);
-    }
-
-    /// <inheritdoc />
-    public void UnregisterFileAssociation(InstallScope scope, string extension, string progId)
-    {
-        using var root = OpenScopeRoot(scope, writable: true);
-        using var classes = root.OpenSubKey(ClassesKeyPath, writable: true);
-        if (classes is null)
-        {
-            return;
-        }
-
-        classes.DeleteSubKeyTree(progId, throwOnMissingSubKey: false);
-
-        using var extensionKey = classes.OpenSubKey(extension, writable: true);
-        if (extensionKey is null)
-        {
-            return;
-        }
-
-        using (var openWith = extensionKey.OpenSubKey("OpenWithProgids", writable: true))
-        {
-            openWith?.DeleteValue(progId, throwOnMissingValue: false);
-        }
-
-        // Only give the extension back if it is still ours: another editor may have claimed it since
-        // installation, and taking it away from them on our uninstall would be the greater sin.
-        if (extensionKey.GetValue(null) is string current &&
-            string.Equals(current, progId, StringComparison.OrdinalIgnoreCase))
-        {
-            if (extensionKey.GetValue("Quill.Backup") is string previous)
-            {
-                extensionKey.SetValue(null, previous);
-                extensionKey.DeleteValue("Quill.Backup", throwOnMissingValue: false);
-            }
-            else
-            {
-                extensionKey.DeleteValue(string.Empty, throwOnMissingValue: false);
-            }
-        }
     }
 
     /// <inheritdoc />
@@ -219,27 +155,6 @@ public sealed partial class WindowsPlatformIntegration : IPlatformIntegration
 
         var updated = entries.Length == 0 ? directory : $"{string.Join(';', entries)};{directory}";
         Environment.SetEnvironmentVariable("Path", updated, target);
-    }
-
-    /// <inheritdoc />
-    public void RemoveFromPath(InstallScope scope, string directory)
-    {
-        var target = scope == InstallScope.AllUsers
-            ? EnvironmentVariableTarget.Machine
-            : EnvironmentVariableTarget.User;
-
-        var current = ReadRawPath(scope);
-        if (string.IsNullOrEmpty(current))
-        {
-            return;
-        }
-
-        var entries = current
-            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(entry => !string.Equals(entry, directory, StringComparison.OrdinalIgnoreCase))
-            .ToArray();
-
-        Environment.SetEnvironmentVariable("Path", string.Join(';', entries), target);
     }
 
     /// <inheritdoc />
@@ -298,31 +213,6 @@ public sealed partial class WindowsPlatformIntegration : IPlatformIntegration
             // The user dismissed the UAC prompt. That is a decision, not a failure.
             return Task.FromResult(false);
         }
-    }
-
-    /// <inheritdoc />
-    public void ScheduleSelfDelete(string directory)
-    {
-        // cmd waits for this process to release its image, then removes the folder and finally the
-        // batch file itself. A detached, window-less cmd is the only mechanism that survives the
-        // process it is cleaning up after.
-        var script = Path.Combine(Path.GetTempPath(), $"quill-cleanup-{Guid.NewGuid():N}.cmd");
-        var contents =
-            $"""
-            @echo off
-            ping 127.0.0.1 -n 4 >nul
-            rmdir /s /q "{directory}"
-            del "%~f0"
-            """;
-
-        File.WriteAllText(script, contents);
-
-        using var _ = Process.Start(new ProcessStartInfo("cmd.exe", $"/c \"{script}\"")
-        {
-            CreateNoWindow = true,
-            UseShellExecute = false,
-            WindowStyle = ProcessWindowStyle.Hidden,
-        });
     }
 
     private static RegistryKey OpenScopeRoot(InstallScope scope, bool writable)

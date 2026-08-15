@@ -36,7 +36,6 @@
   <ItemGroup>
     <ProjectReference Include="../Quill.Setup.Core/Quill.Setup.Core.csproj" />
     <ProjectReference Include="../Quill.Installer/Quill.Installer.csproj" />
-    <ProjectReference Include="../Quill.Uninstaller/Quill.Uninstaller.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 #
-# Builds QuillSetup.exe and QuillUninstall.exe.
+# Builds QuillSetup.exe.
 #
-# Four stages: publish the uninstaller, stage it into a copy of the application image, pack that
-# into a hash-indexed payload archive, then publish the installer with the archive embedded. The
-# uninstaller goes inside the payload so an installation carries its own remover and the registered
-# UninstallString points at a file that still exists after setup exits.
+# Three stages: stage a copy of the application image, pack it into a hash-indexed payload archive,
+# then publish the installer with the archive embedded.
+#
+# There is no uninstaller to build. Quill removes itself — the registered UninstallString runs
+# `Quill.exe --uninstall`, which is already in the payload because it is the application. That
+# deleted a self-contained .NET executable from the install folder and from every release, and it
+# is why this script has three stages rather than four.
 #
 # The application image itself must be produced on Windows — jpackage cannot cross-build one — so
 # this script takes a prebuilt image via --app-image, which is how the CI Windows job hands its
@@ -13,7 +16,7 @@
 #
 # Usage:
 #   tools/build-installer.sh --app-image <dir> [--version <v>] [--output <dir>] [--runtime win-x64]
-#   tools/build-installer.sh --no-payload      # build both executables with nothing embedded
+#   tools/build-installer.sh --no-payload      # build the installer with nothing embedded
 #
 set -euo pipefail
 
@@ -72,12 +75,7 @@ publish() {
 rm -rf "$PAYLOAD_DIR" "$STAGING"
 mkdir -p "$PAYLOAD_DIR" "$OUTPUT"
 
-# ---------------------------------------------------------------- 1. uninstaller
-
-echo "==> Publishing QuillUninstall.exe"
-publish "Quill.Uninstaller/Quill.Uninstaller.csproj" "$OUTPUT/uninstaller"
-
-# ---------------------------------------------------------------- 2 & 3. stage and pack
+# ---------------------------------------------------------------- 1 & 2. stage and pack
 
 if [[ "$NO_PAYLOAD" -eq 1 ]]; then
   echo "==> Skipping payload; the wizard will report that it carries no application image."
@@ -90,7 +88,6 @@ else
   echo "==> Staging $APP_IMAGE"
   mkdir -p "$STAGING"
   cp -a "$APP_IMAGE/." "$STAGING/"
-  cp "$OUTPUT/uninstaller/QuillUninstall.exe" "$STAGING/QuillUninstall.exe"
 
   echo "==> Packing payload"
   # Packing runs through the same PayloadBuilder the extractor was written against, so the archive
@@ -99,10 +96,10 @@ else
     "$STAGING" "$PAYLOAD_ARCHIVE" "$VERSION"
 fi
 
-# ---------------------------------------------------------------- 4. installer
+# ---------------------------------------------------------------- 3. installer
 
 echo "==> Publishing QuillSetup.exe"
 publish "Quill.Installer/Quill.Installer.csproj" "$OUTPUT/installer"
 
 echo "==> Done"
-ls -lh "$OUTPUT/installer/QuillSetup.exe" "$OUTPUT/uninstaller/QuillUninstall.exe"
+ls -lh "$OUTPUT/installer/QuillSetup.exe"

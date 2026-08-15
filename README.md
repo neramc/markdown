@@ -183,7 +183,7 @@ lines instead.
 └─────────────────────────────────────────────────────────────────────┘
 
   app image ──▶ installer-windows (C# / Avalonia UI 12)
-                QuillSetup.exe · QuillUninstall.exe
+                QuillSetup.exe   (uninstall lives in the app)
 ```
 
 Four decisions shape everything else.
@@ -267,7 +267,7 @@ The Windows installer is a separate .NET 10 solution:
 
 ```bash
 cd installer-windows && dotnet test          # engine and headless UI tests
-tools/build-installer.sh --app-image <dir>   # QuillSetup.exe + QuillUninstall.exe
+tools/build-installer.sh --app-image <dir>   # QuillSetup.exe
 ```
 
 See [`docs/BUILD.md`](docs/BUILD.md) and [`docs/INSTALLER.md`](docs/INSTALLER.md).

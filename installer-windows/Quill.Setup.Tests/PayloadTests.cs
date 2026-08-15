@@ -29,7 +29,7 @@ public sealed class PayloadTests
 
         // Archive paths are always '/'-separated, whatever platform packed them.
         Assert.All(index.Entries, entry => Assert.DoesNotContain('\\', entry.Path));
-        Assert.Contains(index.Entries, entry => entry.Path == "lib/app/quill-app.jar");
+        Assert.Contains(index.Entries, entry => entry.Path == "app/quill-app.jar");
     }
 
     [Fact]
@@ -44,13 +44,15 @@ public sealed class PayloadTests
         var result = await PayloadExtractor.ExtractAsync(payload, target);
 
         Assert.Equal(6, result.Files.Count);
-        Assert.Equal("MZ fake launcher", await File.ReadAllTextAsync(Path.Combine(target, "bin", "Quill.exe")));
-        Assert.Equal("fake modules", await File.ReadAllTextAsync(Path.Combine(target, "lib", "runtime", "lib", "modules")));
+        Assert.Equal("MZ fake launcher", await File.ReadAllTextAsync(Path.Combine(target, "Quill.exe")));
+        Assert.Equal("fake modules", await File.ReadAllTextAsync(Path.Combine(target, "runtime", "lib", "modules")));
 
         // Directories are recorded shallowest first so uninstall can walk them backwards.
-        Assert.Equal(["bin", "lib", "lib/app", "lib/runtime", "lib/runtime/bin", "lib/runtime/lib"],
+        Assert.Equal(["app", "runtime", "runtime/bin", "runtime/lib"],
             result.Directories.Order(StringComparer.Ordinal));
-        Assert.Equal("lib", result.Directories.First(directory => directory.StartsWith("lib", StringComparison.Ordinal)));
+        Assert.Equal(
+            "runtime",
+            result.Directories.First(directory => directory.StartsWith("runtime", StringComparison.Ordinal)));
     }
 
     [Fact]
@@ -88,9 +90,9 @@ public sealed class PayloadTests
         // download or a partially overwritten resource looks like.
         using (var archive = ZipFile.Open(workspace.PayloadArchive, ZipArchiveMode.Update))
         {
-            var entry = archive.GetEntry("bin/Quill.exe")!;
+            var entry = archive.GetEntry("Quill.exe")!;
             entry.Delete();
-            var replacement = archive.CreateEntry("bin/Quill.exe");
+            var replacement = archive.CreateEntry("Quill.exe");
             await using var stream = replacement.Open();
             await stream.WriteAsync(Encoding.UTF8.GetBytes("tampered"));
         }

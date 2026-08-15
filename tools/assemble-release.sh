@@ -77,8 +77,7 @@ setup="$downloaded/packages-windows-setup"
 if [[ -d "$setup" ]]; then
     while IFS= read -r -d '' file; do
         case "$(basename "$file")" in
-            QuillSetup.exe)     cp "$file" "$output/QuillSetup-$version-windows-x64.exe" ;;
-            QuillUninstall.exe) cp "$file" "$output/QuillUninstall-$version-windows-x64.exe" ;;
+            QuillSetup.exe) cp "$file" "$output/QuillSetup-$version-windows-x64.exe" ;;
             *) continue ;;
         esac
         collected=$((collected + 1))

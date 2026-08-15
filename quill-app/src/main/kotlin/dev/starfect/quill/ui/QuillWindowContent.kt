@@ -69,6 +69,10 @@ public fun QuillWindowContent(
     controller: QuillController,
     workspace: WorkspaceState,
     modifier: Modifier = Modifier,
+    // Uninstalling ends with the application gone, and only the caller that owns the Compose
+    // application scope can end it. Defaulting to nothing keeps every other caller — the render
+    // tests included — from having to care.
+    onExit: () -> Unit = {},
 ) {
     val shell = LocalShellPalette.current
 
@@ -170,6 +174,10 @@ public fun QuillWindowContent(
             Dialog.SETTINGS -> SettingsDialog(controller, workspace)
             Dialog.RUN_CONFIGURATIONS -> RunConfigurationsDialog(controller, workspace)
             Dialog.ABOUT -> AboutDialog(controller)
+            Dialog.UNINSTALL -> dev.starfect.quill.ui.dialog.UninstallDialog(
+                onDismiss = controller::dismissDialog,
+                onFinished = onExit,
+            )
             null -> Unit
         }
     }

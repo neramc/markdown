@@ -272,16 +272,14 @@ jobs:
           path: app-image
 
       # Publishing cross-compiles from Linux fine; only the *payload* had to be built on Windows.
-      - name: Build the installer and uninstaller
+      - name: Build the installer
         run: tools/build-installer.sh --app-image app-image/Quill
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: packages-windows-setup
-          path: |
-            installer-windows/artifacts/installer/QuillSetup.exe
-            installer-windows/artifacts/uninstaller/QuillUninstall.exe
+          path: installer-windows/artifacts/installer/QuillSetup.exe
           if-no-files-found: error
 
   # ------------------------------------------------------------------------------------- publish

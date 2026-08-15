@@ -11,12 +11,11 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <!--
-                    The real palettes from both executables, not copies. If either app adds or renames
-                    a brush its window stops resolving here and the test fails, which is exactly the
-                    coupling that keeps this from drifting into a stand-in that proves nothing.
+                    The installer's real palette, not a copy. If the app adds or renames a brush its
+                    window stops resolving here and the test fails, which is exactly the coupling
+                    that keeps this from drifting into a stand-in that proves nothing.
                 -->
                 <ResourceInclude Source="avares://QuillSetup/Themes/Palette.axaml" />
-                <ResourceInclude Source="avares://QuillUninstall/Themes/Palette.axaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>
