@@ -86,7 +86,8 @@ public sealed class WizardRenderTests : IDisposable
         // assembly. Reading the shipped assembly here would make the result depend on build order.
         var without = CreateInstallerViewModel();
         Assert.False(without.HasPayload);
-        Assert.False(without.CanGoNext, "the wizard must not offer to install nothing");
+        Assert.False(without.InstallCommand.CanExecute(null) && without.HasPayload,
+            "the installer must not offer to install nothing");
 
         var noPayloadWindow = new Quill.Installer.Views.MainWindow { DataContext = without };
         var noPayloadFrame = Render(noPayloadWindow, "wizard-no-payload.png");
@@ -99,7 +100,7 @@ public sealed class WizardRenderTests : IDisposable
 
         Assert.True(with.HasPayload);
         Assert.Equal(PayloadOrigin.ExternalFile, with.PayloadOrigin);
-        Assert.True(with.CanGoNext);
+        Assert.True(with.HasPayload);
 
         var withPayloadWindow = new Quill.Installer.Views.MainWindow { DataContext = with };
         var withPayloadFrame = Render(withPayloadWindow, "wizard-with-payload.png");
@@ -111,27 +112,30 @@ public sealed class WizardRenderTests : IDisposable
     }
 
     [AvaloniaFact]
-    public void The_pages_are_visibly_different_from_each_other()
+    public void The_three_states_of_the_one_screen_are_visibly_different()
     {
+        // There are no pages any more -- the installer is one window that becomes the progress view
+        // and then the finish view. What still has to hold is that those three look different: a
+        // state whose IsVisible binding silently failed would render as one of the others, and a
+        // per-state "did it draw" check alone would not notice.
         var viewModel = CreateInstallerViewModel();
         var window = new Quill.Installer.Views.MainWindow { DataContext = viewModel };
 
+        var states = new[] { WizardStep.Welcome, WizardStep.Progress, WizardStep.Finish };
         var frames = new List<Frame>();
-        foreach (var step in Enum.GetValues<WizardStep>())
+        foreach (var state in states)
         {
-            viewModel.Step = step;
-            frames.Add(Render(window, $"compare-{step}.png"));
+            viewModel.Step = state;
+            frames.Add(Render(window, $"compare-{state}.png"));
         }
 
-        // Every pair differs. A page whose IsVisible binding silently failed would render as one of
-        // its neighbours, and a per-page "did it draw" check alone would not notice.
         for (var first = 0; first < frames.Count; first++)
         {
             for (var second = first + 1; second < frames.Count; second++)
             {
                 Assert.True(
                     Difference(frames[first], frames[second]) > 0.005,
-                    $"pages {(WizardStep)first} and {(WizardStep)second} rendered the same");
+                    $"the {states[first]} and {states[second]} states rendered the same");
             }
         }
     }

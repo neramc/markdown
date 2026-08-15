@@ -1,162 +1,97 @@
+<!--
+    One screen.
+
+    An installer for a text editor asks one question — where does it go — and everything else is a
+    default somebody will accept. The six-page wizard this replaces (welcome, licence, scope,
+    components, progress, finish) is a shape inherited from installing software off floppy disks,
+    where each page was a real decision point. Modern Windows installers are a single panel with one
+    button, and that is what this is: the destination, three checkboxes, and Install.
+
+    The same window becomes the progress view and then the finish view rather than navigating
+    anywhere, so nothing moves under the pointer and there is never a Back button to wonder about.
+-->
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:Quill.Installer.ViewModels"
         x:Class="Quill.Installer.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
-        Title="Quill Setup"
-        Width="760" Height="520"
-        MinWidth="680" MinHeight="460"
+        Title="Install Quill"
+        Width="520" Height="400"
+        MinWidth="520" MinHeight="400"
+        CanResize="False"
         WindowStartupLocation="CenterScreen"
-        Background="{StaticResource QuillPageBackground}">
+        Background="{DynamicResource SystemControlBackgroundAltHighBrush}">
 
-    <Window.Styles>
-        <Style Selector="TextBlock.h1">
-            <Setter Property="FontSize" Value="21" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-        </Style>
-        <Style Selector="TextBlock.muted">
-            <Setter Property="Foreground" Value="{StaticResource QuillMutedText}" />
-            <Setter Property="TextWrapping" Value="Wrap" />
-        </Style>
-        <Style Selector="TextBlock.step">
-            <Setter Property="Foreground" Value="{StaticResource QuillSidebarText}" />
-            <Setter Property="FontSize" Value="13" />
-            <Setter Property="Margin" Value="0,0,0,10" />
-        </Style>
-        <Style Selector="TextBlock.step.active">
-            <Setter Property="Foreground" Value="{StaticResource QuillSidebarActiveText}" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-        </Style>
-        <Style Selector="StackPanel.page">
-            <Setter Property="Spacing" Value="14" />
-            <Setter Property="Margin" Value="28,26,28,10" />
-        </Style>
-    </Window.Styles>
+    <Grid Margin="32,28,32,24" RowDefinitions="Auto,*,Auto">
 
-    <Grid ColumnDefinitions="190,*" RowDefinitions="*,Auto">
+        <!-- Identity. Name and version, once, at the top: the only branding an installer needs. -->
+        <StackPanel Grid.Row="0" Spacing="4">
+            <TextBlock Text="Quill" FontSize="28" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding Version}" Opacity="0.6" FontSize="13" />
+        </StackPanel>
 
-        <!-- Sidebar: the wizard's map, so the user can see how far in they are. -->
-        <Border Grid.Row="0" Grid.RowSpan="2" Grid.Column="0" Background="{StaticResource QuillSidebar}">
-            <StackPanel Margin="20,26,16,20" Spacing="0">
-                <TextBlock Text="Quill" FontSize="24" FontWeight="Bold"
-                           Foreground="{StaticResource QuillSidebarActiveText}" />
-                <TextBlock Text="{Binding Version, StringFormat='Version {0}'}"
-                           Foreground="{StaticResource QuillSidebarText}" FontSize="12" Margin="0,2,0,26" />
-
-                <TextBlock Classes="step" Classes.active="{Binding IsWelcome}" Text="1  Welcome" />
-                <TextBlock Classes="step" Classes.active="{Binding IsLicense}" Text="2  License" />
-                <TextBlock Classes="step" Classes.active="{Binding IsLocation}" Text="3  Location" />
-                <TextBlock Classes="step" Classes.active="{Binding IsComponents}" Text="4  Components" />
-                <TextBlock Classes="step" Classes.active="{Binding IsProgress}" Text="5  Install" />
-                <TextBlock Classes="step" Classes.active="{Binding IsFinish}" Text="6  Finish" />
-            </StackPanel>
-        </Border>
-
-        <!-- Page area -->
-        <Panel Grid.Row="0" Grid.Column="1">
-
-            <!-- 1. Welcome -->
-            <StackPanel Classes="page" IsVisible="{Binding IsWelcome}">
-                <TextBlock Classes="h1" Text="{Binding WelcomeHeadline}" />
-                <TextBlock Classes="muted"
-                           Text="Quill is an enterprise Markdown editor with a JetBrains-style workspace and a Rust core engine. This wizard installs it on this computer." />
-
-                <Border Background="#F2F3F5" CornerRadius="6" Padding="14" IsVisible="{Binding !HasPayload}">
-                    <StackPanel Spacing="6">
-                        <TextBlock Text="No application payload" FontWeight="SemiBold"
-                                   Foreground="{StaticResource QuillErrorText}" />
-                        <TextBlock Classes="muted"
-                                   Text="This build of the installer carries no application image, so it cannot install anything. Build one with tools/build-installer.sh, or pass --payload &lt;archive&gt; on the command line." />
-                    </StackPanel>
-                </Border>
-
-                <Border Background="#F2F3F5" CornerRadius="6" Padding="14" IsVisible="{Binding Existing, Converter={x:Static ObjectConverters.IsNotNull}}">
-                    <TextBlock Classes="muted"
-                               Text="An existing installation was found and will be updated in place." />
-                </Border>
-            </StackPanel>
-
-            <!-- 2. License -->
-            <Grid Classes="page" IsVisible="{Binding IsLicense}" RowDefinitions="Auto,*,Auto" Margin="28,26,28,10">
-                <TextBlock Grid.Row="0" Classes="h1" Text="License agreement" Margin="0,0,0,12" />
-                <Border Grid.Row="1" BorderBrush="{StaticResource QuillBorder}" BorderThickness="1" CornerRadius="4">
-                    <ScrollViewer Padding="12">
-                        <SelectableTextBlock Text="{Binding LicenseText}" FontFamily="Consolas,Menlo,monospace"
-                                             FontSize="11" TextWrapping="Wrap" />
-                    </ScrollViewer>
-                </Border>
-                <CheckBox Grid.Row="2" Margin="0,12,0,0" IsChecked="{Binding LicenseAccepted}"
-                          Content="I accept the terms of the license agreement" />
-            </Grid>
-
-            <!-- 3. Location -->
-            <StackPanel Classes="page" IsVisible="{Binding IsLocation}">
-                <TextBlock Classes="h1" Text="Choose the installation" />
-
-                <RadioButton GroupName="scope" IsChecked="{Binding !AllUsers}"
-                             Content="Install for me only (recommended)" />
-                <TextBlock Classes="muted" Margin="26,-8,0,0"
-                           Text="Installs under your user profile. No administrator rights are needed." />
-
-                <RadioButton GroupName="scope" IsChecked="{Binding AllUsers}" Content="Install for all users" />
-                <TextBlock Classes="muted" Margin="26,-8,0,0"
-                           Text="Installs under Program Files for every account on this computer. Windows will ask for administrator rights." />
-
-                <TextBlock Text="Destination folder" FontWeight="SemiBold" Margin="0,10,0,0" />
-                <Grid ColumnDefinitions="*,Auto">
-                    <TextBox Grid.Column="0" Text="{Binding TargetDirectory}" PlaceholderText="Installation folder" />
+        <!-- Ready: the one question, and the defaults. -->
+        <StackPanel Grid.Row="1" Margin="0,24,0,0" Spacing="16" IsVisible="{Binding IsReady}">
+            <StackPanel Spacing="6">
+                <TextBlock Text="Install location" FontSize="13" Opacity="0.75" />
+                <Grid ColumnDefinitions="*,Auto" >
+                    <TextBox Grid.Column="0" Text="{Binding TargetDirectory}" FontSize="13" />
                     <Button Grid.Column="1" Margin="8,0,0,0" Content="Default"
                             Command="{Binding UseDefaultDirectoryCommand}" />
                 </Grid>
-                <TextBlock Foreground="{StaticResource QuillErrorText}" TextWrapping="Wrap"
-                           Text="{Binding TargetDirectoryError}"
+                <TextBlock Text="{Binding TargetDirectoryError}"
+                           Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                           FontSize="12" TextWrapping="Wrap"
                            IsVisible="{Binding TargetDirectoryError, Converter={x:Static ObjectConverters.IsNotNull}}" />
             </StackPanel>
 
-            <!-- 4. Components -->
-            <StackPanel Classes="page" IsVisible="{Binding IsComponents}">
-                <TextBlock Classes="h1" Text="Components" />
-                <TextBlock Classes="muted" Text="Everything here is optional and can be changed later." />
-
-                <CheckBox IsChecked="{Binding CreateStartMenuShortcut}" Content="Add a Start menu shortcut" />
-                <CheckBox IsChecked="{Binding CreateDesktopShortcut}" Content="Add a desktop shortcut" />
-                <CheckBox IsChecked="{Binding AssociateMarkdown}" Content="Open .md and .markdown files with Quill" />
-                <CheckBox IsChecked="{Binding AddToPath}" Content="Add Quill to PATH" />
-
-                <Border Background="#F2F3F5" CornerRadius="6" Padding="14" Margin="0,10,0,0"
-                        IsVisible="{Binding RequiresElevation}">
-                    <TextBlock Classes="muted"
-                               Text="Installing for all users needs administrator rights. Windows will ask for them when you continue." />
-                </Border>
+            <StackPanel Spacing="8">
+                <CheckBox Content="Add a Start menu shortcut" IsChecked="{Binding CreateStartMenuShortcut}" />
+                <CheckBox Content="Add a desktop shortcut" IsChecked="{Binding CreateDesktopShortcut}" />
+                <CheckBox Content="Open .md files with Quill" IsChecked="{Binding AssociateMarkdown}" />
             </StackPanel>
 
-            <!-- 5. Progress -->
-            <StackPanel Classes="page" IsVisible="{Binding IsProgress}" VerticalAlignment="Center">
-                <TextBlock Classes="h1" Text="Installing Quill" />
-                <ProgressBar Minimum="0" Maximum="1" Value="{Binding ProgressFraction}" Height="6" />
-                <TextBlock Classes="muted" Text="{Binding ProgressStage}" />
-            </StackPanel>
+            <TextBlock Text="Installing for everybody on this machine needs administrator rights."
+                       FontSize="12" Opacity="0.6" TextWrapping="Wrap"
+                       IsVisible="{Binding RequiresElevation}" />
 
-            <!-- 6. Finish -->
-            <StackPanel Classes="page" IsVisible="{Binding IsFinish}" VerticalAlignment="Center">
-                <TextBlock Classes="h1" Text="{Binding FinishTitle}" />
-                <TextBlock Classes="muted" Text="{Binding FinishDetail}" />
-                <CheckBox IsChecked="{Binding LaunchOnFinish}" Content="Start Quill now"
-                          IsVisible="{Binding !HasError}" />
-            </StackPanel>
-        </Panel>
+            <!-- An installer built with no payload is a real build output. Saying so beats an
+                 Install button that produces a Quill-shaped empty folder. -->
+            <TextBlock Text="This installer was built without an application payload, so there is nothing to install."
+                       Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                       FontSize="12" TextWrapping="Wrap"
+                       IsVisible="{Binding !HasPayload}" />
+        </StackPanel>
 
-        <!-- Footer -->
-        <Border Grid.Row="1" Grid.Column="1" Background="{StaticResource QuillFooterBackground}"
-                BorderBrush="{StaticResource QuillBorder}" BorderThickness="0,1,0,0"
-                IsVisible="{Binding IsNavigationVisible}">
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="16,12">
-                <Button Content="Back" Command="{Binding BackCommand}" IsEnabled="{Binding CanGoBack}" />
-                <Button Content="{Binding NextLabel}" Command="{Binding NextCommand}"
-                        IsEnabled="{Binding CanGoNext}" IsDefault="True"
-                        Background="{StaticResource QuillAccent}" Foreground="White" />
-                <Button Content="Cancel" Command="{Binding CancelCommand}" IsVisible="{Binding !IsFinish}" />
-            </StackPanel>
-        </Border>
+        <!-- Installing: the same window, with the choices replaced by what is happening. -->
+        <StackPanel Grid.Row="1" Margin="0,24,0,0" Spacing="12"
+                    VerticalAlignment="Center" IsVisible="{Binding IsProgress}">
+            <TextBlock Text="{Binding ProgressStage}" FontSize="14" />
+            <ProgressBar Value="{Binding ProgressFraction}" Maximum="1" Height="4" />
+        </StackPanel>
+
+        <!-- Done. -->
+        <StackPanel Grid.Row="1" Margin="0,24,0,0" Spacing="12"
+                    VerticalAlignment="Center" IsVisible="{Binding IsFinish}">
+            <TextBlock Text="{Binding FinishTitle}" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding FinishDetail}" Opacity="0.7" FontSize="13" TextWrapping="Wrap" />
+            <CheckBox Content="Open Quill now" IsChecked="{Binding LaunchOnFinish}" />
+        </StackPanel>
+
+        <!-- Errors are shown where the eye already is rather than in a message box. -->
+        <TextBlock Grid.Row="1" VerticalAlignment="Bottom" TextWrapping="Wrap" FontSize="12"
+                   Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                   Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" />
+
+        <!-- One primary action, in the corner every Windows dialog puts it. -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right"
+                    Spacing="8" Margin="0,20,0,0">
+            <Button Content="Cancel" Command="{Binding CancelCommand}" IsVisible="{Binding IsReady}" />
+            <Button Content="Install" Classes="accent" MinWidth="104"
+                    Command="{Binding InstallCommand}" IsVisible="{Binding IsReady}"
+                    IsEnabled="{Binding HasPayload}" />
+            <Button Content="Close" Classes="accent" MinWidth="104"
+                    Command="{Binding NextCommand}" IsVisible="{Binding IsFinish}" />
+        </StackPanel>
     </Grid>
 </Window>

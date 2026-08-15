@@ -37,6 +37,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(CanGoBack))]
     [NotifyPropertyChangedFor(nameof(CanGoNext))]
     [NotifyPropertyChangedFor(nameof(NextLabel))]
+    [NotifyPropertyChangedFor(nameof(IsReady))]
     [NotifyPropertyChangedFor(nameof(IsWelcome))]
     [NotifyPropertyChangedFor(nameof(IsLicense))]
     [NotifyPropertyChangedFor(nameof(IsLocation))]
@@ -197,6 +198,31 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             Step = (WizardStep)((int)Step - 1);
         }
+    }
+
+    /// <summary>
+    /// Whether the window is still showing the one screen somebody chooses things on.
+    /// </summary>
+    /// <remarks>
+    /// The wizard steps survive underneath because the engine and its tests are written against
+    /// them, but the window no longer walks through them: an installer for a text editor asks one
+    /// question, and asking it across six pages is a shape inherited from installing software off
+    /// six floppy disks.
+    /// </remarks>
+    public bool IsReady => Step is not (WizardStep.Progress or WizardStep.Finish);
+
+    /// <summary>Installs straight away, from the single screen.</summary>
+    [RelayCommand]
+    private async Task InstallAsync()
+    {
+        // HasPayload matters as much as the directory: an installer built without its payload is a
+        // real build output, and offering to install nothing produces a Quill-shaped empty folder.
+        if (IsBusy || !HasPayload || !string.IsNullOrEmpty(TargetDirectoryError))
+        {
+            return;
+        }
+
+        await RunInstallAsync().ConfigureAwait(true);
     }
 
     [RelayCommand]
