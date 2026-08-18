@@ -28,6 +28,8 @@ import dev.starfect.quill.model.Dock
 import dev.starfect.quill.model.DocumentSession
 import dev.starfect.quill.model.FileNode
 import dev.starfect.quill.model.FindState
+import dev.starfect.quill.model.NavigationHistory
+import dev.starfect.quill.model.NavigationPlace
 import dev.starfect.quill.model.Notification
 import dev.starfect.quill.model.NotificationSeverity
 import dev.starfect.quill.editing.AutoPairs
@@ -459,11 +461,21 @@ public class QuillController(
         derive(id, immediate = true)
     }
 
-    /** Opens [path], focusing it if it is already open. */
-    public fun openFile(path: Path) {
+    /**
+     * Opens [path], focusing it if it is already open.
+     *
+     * [onOpened] runs once the document exists and is in the workspace, which is the only moment
+     * anything can be done to it. Reading a file is asynchronous, so a caller that wants to land on
+     * a particular line cannot simply call this and then jump — the document is not there yet.
+     */
+    public fun openFile(path: Path, onOpened: ((Long) -> Unit)? = null) {
         val existing = _state.value.documents.firstOrNull { it.path == path }
         if (existing != null) {
             update { it.copy(activeDocumentId = existing.id) }
+            // A caller that supplies [onOpened] is placing the caret itself, and recording the
+            // arrival before it moves would leave a history entry at line 1 and — worse, when the
+            // caller is Back — truncate the forward branch it is walking.
+            if (onOpened == null) recordVisit(existing.id) else onOpened(existing.id)
             return
         }
 
@@ -495,6 +507,7 @@ public class QuillController(
                         )
                     }
                     derive(id, immediate = true)
+                    if (onOpened == null) recordVisit(id) else onOpened(id)
                 }
                 .onFailure { failure ->
                     update { it.copy(notification = "Could not open ${path.fileName}: ${failure.message}") }
@@ -730,6 +743,9 @@ public class QuillController(
         update { workspace ->
             val remaining = workspace.documents.filterNot { it.id == id }
             workspace.copy(
+                // The places stay; only the dead id goes. Back still reaches a closed file, by
+                // reopening it.
+                navigation = workspace.navigation.forget(id),
                 documents = remaining,
                 activeDocumentId = if (workspace.activeDocumentId == id) {
                     remaining.lastOrNull()?.id
@@ -939,6 +955,7 @@ public class QuillController(
 
     public fun selectDocument(id: Long) {
         update { it.copy(activeDocumentId = id) }
+        recordVisit(id)
     }
 
     /**
@@ -1607,8 +1624,12 @@ public class QuillController(
         }
     }
 
-    /** Moves the caret to a document offset, used by the outline. */
+    /** Moves the caret to a document offset, used by the outline. Recorded in the history. */
     public fun moveCaret(id: Long, offset: Int) {
+        navigating(id) { placeCaretAt(id, offset) }
+    }
+
+    private fun placeCaretAt(id: Long, offset: Int) {
         updateDocument(id) { session ->
             session.copy(text = session.text.copy(selection = TextRange(offset.coerceIn(0, session.text.text.length))))
         }
@@ -1616,6 +1637,10 @@ public class QuillController(
 
     /** Selects a finding's range, so the problem is visible and not merely scrolled to. */
     public fun goToFinding(id: Long, finding: Finding) {
+        navigating(id) { selectFinding(id, finding) }
+    }
+
+    private fun selectFinding(id: Long, finding: Finding) {
         updateDocument(id) { session ->
             val length = session.text.text.length
             val start = finding.start.coerceIn(0, length)
@@ -1641,6 +1666,130 @@ public class QuillController(
             ordered.lastOrNull { it.start < caret } ?: ordered.last()
         }
         goToFinding(session.id, target)
+    }
+
+    // ---------------------------------------------------------------- navigation history
+
+    /** Where the caret in [session] is, as a place the history can return to. */
+    private fun placeOf(session: DocumentSession): NavigationPlace {
+        val caret = session.caretPosition
+        return NavigationPlace(
+            documentId = session.id,
+            path = session.path,
+            line = caret.line + 1,
+            column = caret.column + 1,
+            label = "${session.displayName}:${caret.line + 1}",
+        )
+    }
+
+    /**
+     * Records a move from one place to another.
+     *
+     * The departure is written into the *current* entry rather than appended, when the history is
+     * already standing in that document — otherwise every jump would leave two entries and Back
+     * would need pressing twice to get anywhere.
+     */
+    private fun recordJump(from: NavigationPlace?, to: NavigationPlace) {
+        update { workspace ->
+            var history = workspace.navigation
+            if (from != null) {
+                val here = history.current
+                history = if (here != null && here.documentId == from.documentId) {
+                    history.reanchor(from)
+                } else {
+                    history.record(from)
+                }
+            }
+            workspace.copy(navigation = history.record(to))
+        }
+    }
+
+    /**
+     * Runs [move] against [id] and records where it went.
+     *
+     * Every deliberate jump in the application goes through here: Go to Line, the outline, a
+     * problem, a search result. Ordinary typing and arrow keys do not, which is the whole point —
+     * a history that records the caret is a history where Back means "up one line".
+     */
+    private fun navigating(id: Long, move: () -> Unit) {
+        val before = _state.value.documents.firstOrNull { it.id == id }?.let(::placeOf)
+        move()
+        val after = _state.value.documents.firstOrNull { it.id == id }?.let(::placeOf) ?: return
+        recordJump(before, after)
+    }
+
+    /** Notes that the reader is now looking at [id], without moving anything. */
+    public fun recordVisit(id: Long) {
+        val session = _state.value.documents.firstOrNull { it.id == id } ?: return
+        val place = placeOf(session)
+        update { workspace ->
+            val here = workspace.navigation.current
+            // Re-selecting the tab you are already on is not somewhere new.
+            if (here?.documentId == id) workspace else workspace.copy(navigation = workspace.navigation.record(place))
+        }
+    }
+
+    /** Steps back to the previous place, reopening its file if the tab has since been closed. */
+    public fun navigateBack() {
+        step { it.back() }
+    }
+
+    /** Steps forward again, undoing a [navigateBack]. */
+    public fun navigateForward() {
+        step { it.forward() }
+    }
+
+    /**
+     * Moves the history cursor with [step] and goes wherever it lands.
+     *
+     * The current entry is re-anchored to the live caret first, so Forward returns to where the
+     * reader was standing rather than to wherever the entry was first written. Without that, a
+     * Back-then-Forward round trip quietly moves the caret, which reads as the arrows being broken.
+     */
+    private fun step(step: (NavigationHistory) -> NavigationHistory) {
+        val workspace = _state.value
+        val anchored = workspace.activeDocument
+            ?.takeIf { it.id == workspace.navigation.current?.documentId }
+            ?.let { workspace.navigation.reanchor(placeOf(it)) }
+            ?: workspace.navigation
+
+        val moved = step(anchored)
+        if (moved.index == workspace.navigation.index && moved === anchored) return
+
+        update { it.copy(navigation = moved) }
+        moved.current?.let(::goTo)
+    }
+
+    /**
+     * Puts the caret at [place], opening its file first when the tab is gone.
+     *
+     * The document id is checked against the workspace rather than trusted, because a place can
+     * outlive its document: the tab was closed, the id was reused by a later document, or the file
+     * was reopened and now has a different one.
+     */
+    private fun goTo(place: NavigationPlace) {
+        val open = place.documentId?.let { id -> _state.value.documents.firstOrNull { it.id == id } }
+        if (open != null) {
+            update { it.copy(activeDocumentId = open.id) }
+            placeCaretAtLine(open.id, place.line, place.column)
+            return
+        }
+
+        val path = place.path ?: return
+        // Re-anchor the place onto the document it just got: the id in the history is dead, and
+        // leaving it dead would make every later Back reopen the file from scratch.
+        openFile(path) { id ->
+            placeCaretAtLine(id, place.line, place.column)
+            update { workspace ->
+                workspace.copy(
+                    navigation = workspace.navigation.copy(
+                        places = workspace.navigation.places.map {
+                            if (it.path == path && it.documentId == null) it.copy(documentId = id) else it
+                        },
+                    ),
+                )
+            }
+        }
     }
 
     // ---------------------------------------------------------------- settings & chrome
@@ -1795,6 +1944,10 @@ public class QuillController(
      * of thing that gets described as "the button does not work".
      */
     public fun goToLine(id: Long, line: Int, column: Int = 1) {
+        navigating(id) { placeCaretAtLine(id, line, column) }
+    }
+
+    private fun placeCaretAtLine(id: Long, line: Int, column: Int) {
         val session = _state.value.documents.firstOrNull { it.id == id } ?: return
         val text = session.text.text
 
@@ -1949,7 +2102,11 @@ public class QuillController(
         val handle = handles[session.id] ?: return
         val name = configuration.name
 
-        scope.launch {
+        // Through [launchTask] so the status bar says something is happening. Exporting a large
+        // document takes long enough to look like nothing happened, and "press Run, nothing
+        // visible, a notification some seconds later" is indistinguishable from a broken button.
+        launchTask(name, cancellable = false) {
+            detail(session.displayName)
             val outcome = withContext(Dispatchers.Default) {
                 runCatching {
                     when (configuration.task) {

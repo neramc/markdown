@@ -176,6 +176,30 @@ public object IdeIcons {
         }
     }
 
+    /**
+     * Back, as an arrow with a shaft.
+     *
+     * A bare chevron would be a smaller icon to draw, and it is what a *disclosure* control uses.
+     * Navigation arrows carry a shaft in every IDE toolbar because that is the difference between
+     * "expand this" and "go there", and the two sit within a few pixels of each other here.
+     */
+    @Composable
+    public fun NavigateBack(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
+        IdeIcon(size, modifier) { unit ->
+            line(3.5f, 8f, 12.5f, 8f, tint, unit)
+            polyline(listOf(7f to 3.5f, 3f to 8f, 7f to 12.5f), tint, unit)
+        }
+    }
+
+    /** Forward. The mirror of [NavigateBack]. */
+    @Composable
+    public fun NavigateForward(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
+        IdeIcon(size, modifier) { unit ->
+            line(3.5f, 8f, 12.5f, 8f, tint, unit)
+            polyline(listOf(9f to 3.5f, 13f to 8f, 9f to 12.5f), tint, unit)
+        }
+    }
+
     /** Expanded disclosure triangle. */
     @Composable
     public fun ChevronDown(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {

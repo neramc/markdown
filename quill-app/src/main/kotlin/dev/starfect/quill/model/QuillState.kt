@@ -315,6 +315,8 @@ public data class WorkspaceState(
     val tasks: List<BackgroundTask> = emptyList(),
     /** A question Quill is waiting on before doing something it cannot undo. */
     val confirm: Confirm? = null,
+    /** Where the reader has been, which is what the toolbar's back and forward arrows walk. */
+    val navigation: NavigationHistory = NavigationHistory(),
 ) {
     val activeDocument: DocumentSession?
         get() = documents.firstOrNull { it.id == activeDocumentId }

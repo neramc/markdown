@@ -173,6 +173,15 @@ internal fun handleShortcut(event: KeyEvent, controller: QuillController): Boole
     }
 
     return when {
+        // Ctrl+Alt+Left/Right walk the navigation history, as they do in every JetBrains IDE.
+        event.isAltPressed && event.key == Key.DirectionLeft -> {
+            controller.navigateBack()
+            true
+        }
+        event.isAltPressed && event.key == Key.DirectionRight -> {
+            controller.navigateForward()
+            true
+        }
         // Ctrl+V is intercepted so a paste goes through the converter rather than through the
         // text field, which would insert the clipboard's plain-text flavour and lose the structure.
         event.key == Key.V && !event.isShiftPressed && !event.isAltPressed -> {

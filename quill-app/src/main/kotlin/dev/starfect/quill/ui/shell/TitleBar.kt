@@ -102,6 +102,7 @@ public fun DecoratedWindowScope.QuillTitleBar(
             MainMenuButton(controller, workspace, onExit)
             ProjectWidget(controller, workspace)
             BranchWidget(workspace)
+            NavigationButtons(controller, workspace)
         }
 
         Row(
@@ -138,6 +139,7 @@ public fun QuillToolBar(controller: QuillController, workspace: WorkspaceState, 
         MainMenuButton(controller, workspace, onExit)
         ProjectWidget(controller, workspace)
         BranchWidget(workspace)
+        NavigationButtons(controller, workspace)
 
         Box(Modifier.weight(1f))
 
@@ -149,17 +151,16 @@ public fun QuillToolBar(controller: QuillController, workspace: WorkspaceState, 
 /** Search Everywhere and Settings, the two actions the New UI keeps at the toolbar's right end. */
 @Composable
 private fun TitleBarActions(controller: QuillController, workspace: WorkspaceState) {
-    IdeActionButton(
-        onClick = { controller.setCommandPaletteVisible(true) },
-        tooltip = "Search Everywhere",
-        shortcut = "Ctrl+Shift+P",
-        selected = workspace.commandPaletteVisible,
-    ) { tint -> IdeIcons.Search(tint) }
+    // The run cluster, then a rule, then the window-wide actions. The rule is what stops the run
+    // triangle from reading as part of the same group as Search: one acts on the document, the
+    // others act on the application.
+    RunWidget(controller, workspace)
 
     val active = workspace.activeRunConfiguration
     IdeActionButton(
         onClick = { active?.let(controller::run) ?: controller.showDialog(Dialog.RUN_CONFIGURATIONS) },
-        tooltip = active?.let { "Run '${it.name}'  Shift+F10" } ?: "Add a run configuration",
+        tooltip = active?.let { "Run '${it.name}'" } ?: "Add a run configuration",
+        shortcut = active?.let { "Shift+F10" },
         enabled = workspace.activeDocument != null,
     ) { tint ->
         // The run triangle is green when there is something to run and takes the ordinary icon
@@ -167,12 +168,204 @@ private fun TitleBarActions(controller: QuillController, workspace: WorkspaceSta
         IdeIcons.Run(if (active != null) LocalShellPalette.current.success else tint)
     }
 
+    MoreActionsButton(controller, workspace)
+
+    Box(Modifier.padding(horizontal = Tokens.Spacing.Tiny)) {
+        ShellDivider(Orientation.Vertical, Modifier.height(Tokens.IconSize))
+    }
+
+    IdeActionButton(
+        onClick = { controller.setCommandPaletteVisible(true) },
+        tooltip = "Search Everywhere",
+        shortcut = "Ctrl+Shift+P",
+        selected = workspace.commandPaletteVisible,
+    ) { tint -> IdeIcons.Search(tint) }
+
     IdeActionButton(
         onClick = { controller.showDialog(Dialog.SETTINGS) },
         tooltip = "Settings",
         shortcut = "Ctrl+Alt+S",
         selected = workspace.dialog == Dialog.SETTINGS,
     ) { tint -> IdeIcons.Gear(tint) }
+}
+
+/**
+ * Back and forward, over the places the reader has been.
+ *
+ * Disabled rather than hidden at the ends of the history, because a pair of arrows that appears and
+ * disappears moves everything beside it — and these sit next to the run controls, which must not
+ * wander. The tooltip names the destination, which is the difference between an arrow you can aim
+ * and one you press to find out.
+ */
+@Composable
+private fun NavigationButtons(controller: QuillController, workspace: WorkspaceState) {
+    val history = workspace.navigation
+
+    IdeActionButton(
+        onClick = controller::navigateBack,
+        tooltip = history.previous?.let { "Back to ${it.label}" } ?: "Back",
+        shortcut = "Ctrl+Alt+Left",
+        enabled = history.canGoBack,
+    ) { tint -> IdeIcons.NavigateBack(tint) }
+
+    IdeActionButton(
+        onClick = controller::navigateForward,
+        tooltip = history.next?.let { "Forward to ${it.label}" } ?: "Forward",
+        shortcut = "Ctrl+Alt+Right",
+        enabled = history.canGoForward,
+    ) { tint -> IdeIcons.NavigateForward(tint) }
+}
+
+/**
+ * The run-configuration widget: the selected configuration's name, or an invitation to make one.
+ *
+ * Empty is the state that matters. A toolbar that shows a disabled dropdown with nothing in it
+ * tells the reader they are missing something without saying what; "Add Configuration" says what to
+ * press. That is what the IDE does with an unconfigured project, and it is the state Quill is in
+ * the first time it opens.
+ */
+@Composable
+private fun RunWidget(controller: QuillController, workspace: WorkspaceState) {
+    val shell = LocalShellPalette.current
+    val active = workspace.activeRunConfiguration
+    var open by remember { mutableStateOf(false) }
+
+    Box {
+        IdeWidgetButton(onClick = { open = !open }, selected = open) {
+            Text(
+                text = active?.name ?: "Add Configuration",
+                fontSize = LocalTypeScale.current.default,
+                color = if (active != null) shell.text else shell.secondaryText,
+                maxLines = 1,
+                modifier = Modifier.padding(horizontal = 2.dp),
+            )
+            Box(Modifier.padding(start = 4.dp)) { IdeIcons.WidgetChevron(shell.mutedText) }
+        }
+
+        if (open) {
+            PopupMenu(
+                onDismissRequest = {
+                    open = false
+                    true
+                },
+                horizontalAlignment = Alignment.Start,
+                modifier = Modifier.width(280.dp),
+            ) {
+                workspace.runConfigurations.forEach { configuration ->
+                    selectableItem(
+                        selected = configuration.id == active?.id,
+                        onClick = {
+                            open = false
+                            controller.selectRunConfiguration(configuration.id)
+                        },
+                    ) { Text(configuration.name) }
+                }
+
+                if (workspace.runConfigurations.isNotEmpty()) {
+                    passiveItem { MenuSeparator() }
+                }
+
+                selectableItem(
+                    selected = false,
+                    onClick = {
+                        open = false
+                        controller.showDialog(Dialog.RUN_CONFIGURATIONS)
+                    },
+                ) { Text("Edit Configurations\u2026") }
+            }
+        }
+    }
+}
+
+/**
+ * The overflow menu at the end of the toolbar.
+ *
+ * Everything here has a home elsewhere — the main menu, a shortcut, the status bar. It exists
+ * because the actions people reach for most often should be one press from the toolbar, and the
+ * toolbar has room for about six.
+ */
+@Composable
+private fun MoreActionsButton(controller: QuillController, workspace: WorkspaceState) {
+    var open by remember { mutableStateOf(false) }
+
+    Box {
+        IdeActionButton(
+            onClick = { open = !open },
+            tooltip = "More Actions",
+            selected = open,
+        ) { tint -> IdeIcons.MoreVertical(tint) }
+
+        if (open) {
+            PopupMenu(
+                onDismissRequest = {
+                    open = false
+                    true
+                },
+                horizontalAlignment = Alignment.End,
+                modifier = Modifier.width(280.dp),
+            ) {
+                val activeId = workspace.activeDocumentId
+
+                selectableItem(
+                    selected = false,
+                    keybinding = setOf("Ctrl", "G"),
+                    enabled = activeId != null,
+                    onClick = {
+                        open = false
+                        controller.showDialog(Dialog.GO_TO_LINE)
+                    },
+                ) { Text("Go to Line\u2026") }
+
+                selectableItem(
+                    selected = false,
+                    enabled = workspace.activeDocument?.path != null,
+                    onClick = {
+                        open = false
+                        activeId?.let(controller::reloadFromDisk)
+                    },
+                ) { Text("Reload from Disk") }
+
+                passiveItem { MenuSeparator() }
+
+                selectableItem(
+                    selected = workspace.settings.focusMode,
+                    keybinding = setOf("Ctrl", "Shift", "Q"),
+                    onClick = {
+                        open = false
+                        controller.toggleFocusMode()
+                    },
+                ) { Text("Focus Mode") }
+
+                selectableItem(
+                    selected = workspace.settings.darkTheme,
+                    keybinding = setOf("Ctrl", "Shift", "T"),
+                    onClick = {
+                        open = false
+                        controller.toggleTheme()
+                    },
+                ) { Text("Dark Theme") }
+
+                passiveItem { MenuSeparator() }
+
+                selectableItem(
+                    selected = false,
+                    onClick = {
+                        open = false
+                        controller.showDialog(Dialog.RUN_CONFIGURATIONS)
+                    },
+                ) { Text("Edit Configurations\u2026") }
+
+                selectableItem(
+                    selected = false,
+                    keybinding = setOf("Ctrl", "Alt", "S"),
+                    onClick = {
+                        open = false
+                        controller.showDialog(Dialog.SETTINGS)
+                    },
+                ) { Text("Settings\u2026") }
+            }
+        }
+    }
 }
 
 /**
