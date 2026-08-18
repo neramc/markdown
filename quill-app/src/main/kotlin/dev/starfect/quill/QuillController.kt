@@ -206,6 +206,25 @@ public class QuillController(
         }
     }
 
+    /**
+     * Reloads [id], asking first when that would throw away unsaved edits.
+     *
+     * What the menu and the status bar's "Changed on disk" call. [reloadFromDisk] is what actually
+     * reloads and asks nothing — the answer to the question calls it, and so does the automatic
+     * refresh, which only reloads documents that have nothing to lose.
+     */
+    public fun requestReloadFromDisk(id: Long) {
+        val session = _state.value.documents.firstOrNull { it.id == id } ?: return
+        if (session.path == null) return
+
+        if (!session.isModified) {
+            reloadFromDisk(id)
+            return
+        }
+
+        update { it.copy(confirm = Confirm.ReloadDocument(id, session.displayName)) }
+    }
+
     /** Discards the buffer and reads the file again. */
     public fun reloadFromDisk(id: Long) {
         val session = _state.value.documents.firstOrNull { it.id == id } ?: return
@@ -889,6 +908,36 @@ public class QuillController(
                 ConfirmChoice.CANCEL -> Unit
                 ConfirmChoice.DISCARD -> pending.ids.forEach(::closeDocument)
                 ConfirmChoice.SAVE -> saveThenClose(pending.ids, onNeedsPath)
+            }
+
+            is Confirm.ReloadDocument -> when (choice) {
+                ConfirmChoice.CANCEL -> Unit
+                // Discard is the whole action: reload *is* discarding the buffer.
+                ConfirmChoice.DISCARD -> reloadFromDisk(pending.id)
+                // Save first, then reload — which reads back exactly what was just written, and is
+                // the answer for somebody who wants the file on disk to win but not silently.
+                ConfirmChoice.SAVE -> {
+                    val target = saveTarget(pending.id) { onNeedsPath(_state.value.documents.first { it.id == pending.id }) }
+                        ?: return
+                    scope.launch {
+                        if (persist(pending.id, target)) reloadFromDisk(pending.id)
+                    }
+                }
+            }
+
+            is Confirm.ReloadDocument -> when (choice) {
+                ConfirmChoice.CANCEL -> Unit
+                // Discard is the whole action: reloading *is* discarding the buffer.
+                ConfirmChoice.DISCARD -> reloadFromDisk(pending.id)
+                // Save first, then reload — which reads back exactly what was just written. The
+                // answer for somebody who wants the file to win but not silently.
+                ConfirmChoice.SAVE -> {
+                    val session = _state.value.documents.firstOrNull { it.id == pending.id } ?: return
+                    val target = saveTarget(pending.id) { onNeedsPath(session) } ?: return
+                    scope.launch {
+                        if (persist(pending.id, target)) reloadFromDisk(pending.id)
+                    }
+                }
             }
 
             is Confirm.Exit -> when (choice) {
@@ -1692,6 +1741,13 @@ public class QuillController(
         val find = workspace.find
         if (find.query.isEmpty()) return
 
+        // How many are about to change, counted before anything does. Replace All is the one action
+        // in the editor that rewrites the whole document from a two-word query, and it used to do
+        // so without saying how much it had touched: three replacements and three hundred look
+        // identical when the only feedback is the document redrawing.
+        val replaced = workspace.activeDocument?.matches?.size ?: 0
+        val caret = workspace.activeDocument?.text?.selection?.start ?: 0
+
         scope.launch {
             withContext(Dispatchers.Default) {
                 runCatching {
@@ -1700,9 +1756,26 @@ public class QuillController(
                 }
             }
                 .onSuccess { updated ->
-                    updateDocument(id) { it.copy(text = TextFieldValue(updated), engineVersion = handle.version) }
+                    // Recorded as one step, and recorded at all: this wrote straight to the
+                    // document, so the undo history still described the text from before and
+                    // Ctrl+Z either did nothing or jumped past the replacement to an older edit.
+                    // A bulk rewrite with no way back is the worst thing in the editor to get wrong.
+                    val value = TextFieldValue(updated, TextRange(caret.coerceIn(0, updated.length)))
+                    history(id).record(value, coalesce = false)
+
+                    updateDocument(id) { it.copy(text = value, engineVersion = handle.version) }
                     derive(id, immediate = true)
                     runSearch()
+
+                    update {
+                        it.copy(
+                            notification = when (replaced) {
+                                0 -> "Nothing matched '${find.query}'"
+                                1 -> "Replaced one occurrence of '${find.query}'"
+                                else -> "Replaced $replaced occurrences of '${find.query}'"
+                            },
+                        )
+                    }
                 }
                 .onFailure { failure -> update { it.copy(find = it.find.copy(error = failure.message)) } }
         }

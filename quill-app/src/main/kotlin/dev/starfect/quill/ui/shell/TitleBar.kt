@@ -321,7 +321,7 @@ private fun MoreActionsButton(controller: QuillController, workspace: WorkspaceS
                     enabled = workspace.activeDocument?.path != null,
                     onClick = {
                         open = false
-                        activeId?.let(controller::reloadFromDisk)
+                        activeId?.let(controller::requestReloadFromDisk)
                     },
                 ) { Text("Reload from Disk") }
 

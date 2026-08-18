@@ -346,7 +346,7 @@ public fun StatusBar(controller: QuillController, workspace: WorkspaceState) {
                         "Changed on disk",
                         "This file changed outside Quill and you have unsaved edits. " +
                             "Click to discard yours and reload.",
-                        onClick = { controller.reloadFromDisk(document.id) },
+                        onClick = { controller.requestReloadFromDisk(document.id) },
                     )
                 }
 

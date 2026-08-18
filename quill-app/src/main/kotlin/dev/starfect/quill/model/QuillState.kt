@@ -359,6 +359,19 @@ public sealed interface Confirm {
     ) : Confirm
 
     /**
+     * Throwing away a buffer's edits to read the file again.
+     *
+     * Reload is the only action in the editor that destroys work and produces nothing — a close at
+     * least offers to save it, and an overwrite at least keeps what you wrote. It earns a question
+     * on its own.
+     */
+    @Immutable
+    public data class ReloadDocument(
+        public val id: Long,
+        public val name: String,
+    ) : Confirm
+
+    /**
      * Leaving Quill with unsaved edits.
      *
      * Distinct from [CloseDocuments] even though the machinery is the same, because the answer

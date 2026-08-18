@@ -357,3 +357,180 @@ class ConfirmExitTest {
         assertTrue(!exited, "with nowhere to write it, quitting would be the discard it refused")
     }
 }
+
+/**
+ * Reloading a document that has unsaved edits, and replacing every match in one.
+ *
+ * Both are destructive and both used to happen without a word. Reload threw the buffer away and
+ * read the file; Replace All rewrote the whole document from a two-word query, said nothing about
+ * how much it had touched, and — because it wrote straight to the document rather than through the
+ * edit path — could not be undone.
+ */
+class DestructiveActionTest {
+
+    private lateinit var scope: CoroutineScope
+    private lateinit var controller: QuillController
+    private lateinit var directory: Path
+
+    @BeforeTest
+    fun setUp() {
+        scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        controller = QuillController(scope, QuillEngine.create(darkTheme = true))
+        directory = Files.createTempDirectory("quill-destructive")
+    }
+
+    @AfterTest
+    fun tearDown() {
+        controller.close()
+        scope.cancel()
+    }
+
+    private fun open(name: String, text: String): Long {
+        val file = directory.resolve(name)
+        file.writeText(text)
+        controller.openFile(file)
+        val deadline = System.nanoTime() + 20_000_000_000L
+        while (System.nanoTime() < deadline) {
+            val session = controller.state.value.documents.firstOrNull { it.path == file }
+            if (session != null && session.derivedVersion >= session.engineVersion) return session.id
+            Thread.sleep(5)
+        }
+        error("never opened $name")
+    }
+
+    private fun textOf(id: Long) = controller.state.value.documents.first { it.id == id }.text.text
+
+    private fun awaitText(id: Long, predicate: (String) -> Boolean) {
+        val deadline = System.nanoTime() + 20_000_000_000L
+        while (System.nanoTime() < deadline) {
+            if (predicate(textOf(id))) return
+            Thread.sleep(5)
+        }
+        error("the text never became what was expected; it is:\n${textOf(id)}")
+    }
+
+    @Test
+    fun `reloading an unmodified document asks nothing`() {
+        val id = open("clean.md", "# One\n")
+        directory.resolve("clean.md").writeText("# Two\n")
+
+        controller.requestReloadFromDisk(id)
+
+        assertNull(controller.state.value.confirm)
+        awaitText(id) { it.contains("Two") }
+    }
+
+    @Test
+    fun `reloading over unsaved edits asks first`() {
+        val id = open("dirty.md", "# One\n")
+        edit(id, "unsaved\n")
+        directory.resolve("dirty.md").writeText("# Two\n")
+
+        controller.requestReloadFromDisk(id)
+
+        val pending = controller.state.value.confirm
+        assertTrue(pending is Confirm.ReloadDocument)
+        assertEquals("dirty.md", pending.name)
+        assertTrue(textOf(id).contains("unsaved"), "nothing may be discarded before the answer")
+    }
+
+    @Test
+    fun `cancelling a reload keeps the buffer`() {
+        val id = open("cancel.md", "# One\n")
+        edit(id, "unsaved\n")
+        directory.resolve("cancel.md").writeText("# Two\n")
+        controller.requestReloadFromDisk(id)
+
+        controller.resolveConfirm(ConfirmChoice.CANCEL)
+
+        Thread.sleep(200)
+        assertTrue(textOf(id).contains("unsaved"))
+    }
+
+    @Test
+    fun `discarding a reload takes what is on disk`() {
+        val id = open("discard.md", "# One\n")
+        edit(id, "unsaved\n")
+        directory.resolve("discard.md").writeText("# Two\n")
+        controller.requestReloadFromDisk(id)
+
+        controller.resolveConfirm(ConfirmChoice.DISCARD)
+
+        awaitText(id) { it.contains("Two") && !it.contains("unsaved") }
+    }
+
+    @Test
+    fun `save and reload writes first, so the reload reads back the edits`() {
+        val id = open("both.md", "# One\n")
+        edit(id, "kept\n")
+        controller.requestReloadFromDisk(id)
+
+        controller.resolveConfirm(ConfirmChoice.SAVE)
+
+        // The buffer already reads "kept" — it is what was typed — so waiting on the text proves
+        // nothing. What has to be waited for is the write and the read that follows it, and the
+        // observable end of both is the document no longer differing from disk.
+        val deadline = System.nanoTime() + 20_000_000_000L
+        while (System.nanoTime() < deadline &&
+            controller.state.value.documents.first { it.id == id }.isModified
+        ) {
+            Thread.sleep(5)
+        }
+
+        assertTrue(
+            !controller.state.value.documents.first { it.id == id }.isModified,
+            "after saving and reloading, the buffer and the file agree",
+        )
+        assertTrue("kept" in textOf(id), "the reload must read back what was written, not the old file")
+        assertTrue("kept" in directory.resolve("both.md").readText())
+    }
+
+    private fun edit(id: Long, appended: String) {
+        val current = textOf(id)
+        val next = current + appended
+        controller.onTextChanged(id, TextFieldValue(next, TextRange(next.length)))
+    }
+
+    @Test
+    fun `replace all can be undone in one step`() {
+        val id = open("replace.md", "alpha one\nalpha two\nalpha three\n")
+        val before = textOf(id)
+
+        controller.updateFind { it.copy(visible = true, query = "alpha") }
+        awaitMatches(id, 3)
+        controller.updateFind { it.copy(replacement = "beta") }
+        controller.replaceAll()
+
+        awaitText(id) { "alpha" !in it && it.count { c -> c == '\n' } == 3 }
+        controller.undo(id)
+
+        awaitText(id) { it == before }
+    }
+
+    @Test
+    fun `replace all says how many it changed`() {
+        val id = open("count.md", "one x\ntwo x\n")
+        controller.updateFind { it.copy(visible = true, query = "x") }
+        awaitMatches(id, 2)
+        controller.updateFind { it.copy(replacement = "y") }
+
+        controller.replaceAll()
+
+        val deadline = System.nanoTime() + 20_000_000_000L
+        while (System.nanoTime() < deadline) {
+            val message = controller.state.value.notification
+            if (message != null && "2" in message) return
+            Thread.sleep(5)
+        }
+        error("no count was reported; the message was ${controller.state.value.notification}")
+    }
+
+    private fun awaitMatches(id: Long, count: Int) {
+        val deadline = System.nanoTime() + 20_000_000_000L
+        while (System.nanoTime() < deadline) {
+            if (controller.state.value.documents.first { it.id == id }.matches.size == count) return
+            Thread.sleep(5)
+        }
+        error("the search never found $count matches")
+    }
+}

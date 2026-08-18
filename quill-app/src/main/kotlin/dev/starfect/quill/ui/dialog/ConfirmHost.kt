@@ -34,6 +34,7 @@ public fun ConfirmHost(
     AnimatedConfirm(visible = pending != null) {
         when (val question = pending ?: last) {
             is Confirm.CloseDocuments -> CloseDocumentsQuestion(controller, question)
+            is Confirm.ReloadDocument -> ReloadQuestion(controller, question)
             is Confirm.Exit -> ExitQuestion(controller, question, onExit)
             null -> Unit
         }
@@ -113,6 +114,38 @@ private fun ExitQuestion(controller: QuillController, question: Confirm.Exit, on
             ConfirmAction(
                 label = "Cancel",
                 onClick = { controller.resolveConfirm(ConfirmChoice.CANCEL) },
+            ),
+        ),
+    )
+}
+
+@Composable
+private fun ReloadQuestion(controller: QuillController, question: Confirm.ReloadDocument) {
+    ConfirmDialog(
+        title = "Reload ${question.name}?",
+        message = "The copy on disk has changed and this one has unsaved edits. Reloading reads " +
+            "the file again and the edits here are gone.",
+        onDismiss = { controller.resolveConfirm(ConfirmChoice.CANCEL) },
+        actions = listOf(
+            // Cancel is the default. Every other question here defaults to the answer that keeps
+            // the work; for this one that answer is doing nothing at all.
+            ConfirmAction(
+                label = "Cancel",
+                default = true,
+                onClick = { controller.resolveConfirm(ConfirmChoice.CANCEL) },
+            ),
+            ConfirmAction(
+                label = "Save and Reload",
+                onClick = {
+                    controller.resolveConfirm(
+                        choice = ConfirmChoice.SAVE,
+                        onNeedsPath = controller::promptForPath,
+                    )
+                },
+            ),
+            ConfirmAction(
+                label = "Reload",
+                onClick = { controller.resolveConfirm(ConfirmChoice.DISCARD) },
             ),
         ),
     )
