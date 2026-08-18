@@ -85,6 +85,86 @@ class WelcomeRenderTest {
     }
 
     @Test
+    fun `the header actions fold away when the window is narrow`() {
+        // The behaviour the IDE's own welcome screen has, and the reason the header is measured
+        // rather than laid out with fixed widths: when there is room the actions are spelled out
+        // beside the search field, and when there is not they collapse into an overflow so the
+        // field keeps its width instead of being squeezed to nothing.
+        val wide = render("welcome-wide.png", dark = true, recents = sampleRecents(), width = 1000)
+        val narrow = render("welcome-narrow.png", dark = true, recents = sampleRecents(), width = 620)
+
+        assertTrue(distinctColours(narrow) > 32, "the narrow welcome window rendered blank")
+
+        // What is actually being asserted: how much of the header the search field is *not*
+        // using. Two spelled-out buttons need far more of it than one overflow button does, and
+        // measuring the gap rather than counting ink avoids depending on which glyphs are in it.
+        val wideGap = wide.width - searchFieldRight(wide)
+        val narrowGap = narrow.width - searchFieldRight(narrow)
+
+        assertTrue(
+            wideGap > 150,
+            "the wide header should leave room for New Document and Open, but left $wideGap points",
+        )
+        assertTrue(
+            narrowGap < 110,
+            "the narrow header should leave room for one overflow button, but left $narrowGap points",
+        )
+    }
+
+    /**
+     * The x where the search field ends, found by scanning across the middle of the header.
+     *
+     * The field is the one wide contiguous run of non-background pixels on that row: everything to
+     * its left is the rail, and everything to its right is either buttons or nothing.
+     */
+    private fun searchFieldRight(image: BufferedImage, y: Int = 34): Int {
+        val background = image.getRGB(image.width - 4, image.height - 4)
+        val paneLeft = 260
+        var x = paneLeft
+        while (x < image.width && image.getRGB(x, y) == background) x++
+        if (x >= image.width) return paneLeft
+
+        var lastInk = x
+        var gap = 0
+        while (x < image.width) {
+            if (image.getRGB(x, y) == background) {
+                gap++
+                // Eight background pixels in a row is past the field's right border.
+                if (gap >= 8) break
+            } else {
+                gap = 0
+                lastInk = x
+            }
+            x++
+        }
+        return lastInk
+    }
+
+    @Test
+    fun `the shortcut reference lists every documented binding`() {
+        // The Learn pane reads [Keymap] directly, so what is worth asserting is that the table it
+        // reads is not empty and is grouped — a reference of one flat list of forty rows is a
+        // reference nobody finishes.
+        assertTrue(dev.starfect.quill.model.Keymap.sections.size >= 4)
+        assertTrue(dev.starfect.quill.model.Keymap.all.size >= 30)
+        assertTrue(dev.starfect.quill.model.Keymap.sections.all { it.bindings.isNotEmpty() })
+    }
+
+    /** How many pixels in a region differ from the pane's background, as a rough "how much is here". */
+    private fun inkInRegion(image: BufferedImage, x: IntRange, y: IntRange): Int {
+        val background = image.getRGB(image.width - 4, image.height - 4)
+        var ink = 0
+        for (px in x) {
+            if (px !in 0 until image.width) continue
+            for (py in y) {
+                if (py !in 0 until image.height) continue
+                if (image.getRGB(px, py) != background) ink++
+            }
+        }
+        return ink
+    }
+
+    @Test
     fun `recent projects round-trip through the store`() {
         // The welcome window is only as good as the list behind it, and that list lives in a file
         // the application writes on every project open.
@@ -118,10 +198,15 @@ class WelcomeRenderTest {
         RecentProject(Path.of("/opt", "notes", "architecture-decisions")),
     )
 
-    private fun render(fileName: String, dark: Boolean, recents: List<RecentProject>): BufferedImage {
+    private fun render(
+        fileName: String,
+        dark: Boolean,
+        recents: List<RecentProject>,
+        width: Int = WIDTH,
+    ): BufferedImage {
         SkiaAvailability.require()
 
-        val encoded = ImageComposeScene(width = WIDTH, height = HEIGHT, density = Density(1f)).use { scene ->
+        val encoded = ImageComposeScene(width = width, height = HEIGHT, density = Density(1f)).use { scene ->
             scene.setContent {
                 QuillTheme(dark = dark) {
                     WelcomeContent(

@@ -1,5 +1,12 @@
 package dev.starfect.quill.ui.welcome
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -8,8 +15,10 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -32,37 +41,56 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.starfect.quill.io.RecentProject
+import dev.starfect.quill.model.Keymap
 import dev.starfect.quill.ui.icons.IdeIcons
 import dev.starfect.quill.ui.shell.IdeActionButton
-import dev.starfect.quill.ui.theme.LocalTypeScale
-import dev.starfect.quill.ui.theme.Tokens
-import dev.starfect.quill.ui.theme.interactiveSurface
 import dev.starfect.quill.ui.theme.LocalShellPalette
+import dev.starfect.quill.ui.theme.LocalTypeScale
+import dev.starfect.quill.ui.theme.Motion
 import dev.starfect.quill.ui.theme.ShellDivider
 import dev.starfect.quill.ui.theme.ShellPalette
+import dev.starfect.quill.ui.theme.Tokens
+import dev.starfect.quill.ui.theme.interactiveSurface
 import java.nio.file.Path
 import org.jetbrains.jewel.ui.Orientation
 import org.jetbrains.jewel.ui.component.Icon
+import org.jetbrains.jewel.ui.component.MenuScope
+import org.jetbrains.jewel.ui.component.MenuSeparator
+import org.jetbrains.jewel.ui.component.PopupMenu
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.TextField
 
 /** What the welcome window's left rail can show. */
 internal enum class WelcomePage(val title: String) {
     Projects("Projects"),
+    Learn("Learn"),
     Customize("Customize"),
 }
 
 /**
+ * Below this width the header's action buttons fold into a single overflow button.
+ *
+ * The number comes from the layout rather than from a guess: the search field stops being usable
+ * at roughly a third of the pane, and two buttons plus their spacing take about 200 points. It is
+ * the same behaviour the IDE's own welcome screen has — narrow the window and the buttons go, not
+ * the search.
+ */
+private val ActionsCollapseBelow: Dp = 560.dp
+
+/**
  * The welcome window, shown when Quill starts with no project.
  *
- * IntelliJ's own is a two-pane window: a narrow rail carrying the product identity and a short
- * navigation list, and a content pane that is either a grid of large actions when there is nothing
- * to reopen, or a searchable list of recent projects when there is. Quill follows the same rule,
- * because the empty and populated states genuinely want different layouts and the IDE's choice of
- * which to show is the right one.
+ * A narrow rail carrying the product identity, a short navigation list and — pinned to the bottom —
+ * the two menus that belong to the application rather than to any project. Beside it, a content
+ * pane that is either a grid of large actions when there is nothing to reopen or a searchable list
+ * of recent projects when there is.
+ *
+ * The pane is deliberately responsive. Everything in the header has somewhere to go when the window
+ * is narrowed: the buttons collapse into an overflow, the search field keeps its width, and nothing
+ * is clipped or pushed off the edge. A welcome screen is the first thing anybody resizes.
  */
 @Composable
 public fun WelcomeContent(
@@ -75,6 +103,15 @@ public fun WelcomeContent(
     onToggleTheme: () -> Unit,
     darkTheme: Boolean,
     modifier: Modifier = Modifier,
+    /**
+     * What the rail's Configure and Help menus can reach.
+     *
+     * Null means the entry is not shown at all rather than shown and inert. The render tests mount
+     * this window without a controller, and a menu that offered Settings there would open nothing.
+     */
+    onSettings: (() -> Unit)? = null,
+    onAbout: (() -> Unit)? = null,
+    onCheckForUpdates: (() -> Unit)? = null,
 ) {
     val shell = LocalShellPalette.current
     var page by remember { mutableStateOf(WelcomePage.Projects) }
@@ -92,41 +129,64 @@ public fun WelcomeContent(
     }
 
     Row(modifier.fillMaxSize().background(shell.welcomeBackground)) {
-        WelcomeRail(version, page, onSelect = { page = it }, onToggleTheme = onToggleTheme, darkTheme = darkTheme)
+        WelcomeRail(
+            version = version,
+            selected = page,
+            onSelect = { page = it },
+            onSettings = onSettings,
+            onAbout = onAbout,
+            onCheckForUpdates = onCheckForUpdates,
+            darkTheme = darkTheme,
+            onToggleTheme = onToggleTheme,
+        )
         ShellDivider(Orientation.Vertical)
 
         Box(Modifier.weight(1f).fillMaxHeight()) {
-            when (page) {
-                WelcomePage.Projects ->
-                    if (recents.isEmpty()) {
-                        EmptyProjects(onNewDocument, onBrowse)
-                    } else {
-                        RecentProjectsPane(
-                            query = query,
-                            onQueryChange = { query = it },
-                            projects = filtered,
-                            onOpenProject = onOpenProject,
-                            onNewDocument = onNewDocument,
-                            onBrowse = onBrowse,
-                            onForget = onForget,
-                        )
-                    }
+            // Cross-fade rather than slide. The panes have nothing in common to carry across, and a
+            // pane that travels makes the rail look like it scrolled something.
+            AnimatedContent(
+                targetState = page,
+                transitionSpec = {
+                    fadeIn(tween(Motion.ENTER_MILLIS, easing = Motion.Easing)) togetherWith
+                        fadeOut(tween(Motion.EXIT_MILLIS, easing = Motion.Easing))
+                },
+                label = "welcomePage",
+            ) { current ->
+                when (current) {
+                    WelcomePage.Projects ->
+                        if (recents.isEmpty()) {
+                            EmptyProjects(onNewDocument, onBrowse)
+                        } else {
+                            RecentProjectsPane(
+                                query = query,
+                                onQueryChange = { query = it },
+                                projects = filtered,
+                                onOpenProject = onOpenProject,
+                                onNewDocument = onNewDocument,
+                                onBrowse = onBrowse,
+                                onForget = onForget,
+                            )
+                        }
 
-                WelcomePage.Customize -> CustomizePane(darkTheme, onToggleTheme)
+                    WelcomePage.Learn -> LearnPane()
+                    WelcomePage.Customize -> CustomizePane(darkTheme, onToggleTheme)
+                }
             }
         }
     }
 }
 
-/** The left rail: product identity, navigation, and a settings action pinned to the bottom. */
+/** The left rail: product identity, navigation, and the application menus pinned to the bottom. */
 @Composable
 private fun WelcomeRail(
     version: String,
     selected: WelcomePage,
     onSelect: (WelcomePage) -> Unit,
-    onToggleTheme: () -> Unit,
+    onSettings: (() -> Unit)?,
+    onAbout: (() -> Unit)?,
+    onCheckForUpdates: (() -> Unit)?,
     darkTheme: Boolean,
-    modifier: Modifier = Modifier,
+    onToggleTheme: () -> Unit,
 ) {
     val shell = LocalShellPalette.current
 
@@ -154,12 +214,58 @@ private fun WelcomeRail(
             RailItem(entry.title, entry == selected) { onSelect(entry) }
         }
 
-        Box(Modifier.weight(1f))
+        Spacer(Modifier.weight(1f))
 
-        IdeActionButton(
-            onClick = onToggleTheme,
-            tooltip = if (darkTheme) "Switch to Light theme" else "Switch to Dark theme",
-        ) { tint -> IdeIcons.Gear(tint) }
+        // Configure and Help, as the IDE's welcome screen has them: text rows with a chevron,
+        // pinned to the bottom, holding what belongs to the application rather than to a project.
+        RailMenu("Configure") { dismiss ->
+            if (onSettings != null) {
+                selectableItem(
+                    selected = false,
+                    onClick = {
+                        dismiss()
+                        onSettings()
+                    },
+                ) { Text("Settings…") }
+            }
+            selectableItem(
+                selected = false,
+                onClick = {
+                    dismiss()
+                    onToggleTheme()
+                },
+            ) { Text(if (darkTheme) "Switch to Light Theme" else "Switch to Dark Theme") }
+        }
+
+        RailMenu("Help") { dismiss ->
+            if (onCheckForUpdates != null) {
+                selectableItem(
+                    selected = false,
+                    onClick = {
+                        dismiss()
+                        onCheckForUpdates()
+                    },
+                ) { Text("Check for Updates…") }
+            }
+            selectableItem(
+                selected = false,
+                onClick = {
+                    dismiss()
+                    onSelect(WelcomePage.Learn)
+                },
+            ) { Text("Keyboard Shortcuts") }
+
+            if (onAbout != null) {
+                passiveItem { MenuSeparator() }
+                selectableItem(
+                    selected = false,
+                    onClick = {
+                        dismiss()
+                        onAbout()
+                    },
+                ) { Text("About Quill") }
+            }
+        }
     }
 }
 
@@ -179,6 +285,47 @@ private fun RailItem(title: String, selected: Boolean, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(title, fontSize = LocalTypeScale.current.default, color = shell.text, maxLines = 1)
+    }
+}
+
+/** One of the bottom-of-rail menus: a label, a chevron, and a popup. */
+@Composable
+private fun RailMenu(
+    title: String,
+    content: MenuScope.(dismiss: () -> Unit) -> Unit,
+) {
+    val shell = LocalShellPalette.current
+    var open by remember { mutableStateOf(false) }
+
+    Box {
+        Row(
+            modifier = Modifier.fillMaxWidth().height(Tokens.MenuRowHeight)
+                .interactiveSurface(
+                    onClick = { open = !open },
+                    palette = shell,
+                    selected = open,
+                    cornerRadius = Tokens.Radius.Control,
+                )
+                .padding(horizontal = Tokens.Spacing.Small),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(title, fontSize = LocalTypeScale.current.default, color = shell.secondaryText, maxLines = 1)
+            Spacer(Modifier.width(Tokens.Spacing.Tiny))
+            IdeIcons.WidgetChevron(shell.mutedText)
+        }
+
+        if (open) {
+            PopupMenu(
+                onDismissRequest = {
+                    open = false
+                    true
+                },
+                horizontalAlignment = Alignment.Start,
+                modifier = Modifier.width(240.dp),
+            ) {
+                content { open = false }
+            }
+        }
     }
 }
 
@@ -235,11 +382,12 @@ private fun BigAction(
 
     // The primary action carries the accent outline, which is how the IDE marks "New Project" as the
     // one most people want without making it a filled button.
-    val borderColor = when {
+    val target = when {
         primary -> shell.accent
         hovered -> shell.mutedText
         else -> shell.border
     }
+    val borderColor by animateColorAsState(target, Motion.state(), label = "bigActionBorder")
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
@@ -285,24 +433,49 @@ private fun RecentProjectsPane(
     val listState = rememberLazyListState()
 
     Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 20.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Box(Modifier.weight(1f)) {
-                TextField(
-                    value = query,
-                    onValueChange = onQueryChange,
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Search projects", color = shell.mutedText) },
-                    leadingIcon = {
-                        Box(Modifier.padding(start = 6.dp)) { IdeIcons.Search(shell.mutedText, size = Tokens.IconSize) }
-                    },
-                )
+        BoxWithConstraints(Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+            val roomForButtons = maxWidth >= ActionsCollapseBelow
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Box(Modifier.weight(1f)) {
+                    TextField(
+                        value = query,
+                        onValueChange = onQueryChange,
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Search projects", color = shell.mutedText) },
+                        leadingIcon = {
+                            Box(Modifier.padding(start = 6.dp)) {
+                                IdeIcons.Search(shell.mutedText, size = Tokens.IconSize)
+                            }
+                        },
+                    )
+                }
+
+                // The buttons fade rather than blink, and the overflow fades in as they leave, so a
+                // drag-resize does not look like the header is being rebuilt each frame.
+                AnimatedVisibility(
+                    visible = roomForButtons,
+                    enter = fadeIn(tween(Motion.ENTER_MILLIS, easing = Motion.Easing)),
+                    exit = fadeOut(tween(Motion.EXIT_MILLIS, easing = Motion.Easing)),
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        WelcomeButton("New Document", onNewDocument)
+                        WelcomeButton("Open", onBrowse)
+                    }
+                }
+
+                AnimatedVisibility(
+                    visible = !roomForButtons,
+                    enter = fadeIn(tween(Motion.ENTER_MILLIS, easing = Motion.Easing)),
+                    exit = fadeOut(tween(Motion.EXIT_MILLIS, easing = Motion.Easing)),
+                ) {
+                    HeaderOverflow(onNewDocument, onBrowse)
+                }
             }
-            WelcomeButton("New Document", onNewDocument)
-            WelcomeButton("Open", onBrowse)
         }
 
         if (projects.isEmpty()) {
@@ -320,6 +493,48 @@ private fun RecentProjectsPane(
     }
 }
 
+/** Where the header's actions go when the window is too narrow to spell them out. */
+@Composable
+private fun HeaderOverflow(onNewDocument: () -> Unit, onBrowse: () -> Unit) {
+    var open by remember { mutableStateOf(false) }
+
+    Box {
+        IdeActionButton(
+            onClick = { open = !open },
+            tooltip = "More Actions",
+            selected = open,
+            size = Tokens.MenuRowHeight,
+        ) { tint -> IdeIcons.MoreVertical(tint) }
+
+        if (open) {
+            PopupMenu(
+                onDismissRequest = {
+                    open = false
+                    true
+                },
+                horizontalAlignment = Alignment.End,
+                modifier = Modifier.width(220.dp),
+            ) {
+                selectableItem(
+                    selected = false,
+                    onClick = {
+                        open = false
+                        onNewDocument()
+                    },
+                ) { Text("New Document") }
+
+                selectableItem(
+                    selected = false,
+                    onClick = {
+                        open = false
+                        onBrowse()
+                    },
+                ) { Text("Open…") }
+            }
+        }
+    }
+}
+
 @Composable
 private fun RecentProjectRow(
     project: RecentProject,
@@ -329,6 +544,7 @@ private fun RecentProjectRow(
     val shell = LocalShellPalette.current
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
+    var menuOpen by remember { mutableStateOf(false) }
 
     Row(
         modifier = Modifier.fillMaxWidth().height(Tokens.WelcomeRecentRowHeight)
@@ -366,14 +582,68 @@ private fun RecentProjectRow(
             )
         }
 
-        // Removing an entry appears on hover only, exactly as it does in the IDE's list.
-        if (hovered) {
-            IdeActionButton(
-                onClick = { onForget(project.path) },
-                tooltip = "Remove from Recent Projects",
-                size = Tokens.SmallControlSize,
-            ) { tint -> IdeIcons.Close(tint, size = Tokens.SmallIconSize) }
+        // The row's own menu, on hover only, exactly as the IDE's list does it. It replaced a bare
+        // close button: removing an entry is not the only thing anyone wants to do to a row, and a
+        // lone X next to a project reads as "delete this project".
+        AnimatedVisibility(
+            visible = hovered || menuOpen,
+            enter = fadeIn(tween(Motion.STATE_MILLIS, easing = Motion.Easing)),
+            exit = fadeOut(tween(Motion.STATE_MILLIS, easing = Motion.Easing)),
+        ) {
+            Box {
+                IdeActionButton(
+                    onClick = { menuOpen = !menuOpen },
+                    tooltip = project.name,
+                    selected = menuOpen,
+                    size = Tokens.SmallControlSize,
+                ) { tint -> IdeIcons.MoreVertical(tint, size = Tokens.SmallIconSize) }
+
+                if (menuOpen) {
+                    PopupMenu(
+                        onDismissRequest = {
+                            menuOpen = false
+                            true
+                        },
+                        horizontalAlignment = Alignment.End,
+                        modifier = Modifier.width(260.dp),
+                    ) {
+                        selectableItem(
+                            selected = false,
+                            onClick = {
+                                menuOpen = false
+                                onOpen(project.path)
+                            },
+                        ) { Text("Open") }
+
+                        selectableItem(
+                            selected = false,
+                            onClick = {
+                                menuOpen = false
+                                copyToClipboard(project.path.toString())
+                            },
+                        ) { Text("Copy Path") }
+
+                        passiveItem { MenuSeparator() }
+
+                        selectableItem(
+                            selected = false,
+                            onClick = {
+                                menuOpen = false
+                                onForget(project.path)
+                            },
+                        ) { Text("Remove from Recent Projects") }
+                    }
+                }
+            }
         }
+    }
+}
+
+/** Puts [text] on the system clipboard, ignoring a headless or locked one. */
+private fun copyToClipboard(text: String) {
+    runCatching {
+        java.awt.Toolkit.getDefaultToolkit().systemClipboard
+            .setContents(java.awt.datatransfer.StringSelection(text), null)
     }
 }
 
@@ -393,6 +663,70 @@ private fun WelcomeButton(label: String, onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Text(label, fontSize = LocalTypeScale.current.medium, color = shell.text, maxLines = 1)
+    }
+}
+
+/**
+ * The keyboard reference.
+ *
+ * A welcome screen is where somebody is between having installed the thing and knowing how to use
+ * it, and a Markdown editor's whole speed argument is that the writing actions are under the
+ * fingers. Listing them here costs one pane and saves the search that most people never make.
+ */
+@Composable
+private fun LearnPane() {
+    val shell = LocalShellPalette.current
+    val listState = rememberLazyListState()
+
+    Column(Modifier.fillMaxSize().padding(horizontal = 32.dp, vertical = 24.dp)) {
+        Text(
+            text = "Keyboard shortcuts",
+            fontSize = LocalTypeScale.current.h2,
+            fontWeight = FontWeight.SemiBold,
+            color = shell.text,
+        )
+        Text(
+            text = "On macOS, use Cmd wherever this says Ctrl.",
+            fontSize = LocalTypeScale.current.medium,
+            color = shell.mutedText,
+            modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
+        )
+
+        LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+            Keymap.sections.forEach { section ->
+                item(key = "section-${section.title}") {
+                    Text(
+                        text = section.title,
+                        fontSize = LocalTypeScale.current.default,
+                        fontWeight = LocalTypeScale.current.headerWeight,
+                        color = shell.text,
+                        modifier = Modifier.padding(top = 16.dp, bottom = 6.dp),
+                    )
+                }
+
+                items(section.bindings.size, key = { "${section.title}-$it" }) { index ->
+                    val binding = section.bindings[index]
+                    Row(
+                        modifier = Modifier.fillMaxWidth().height(Tokens.TreeRowHeight),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = binding.action,
+                            fontSize = LocalTypeScale.current.default,
+                            color = shell.secondaryText,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                        )
+                        Text(
+                            text = binding.keys,
+                            fontSize = LocalTypeScale.current.medium,
+                            color = shell.mutedText,
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -419,11 +753,23 @@ private fun CustomizePane(darkTheme: Boolean, onToggleTheme: () -> Unit) {
 @Composable
 private fun ThemeChoice(label: String, selected: Boolean, onClick: () -> Unit) {
     val shell = LocalShellPalette.current
+    val border by animateColorAsState(
+        if (selected) shell.accent else shell.border,
+        Motion.state(),
+        label = "themeChoiceBorder",
+    )
+    val fill by animateColorAsState(
+        if (selected) shell.selectionBackground else Color.Transparent,
+        Motion.state(),
+        label = "themeChoiceFill",
+    )
+
     Box(
         modifier = Modifier.height(30.dp)
             .clip(RoundedCornerShape(5.dp))
-            .background(if (selected) shell.selectionBackground else Color.Transparent)
-            .border(1.dp, if (selected) shell.accent else shell.border, RoundedCornerShape(5.dp))
+            .background(fill)
+            .border(1.dp, border, RoundedCornerShape(5.dp))
+            .hoverable(remember { MutableInteractionSource() })
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,

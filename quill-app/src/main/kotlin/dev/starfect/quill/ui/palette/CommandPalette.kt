@@ -33,6 +33,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import dev.starfect.quill.QuillController
 import dev.starfect.quill.io.FileService
+import dev.starfect.quill.model.Dialog
 import dev.starfect.quill.model.ToolWindow
 import dev.starfect.quill.model.ViewMode
 import dev.starfect.quill.model.WorkspaceState
@@ -290,13 +291,16 @@ private fun buildCommands(controller: QuillController, workspace: WorkspaceState
             )
         }
         add(Command("Find", "Edit", "Ctrl+F") { controller.setFindVisible(true) })
+        if (activeId != null) {
+            add(Command("Go to Line\u2026", "Edit", "Ctrl+G") { controller.showDialog(Dialog.GO_TO_LINE) })
+        }
         add(Command("Replace", "Edit", "Ctrl+R") { controller.setFindVisible(true, withReplace = true) })
 
         ViewMode.entries.forEach { mode ->
             val label = mode.name.lowercase().replaceFirstChar(Char::titlecase)
             add(Command("View: $label", "View", "Ctrl+${mode.ordinal + 1}") { controller.setViewMode(mode) })
         }
-        add(Command("Toggle Theme", "View", "Ctrl+Shift+T", controller::toggleTheme))
+        add(Command("Toggle Theme", "View", null, controller::toggleTheme))
         add(
             Command("Toggle Line Numbers", "View", null) {
                 controller.updateSettings { it.copy(showLineNumbers = !it.showLineNumbers) }

@@ -59,11 +59,29 @@ internal fun handleShortcut(event: KeyEvent, controller: QuillController): Boole
                 else -> false
             }
 
+            // Alt+Shift+arrow moves lines, as it does in the IDE. These live here rather than in
+            // the Ctrl-gated block below: that block is only reached with Ctrl held, so the
+            // binding was really Ctrl+Alt+Shift+arrow and the documented one did nothing.
+            event.isAltPressed && event.isShiftPressed && event.key == Key.DirectionUp -> {
+                controller.edit { MarkdownEdits.moveLines(it, -1) }
+                true
+            }
+            event.isAltPressed && event.isShiftPressed && event.key == Key.DirectionDown -> {
+                controller.edit { MarkdownEdits.moveLines(it, 1) }
+                true
+            }
+
             // Shift+F10 runs, as it does in the IDE.
             event.key == Key.F10 && event.isShiftPressed -> {
                 workspace.activeRunConfiguration
                     ?.let(controller::run)
                     ?: controller.showDialog(Dialog.RUN_CONFIGURATIONS)
+                true
+            }
+
+            // F3 and Shift+F3 step through the find matches, as they do in the IDE.
+            event.key == Key.F3 -> {
+                controller.stepMatch(forward = !event.isShiftPressed)
                 true
             }
 
@@ -127,15 +145,6 @@ internal fun handleShortcut(event: KeyEvent, controller: QuillController): Boole
             // editor, since the search is also where somebody finds the link action.
             event.key == Key.K && event.isShiftPressed -> {
                 controller.edit { MarkdownEdits.insertLink(it) }
-                true
-            }
-            // Alt+Shift+arrow moves lines, as it does in the IDE.
-            event.isAltPressed && event.isShiftPressed && event.key == Key.DirectionUp -> {
-                controller.edit { MarkdownEdits.moveLines(it, -1) }
-                true
-            }
-            event.isAltPressed && event.isShiftPressed && event.key == Key.DirectionDown -> {
-                controller.edit { MarkdownEdits.moveLines(it, 1) }
                 true
             }
             event.key == Key.D && !event.isShiftPressed -> {
@@ -243,8 +252,10 @@ internal fun handleShortcut(event: KeyEvent, controller: QuillController): Boole
             controller.setCommandPaletteVisible(!controller.state.value.commandPaletteVisible)
             true
         }
+        // Ctrl+G is Go to Line in every JetBrains IDE. It used to step the find matches here,
+        // which left Go to Line with no binding and made the menu entry claiming one a lie.
         event.key == Key.G -> {
-            controller.stepMatch(forward = !event.isShiftPressed)
+            controller.showDialog(Dialog.GO_TO_LINE)
             true
         }
         event.key == Key.One -> {
@@ -257,10 +268,6 @@ internal fun handleShortcut(event: KeyEvent, controller: QuillController): Boole
         }
         event.key == Key.Three -> {
             controller.setViewMode(ViewMode.PREVIEW)
-            true
-        }
-        event.key == Key.T && event.isShiftPressed -> {
-            controller.toggleTheme()
             true
         }
         // Ctrl+Shift+M switches between writing and reading, which is the question people have.

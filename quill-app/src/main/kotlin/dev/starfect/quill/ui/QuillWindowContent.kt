@@ -25,7 +25,7 @@ import dev.starfect.quill.model.Dock
 import dev.starfect.quill.model.ToolWindow
 import dev.starfect.quill.model.ViewMode
 import dev.starfect.quill.model.WorkspaceState
-import dev.starfect.quill.ui.dialog.ConfirmHost
+import dev.starfect.quill.ui.dialog.QuillDialogs
 import dev.starfect.quill.ui.dialog.RunConfigurationsDialog
 import dev.starfect.quill.ui.dialog.SettingsDialog
 import dev.starfect.quill.ui.editor.EditorTabs
@@ -175,25 +175,7 @@ public fun QuillWindowContent(
             MarkdownFeaturePalette(controller) { controller.setFeaturePaletteVisible(false) }
         }
 
-        // Above the dialogs, because a question about losing work outranks whatever is on screen —
-        // including a settings page that is itself modal.
-        ConfirmHost(controller, workspace, onExit)
-
-        when (workspace.dialog) {
-            Dialog.SETTINGS -> SettingsDialog(controller, workspace)
-            Dialog.RUN_CONFIGURATIONS -> RunConfigurationsDialog(controller, workspace)
-            Dialog.ABOUT -> AboutDialog(controller)
-            Dialog.GO_TO_LINE -> dev.starfect.quill.ui.dialog.GoToLineDialog(controller, workspace)
-            Dialog.UPDATE -> dev.starfect.quill.ui.dialog.UpdateDialog(
-                onDismiss = controller::dismissDialog,
-                onRestart = onExit,
-            )
-            Dialog.UNINSTALL -> dev.starfect.quill.ui.dialog.UninstallDialog(
-                onDismiss = controller::dismissDialog,
-                onFinished = onExit,
-            )
-            null -> Unit
-        }
+        QuillDialogs(controller, workspace, onExit)
     }
 }
 
@@ -355,56 +337,6 @@ private fun EditorArea(controller: QuillController, workspace: WorkspaceState, m
                     secondPaneMinWidth = 220.dp,
                 )
             }
-        }
-    }
-}
-
-/** The About box, which is the one dialog with nothing to configure. */
-@Composable
-private fun AboutDialog(controller: QuillController) {
-    val shell = LocalShellPalette.current
-
-    dev.starfect.quill.ui.dialog.IdeDialog(
-        title = "About Quill",
-        onDismiss = controller::dismissDialog,
-        width = 420.dp,
-        height = 240.dp,
-        confirmLabel = "Close",
-    ) {
-        Column(
-            Modifier.fillMaxSize().padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Text(
-                text = "Quill",
-                color = shell.text,
-                fontSize = LocalTypeScale.current.h1,
-                fontWeight = FontWeight.SemiBold,
-            )
-            // The packaged launcher passes -Dquill.version; a Gradle run does not, and saying so is
-            // better than showing a number that would be a guess.
-            Text(
-                text = System.getProperty("quill.version")?.let { "Version $it" } ?: "Development build",
-                color = shell.mutedText,
-                fontSize = LocalTypeScale.current.medium,
-            )
-            Box(Modifier.height(6.dp))
-            Text(
-                "A Markdown editor with a Rust engine.",
-                color = shell.mutedText,
-                fontSize = LocalTypeScale.current.medium,
-            )
-            Box(Modifier.height(8.dp))
-            Text(
-                "Runtime: ${System.getProperty("java.vm.name")} ${System.getProperty("java.version")}",
-                color = shell.mutedText,
-                fontSize = LocalTypeScale.current.medium,
-            )
-            Text(
-                "Renderer: Skia via Compose Multiplatform",
-                color = shell.mutedText,
-                fontSize = LocalTypeScale.current.medium,
-            )
         }
     }
 }

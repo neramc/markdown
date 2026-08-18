@@ -24,7 +24,9 @@ import dev.starfect.quill.io.RecentProject
 import dev.starfect.quill.io.RecentProjects
 import dev.starfect.quill.io.SettingsStore
 import dev.starfect.quill.model.WorkspaceState
+import dev.starfect.quill.model.Dialog
 import dev.starfect.quill.ui.QuillWindowContent
+import dev.starfect.quill.ui.dialog.QuillDialogs
 import dev.starfect.quill.ui.dialog.UninstallDialog
 import dev.starfect.quill.ui.shell.QuillTitleBar
 import dev.starfect.quill.ui.shell.QuillToolBar
@@ -156,6 +158,8 @@ public fun main(arguments: Array<String>) {
 
         if (!projectOpen) {
             WelcomeWindow(
+                controller = controller,
+                workspace = workspace,
                 recents = recents,
                 darkTheme = workspace.settings.darkTheme,
                 onExit = ::exitApplication,
@@ -401,6 +405,8 @@ private fun runUninstaller(silent: Boolean) {
 /** The welcome window: a small, non-resizable-feeling frame carrying [WelcomeContent]. */
 @androidx.compose.runtime.Composable
 private fun WelcomeWindow(
+    controller: QuillController,
+    workspace: WorkspaceState,
     recents: List<RecentProject>,
     darkTheme: Boolean,
     onExit: () -> Unit,
@@ -419,16 +425,26 @@ private fun WelcomeWindow(
             title = "Welcome to Quill",
             icon = painterResource("icons/icon.png"),
         ) {
-            WelcomeContent(
-                version = System.getProperty("quill.version", "0.1.0"),
-                recents = recents,
-                onOpenProject = onOpenProject,
-                onNewDocument = onNewDocument,
-                onBrowse = onBrowse,
-                onForget = onForget,
-                onToggleTheme = onToggleTheme,
-                darkTheme = darkTheme,
-            )
+            androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+                WelcomeContent(
+                    version = System.getProperty("quill.version", "0.1.0"),
+                    recents = recents,
+                    onOpenProject = onOpenProject,
+                    onNewDocument = onNewDocument,
+                    onBrowse = onBrowse,
+                    onForget = onForget,
+                    onToggleTheme = onToggleTheme,
+                    darkTheme = darkTheme,
+                    onSettings = { controller.showDialog(Dialog.SETTINGS) },
+                    onAbout = { controller.showDialog(Dialog.ABOUT) },
+                    onCheckForUpdates = { controller.showDialog(Dialog.UPDATE) },
+                )
+
+                // The same dialogs the main window mounts. Without this the welcome window's
+                // Configure menu would set a state nothing rendered — a menu entry that opens
+                // nothing, which is precisely the failure it is there to avoid.
+                QuillDialogs(controller, workspace, onExit)
+            }
         }
     }
 }

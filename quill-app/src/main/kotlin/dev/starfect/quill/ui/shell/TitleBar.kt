@@ -329,7 +329,7 @@ private fun MoreActionsButton(controller: QuillController, workspace: WorkspaceS
 
                 selectableItem(
                     selected = workspace.settings.focusMode,
-                    keybinding = setOf("Ctrl", "Shift", "Q"),
+                    keybinding = setOf("Ctrl", "Shift", "D"),
                     onClick = {
                         open = false
                         controller.toggleFocusMode()
@@ -338,7 +338,6 @@ private fun MoreActionsButton(controller: QuillController, workspace: WorkspaceS
 
                 selectableItem(
                     selected = workspace.settings.darkTheme,
-                    keybinding = setOf("Ctrl", "Shift", "T"),
                     onClick = {
                         open = false
                         controller.toggleTheme()
