@@ -46,16 +46,29 @@ class NavigationTest {
     /** 400 numbered lines, so a line number is visible in the text at that line. */
     private fun numbered() = (1..400).joinToString("\n") { "line $it" } + "\n"
 
+    /**
+     * Opens a file and waits until it has *settled*, not merely appeared.
+     *
+     * Opening is asynchronous and records the arrival in the history a moment after the document
+     * reaches the workspace. Returning as soon as the document exists left every test reading the
+     * history in a race with that record: locally the write always won, and on a CI runner it did
+     * not — "re-selecting the tab you are on is not navigation" read a history of zero, then the
+     * pending record made it one, and the test failed on a product that was behaving correctly.
+     */
     private fun open(name: String): Long {
         val file = directory.resolve(name)
         file.writeText(numbered())
         controller.openFile(file)
+
         val deadline = System.nanoTime() + 20_000_000_000L
         while (System.nanoTime() < deadline) {
-            controller.state.value.documents.firstOrNull { it.path == file }?.let { return it.id }
+            val session = controller.state.value.documents.firstOrNull { it.path == file }
+            if (session != null && controller.state.value.navigation.current?.documentId == session.id) {
+                return session.id
+            }
             Thread.sleep(5)
         }
-        error("never opened $name")
+        error("never opened $name, or it never reached the navigation history")
     }
 
     private fun caretLine(id: Long): Int {
