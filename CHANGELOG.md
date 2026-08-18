@@ -6,7 +6,112 @@ The sections here are the source of the release notes on GitHub: the publish wor
 section matching the tag it was triggered by, so a release whose notes are wrong is a changelog
 whose notes are wrong, and there is only one place to fix it.
 
-## Unreleased
+## 1.3.0
+
+### Nothing irreversible happens quietly
+
+Closing a modified document threw the work away between one click and the next frame. The tab's
+close button, `Ctrl+W`, Close All and the window's X all called straight through to the close.
+
+They now ask — once for a whole batch rather than once per tab, because "Close All" over twelve tabs
+with four modified is one decision to the person making it, and four dialogs in a row is how a
+confirmation becomes something you click through without reading. The names are listed rather than
+counted: a number is something you have to trust, and the names are what you actually check before
+pressing Discard. Saving waits for the bytes to reach disk before the tab goes, since the tab
+disappearing is the only signal the writer gets that it is safe to quit.
+
+Quitting asks the same way. So does **Reload from Disk**, which is the one action in the editor that
+destroys work and produces nothing in return — and where Cancel is the *default* answer, unlike
+everywhere else, because here the answer that keeps the work is doing nothing at all.
+
+**Replace All could not be undone.** It wrote the replaced text straight into the document instead of
+going through the edit path, so the undo history still described the text from before it ran and
+`Ctrl+Z` either did nothing or jumped past the replacement to an older edit. A bulk rewrite driven by
+a two-word query is the worst thing in the editor to leave unrecoverable. It is one step now, and it
+reports how many occurrences it changed — three replacements and three hundred look identical when
+the only feedback is the document redrawing.
+
+### Long work is visible while it runs
+
+Opening a project, exporting and searching a project all walked the disk with nothing on screen to
+say so. On a large tree that is several seconds of a window that looks hung.
+
+The status bar now carries whatever is running, with a progress bar where the total is known and an
+indeterminate one where it is not. It waits 200 ms before appearing, so a fast scan does not flash a
+bar at you, and stays at least 400 ms once shown, so it does not flicker. More than one running
+collapses into a popup listing them, each with a stop button.
+
+### Back and forward
+
+`Ctrl+Alt+Left` and `Ctrl+Alt+Right`, over the places you have been, with the toolbar arrows the IDE
+puts beside the project widget.
+
+The history is a single list with a cursor on it rather than two stacks — a stack pair drops the
+forward side as soon as anything else happens, which is what "the forward arrow never works"
+describes. Recording is coarse on purpose: a jump landing within 25 lines of the current entry
+replaces it instead of appending, so paging through search hits leaves one entry per region and not
+one per hit. Go to Line, the outline, a problem, a search result and switching tabs record; typing
+and arrow keys do not.
+
+Closing a tab does not erase where you have been. The place keeps its path and loses only its
+document id, and Back reopens the file to get there.
+
+### Three shortcuts that did not work
+
+Writing the keyboard reference for the new Learn page turned them up, and a test that presses every
+binding the reference lists now keeps them honest.
+
+- **`Alt+Shift+Up` / `Alt+Shift+Down`** (move line) sat inside the block that only runs with Ctrl
+  held, so the real binding was `Ctrl+Alt+Shift+arrow` and the documented one did nothing.
+- **`Ctrl+G`** stepped the find matches, which left **Go to Line** with no binding at all while a
+  menu entry claimed one. `Ctrl+G` is Go to Line now and `F3` / `Shift+F3` step the matches, as in
+  the IDE.
+- **`Ctrl+Shift+T`** was both the task-list toggle and the theme toggle. The task list is bound
+  first and returns, so with a document open — which is always — the theme binding could never fire.
+
+### A toolbar and a welcome screen that match the IDE
+
+The toolbar gains the navigation pair, a run-configuration widget that names its configuration (or
+says "Add Configuration", which is what to press rather than an empty dropdown), an overflow menu,
+and a rule separating what acts on the document from what acts on the application.
+
+The welcome screen gains a Learn page listing the whole keyboard, and Configure and Help menus
+pinned to the bottom of the rail. Those needed every dialog moved into one place first: they set
+state that only the main window rendered, so Settings from the welcome screen would have opened
+nothing. Its header also folds — above 560 points the actions are spelled out beside the search
+field, below it they collapse into an overflow so the field keeps its width.
+
+### Controls that still did nothing
+
+Four more places lit up under the pointer and did not keep the promise.
+
+The **breadcrumbs** were decoration except for the heading crumb — four broken promises along the
+bottom of the window, per document. Every crumb now reveals its target in the project view. **"Show
+in Project View"** only opened the panel, which on a project of any depth leaves the file exactly as
+hidden as it was; it expands every directory down to the target now. The **tool window title
+chevron** is the IDE's view switcher, so it is one — and it only appears where the dock has
+somewhere else to go. The **project root row** had a hover fill and an empty handler, and now has
+neither.
+
+The Project panel also gained **Refresh**, which it needed badly: the tree was read once when the
+project opened and never again, so a file created in a terminal — or by Quill's own export — was
+invisible until a restart.
+
+### Motion
+
+Tool windows grow out of the edge they dock to and collapse back into it. Dialogs and the search
+palettes arrive with a fade and a 2% scale. Editor tabs cross-fade their fill, the accent bar fades
+between them instead of jumping, and closing one slides the rest along. The status strip cross-fades
+between the breadcrumbs and a message.
+
+Every duration is asserted inside a band, and a render test drives a panel through a visibility
+change until the scene stops asking to be drawn — an animation that never settles is a repaint loop,
+which on the desktop is a pinned core for as long as the window is open.
+
+### Save As
+
+`Ctrl+Shift+S`. Saving a document that had never been on disk previously reported that it had
+nowhere to write and stopped there, because there was no file picker anywhere in the application.
 
 ### Typing is between three and four times faster
 
