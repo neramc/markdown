@@ -156,10 +156,23 @@ lines instead.
 </table>
 
 - **Tool windows** on three docks: Project, Structure, Problems, Notifications, Terminal, Database.
+  They grow out of the edge they dock to rather than appearing, so the editor beside them is pushed
+  rather than covered.
+- **Back and forward** (`Ctrl+Alt+Left` / `Ctrl+Alt+Right`) over the places you have been. Jumps are
+  recorded — Go to Line, the outline, a problem, a search result, switching tabs — and typing is
+  not, because a history that records the caret is one where Back means "up one line". Closing a
+  tab does not erase where you have been; Back reopens the file to get there.
 - **Run configurations** for the document tasks — export to HTML, inspect, count — with their own
   dialog and `Shift+F10`.
 - **Settings** covering appearance, editor behaviour, inspections and save actions.
 - **Breadcrumbs** along the status bar: project, folders, file, and the heading the caret sits under.
+  Every one of them reveals its target in the project view.
+- **Nothing irreversible happens quietly.** Closing a modified document asks, and asks once for a
+  whole batch rather than once per tab; so does quitting, and so does reloading a file over unsaved
+  edits. Replace All reports how many it changed and is one `Ctrl+Z` away from undone.
+- **Long work is visible.** Scanning a project, exporting and searching report progress in the
+  status bar — after 200 ms, so a fast scan does not flash a bar at you, and for at least 400 ms
+  once shown so it does not flicker.
 - **Dark and light themes,** switched at runtime.
 - **Export** to HTML, PDF, Word, EPUB, Confluence, Notion and a GitHub README.
 

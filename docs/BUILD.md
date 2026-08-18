@@ -100,8 +100,15 @@ ships no CDS archive to skip that. On a benchmark that loads a broad slice of `j
 `java.desktop` — the classes a first frame needs — the cost measured **+21 ms** (79 ms → 101 ms).
 Only JDK classes are affected; everything in `lib/app` is read from ordinary jars either way. Thirty
 megabytes of permanent disk for twenty-odd milliseconds of one-time work is the right side of that
-trade, but it is a trade. `-J-Dquill.startup.trace=true` prints time-to-first-frame if you want to
-re-measure it.
+trade, but it is a trade. `JAVA_TOOL_OPTIONS=-Dquill.startup.trace=true` prints time-to-first-frame
+if you want to re-measure it.
+
+Through the environment rather than on the command line, and the distinction is not cosmetic. A
+jpackage app-image launcher reads its JVM options from `lib/app/Quill.cfg` and hands everything on
+its command line to the application, so `-Dquill.startup.trace=true` is taken as a file to open and
+`-J-Dquill.startup.trace=true` — the form `java` itself would want — is accepted and then ignored.
+Both look like the flag working and neither is. `JAVA_TOOL_OPTIONS` reaches the JVM; the launcher
+prints a line saying it picked it up, which is how you know.
 
 The compression also does **not** make the download smaller — it makes it slightly larger, because
 `gzip` was already doing this work on the way to disk and now has nothing left to squeeze

@@ -13,12 +13,16 @@ package dev.starfect.quill
  * to know whether that stays a good trade is to have a number on both sides of it.
  *
  * ```
- * Quill -J-Dquill.startup.trace=true
+ * JAVA_TOOL_OPTIONS=-Dquill.startup.trace=true Quill
  * quill: first frame after 1284 ms
  * ```
  *
- * Note the `-J`. A jpackage launcher passes bare arguments to the application and needs `-J` to
- * forward one to the JVM, so `-Dquill.startup.trace=true` on its own is read as a file to open.
+ * Through the environment, not the command line. A jpackage app-image launcher takes its JVM
+ * options from `lib/app/Quill.cfg` and passes everything on its command line to the application:
+ * `-Dquill.startup.trace=true` is read as a file to open, and `-J-D…` — which is how `java` itself
+ * would be told — is *silently ignored*, so the flag looks accepted and nothing happens.
+ * `JAVA_TOOL_OPTIONS` is the one channel that reaches the JVM from outside; the launcher announces
+ * on every run that it picked it up.
  */
 public object Startup {
 
