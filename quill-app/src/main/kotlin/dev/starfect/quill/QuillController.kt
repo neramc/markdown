@@ -610,17 +610,34 @@ public class QuillController(
         .replace(Regex("[^\\p{L}\\p{N}\\s-]"), "")
         .replace(Regex("\\s+"), "-")
 
-    /** Closes a document, releasing its engine handle. */
+    /**
+     * Closes a document, releasing its engine handle.
+     *
+     * The tab goes from the window immediately and the native handle is released afterwards, once
+     * the derivation that might be reading it has stopped. This used to wait for that derivation on
+     * the calling thread — which is the UI thread — so closing a tab froze the window for as long as
+     * the parse took, up to half a second on a large file, and closing ten tabs froze it ten times
+     * in a row.
+     *
+     * The ordering still matters for the same reason it always did: freeing the document out from
+     * under a worker reading it is a crash in native code. What changed is who waits.
+     */
     public fun closeDocument(id: Long) {
-        // Same ordering as [close]: the document's derivation has to have finished before its handle
-        // is released, or the worker is left reading freed memory.
         val running = derivationJobs.remove(id)
         running?.cancel()
-        if (running != null) runBlocking { running.join() }
-        handles.remove(id)?.close()
+        highlightJobs.remove(id)?.cancel()
+        val handle = handles.remove(id)
         histories.remove(id)
         visibleLines.remove(id)
         highlightedLines.remove(id)
+
+        if (handle != null) {
+            scope.launch {
+                running?.join()
+                handle.close()
+            }
+        }
+
         update { workspace ->
             val remaining = workspace.documents.filterNot { it.id == id }
             workspace.copy(
