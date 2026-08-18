@@ -36,9 +36,12 @@ import kotlinx.coroutines.cancel
  * is no compositor and no vsync — so treat the absolute numbers as a floor and the *ratios* between
  * document sizes as the finding.
  *
- * The ceilings asserted at the end are deliberately loose. This runs on shared CI hardware where a
- * 3x swing is ordinary; the point is to fail when a keystroke starts costing an order of magnitude
- * more, not to police milliseconds.
+ * What is asserted is therefore the *growth* between document sizes, not the milliseconds. This runs
+ * on shared CI hardware where a four-fold swing happens, and a ceiling within a small multiple of
+ * the local number fails on the machine rather than on the change — which teaches everyone to re-run
+ * it, at which point it has stopped being a guard. The ratios are stable because the harness cost
+ * appears in both terms, and they are what actually distinguishes viewport-scoped highlighting from
+ * whole-document highlighting.
  */
 class EditorLatencyTest {
 
@@ -140,16 +143,41 @@ class EditorLatencyTest {
         println("=== frame cost of one keystroke ===")
         measurements.forEach { (lines, millis) -> println("  %5d lines : %7.2f ms".format(lines, millis)) }
 
-        // Measured here at 34 / 114 / 455 ms after scoping highlighting to the viewport, against
+        // Measured here at 37 / 114 / 527 ms after scoping highlighting to the viewport, against
         // 54 / 211 / 1579 ms before it. About 40 ms of every number is the offscreen scene
         // rasterising 1440x900 in software, which a real window does not pay the same way.
         //
-        // The ceilings sit roughly three times the measured value: shared CI hardware swings that
-        // much, and the regression worth failing on is the structural one — highlighting the whole
-        // document again would put the last row back over 1500 ms.
-        assertTrue(measurements.getValue(100) < 150.0, "a keystroke in a 100-line document cost ${measurements[100]} ms")
-        assertTrue(measurements.getValue(500) < 400.0, "a keystroke in a 500-line document cost ${measurements[500]} ms")
-        assertTrue(measurements.getValue(2000) < 1_200.0, "a keystroke in a 2000-line document cost ${measurements[2000]} ms")
+        // **The finding is the growth, not the milliseconds.** Ceilings within a small multiple of
+        // the local numbers do not survive shared CI hardware: this suite ran four times in one
+        // afternoon on identical editor code and failed once, at 492 ms against a 400 ms ceiling —
+        // four times the local 114 ms, on a runner that was simply busy. A test that fails on the
+        // machine rather than on the change teaches everyone to re-run it, and then it is not a
+        // guard at all.
+        //
+        // Ratios do not care how fast the machine is, because the harness cost is in both terms.
+        // They also catch the regression this exists for: four times the lines cost 4.0-4.6x here
+        // and 7.5x before viewport scoping, so the ceiling sits between those.
+        val smallToMedium = measurements.getValue(500) / measurements.getValue(100)
+        val mediumToLarge = measurements.getValue(2000) / measurements.getValue(500)
+        println("  growth 100 -> 500 : %.2fx".format(smallToMedium))
+        println("  growth 500 -> 2000: %.2fx".format(mediumToLarge))
+
+        // Only the second ratio is asserted. The first barely discriminates — 3.0-3.6x here against
+        // 3.9x before the fix — so a ceiling tight enough to catch anything would be tight enough
+        // to fail on noise, and one loose enough to be stable would catch nothing. It is printed
+        // because it is worth reading, not because it is worth failing on.
+        assertTrue(
+            mediumToLarge < 6.0,
+            "four times the lines cost ${"%.2f".format(mediumToLarge)}x the frame; " +
+                "highlighting is meant to follow the viewport, not the document",
+        )
+
+        // And a floor under all of it, an order of magnitude above the local numbers rather than a
+        // small multiple. This is not policing milliseconds — it is the assertion that catches a
+        // keystroke becoming unusable in a way the ratios happen to preserve.
+        assertTrue(measurements.getValue(100) < 600.0, "a keystroke in a 100-line document cost ${measurements[100]} ms")
+        assertTrue(measurements.getValue(500) < 2_000.0, "a keystroke in a 500-line document cost ${measurements[500]} ms")
+        assertTrue(measurements.getValue(2000) < 6_000.0, "a keystroke in a 2000-line document cost ${measurements[2000]} ms")
     }
 
     /** Types one character into the middle of the document, the way the text field would. */

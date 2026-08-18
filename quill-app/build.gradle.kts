@@ -74,6 +74,14 @@ tasks.test {
     useJUnitPlatform()
     jvmArgs("--enable-native-access=ALL-UNNAMED")
 
+    // No test may open a native window. Several of them drive the controller through actions that
+    // would — Save As raises a file picker — and a modal dialog in a test run is not a failure, it
+    // is a hang: the CI runner sits at the prompt until the job's six-hour limit. On Linux this is
+    // already true by accident, since there is no display and AWT throws; on the Windows and macOS
+    // runners there *is* one, which is how a suite that passed everywhere locally stopped three
+    // release builds dead. Skiko renders offscreen and does not need a display either way.
+    systemProperty("java.awt.headless", "true")
+
     // Print the assertion, not Gradle's stack. A failing build on a CI runner otherwise reports two
     // hundred lines of org.gradle.internal.execution frames with the one line that says what went
     // wrong scrolled off the top -- which is how a five-minute diagnosis becomes an hour.
