@@ -19,6 +19,7 @@ import androidx.compose.ui.window.rememberWindowState
 import dev.starfect.quill.bridge.QuillEngine
 import dev.starfect.quill.bridge.QuillNativeLibraryException
 import dev.starfect.quill.install.Uninstall
+import dev.starfect.quill.io.FileService
 import dev.starfect.quill.io.RecentProject
 import dev.starfect.quill.io.RecentProjects
 import dev.starfect.quill.io.SettingsStore
@@ -170,7 +171,7 @@ public fun main(arguments: Array<String>) {
                     projectOpen = true
                 },
                 onBrowse = {
-                    chooseDirectory()?.let { directory ->
+                    FileService.chooseDirectory()?.let { directory ->
                         controller.openProject(directory)
                         recentProjects.remember(directory)
                         recents = recentProjects.load()
@@ -396,42 +397,6 @@ private fun WelcomeWindow(
                 onToggleTheme = onToggleTheme,
                 darkTheme = darkTheme,
             )
-        }
-    }
-}
-
-/**
- * Asks the platform for a directory.
- *
- * AWT's `FileDialog` is used rather than Swing's `JFileChooser` because it is the *native* dialog on
- * macOS and Windows, and a file picker that does not look like the platform's own is jarring in a
- * way no amount of theming fixes. The `apple.awt.fileDialogForDirectories` property is what makes it
- * select directories on macOS; elsewhere the parent of the chosen file is used.
- */
-private fun chooseDirectory(): Path? {
-    val previous = System.getProperty("apple.awt.fileDialogForDirectories")
-    System.setProperty("apple.awt.fileDialogForDirectories", "true")
-
-    return try {
-        val dialog = FileDialog(null as Frame?, "Open Folder", FileDialog.LOAD)
-        dialog.isVisible = true
-
-        val directory = dialog.directory ?: return null
-        val file = dialog.file
-
-        val selected = if (file != null) Path.of(directory, file) else Path.of(directory)
-        if (selected.isDirectory()) selected else selected.parent
-    } catch (failure: Exception) {
-        // A headless or otherwise unavailable dialog must not take the application down with it.
-        when (failure) {
-            is java.awt.HeadlessException, is SecurityException -> null
-            else -> throw failure
-        }
-    } finally {
-        if (previous == null) {
-            System.clearProperty("apple.awt.fileDialogForDirectories")
-        } else {
-            System.setProperty("apple.awt.fileDialogForDirectories", previous)
         }
     }
 }

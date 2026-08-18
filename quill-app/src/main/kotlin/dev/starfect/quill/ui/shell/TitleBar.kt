@@ -100,7 +100,7 @@ public fun DecoratedWindowScope.QuillTitleBar(
                 modifier = Modifier.size(Tokens.IconSize),
             )
             MainMenuButton(controller, workspace, onExit)
-            ProjectWidget(workspace)
+            ProjectWidget(controller, workspace)
             BranchWidget(workspace)
         }
 
@@ -136,7 +136,7 @@ public fun QuillToolBar(controller: QuillController, workspace: WorkspaceState, 
             modifier = Modifier.size(Tokens.IconSize),
         )
         MainMenuButton(controller, workspace, onExit)
-        ProjectWidget(workspace)
+        ProjectWidget(controller, workspace)
         BranchWidget(workspace)
 
         Box(Modifier.weight(1f))
@@ -183,11 +183,13 @@ private fun TitleBarActions(controller: QuillController, workspace: WorkspaceSta
  * read anything.
  */
 @Composable
-private fun ProjectWidget(workspace: WorkspaceState) {
+private fun ProjectWidget(controller: QuillController, workspace: WorkspaceState) {
     val shell = LocalShellPalette.current
     val project = workspace.projectRoot?.fileName?.toString() ?: "quill"
+    var open by remember { mutableStateOf(false) }
 
-    IdeWidgetButton(onClick = {}) {
+    Box {
+    IdeWidgetButton(onClick = { open = !open }, selected = open) {
         Box(
             modifier = Modifier.size(Tokens.ProjectBadgeSize)
                 .clip(RoundedCornerShape(Tokens.ProjectBadgeCorner))
@@ -211,8 +213,23 @@ private fun ProjectWidget(workspace: WorkspaceState) {
             modifier = Modifier.padding(start = Tokens.Spacing.Tiny),
         )
         // The chevron is what marks this as a widget rather than a caption; the IDE draws one on
-        // every toolbar widget that can be opened.
+        // every toolbar widget that can be opened. It was drawing one over a button that opened
+        // nothing, which is the chevron telling a lie.
         Box(Modifier.padding(start = 4.dp)) { IdeIcons.WidgetChevron(shell.mutedText) }
+    }
+
+        if (open) {
+            PopupMenu(
+                onDismissRequest = {
+                    open = false
+                    true
+                },
+                horizontalAlignment = Alignment.Start,
+                modifier = Modifier.width(280.dp),
+            ) {
+                projectMenu(controller, workspace) { open = false }
+            }
+        }
     }
 }
 
@@ -229,7 +246,9 @@ private fun BranchWidget(workspace: WorkspaceState) {
     val root = workspace.projectRoot
     val branch = remember(root) { GitStatus.currentBranch(root) } ?: return
 
-    IdeWidgetButton(onClick = {}) {
+    // An indicator. Quill has no branch operations to offer, and a widget that highlights under
+    // the pointer and then does nothing is how an application gets described as broken.
+    IdeWidgetButton(onClick = null) {
         IdeIcons.Branch(shell.icon, size = Tokens.IconSize)
         Text(
             text = branch,
@@ -553,5 +572,51 @@ public fun ApplicationScope.StartupFailureWindow(failure: QuillNativeLibraryExce
                 }
             }
         }
+    }
+}
+
+
+/**
+ * What the project widget opens.
+ *
+ * The three things a reader wants from the name of the project they are in: somewhere else, the
+ * place it lives, and a way to see the whole of it. Recent projects are the first of those and are
+ * listed by name with their path beside them, because two checkouts of the same repository have the
+ * same name and the path is the only thing that tells them apart.
+ */
+private fun MenuScope.projectMenu(
+    controller: QuillController,
+    workspace: WorkspaceState,
+    dismiss: () -> Unit,
+) {
+    val root = workspace.projectRoot
+
+    selectableItem(
+        selected = false,
+        onClick = {
+            dismiss()
+            FileService.chooseDirectory()?.let(controller::openProject)
+        },
+    ) { Text("Open Folder…") }
+
+    selectableItem(
+        selected = false,
+        enabled = root != null,
+        onClick = {
+            dismiss()
+            root?.let { controller.setLeftToolWindow(ToolWindow.PROJECT) }
+        },
+    ) { Text("Show in Project View") }
+
+    if (root != null) {
+        passiveItem { MenuSeparator() }
+        selectableItem(
+            selected = false,
+            onClick = {
+                dismiss()
+                java.awt.Toolkit.getDefaultToolkit().systemClipboard
+                    .setContents(java.awt.datatransfer.StringSelection(root.toString()), null)
+            },
+        ) { Text("Copy Path") }
     }
 }

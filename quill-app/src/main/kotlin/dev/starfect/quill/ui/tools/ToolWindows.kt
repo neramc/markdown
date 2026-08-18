@@ -142,7 +142,9 @@ private fun ProjectRootRow(root: Path) {
         }
     }
 
-    TreeRow(depth = 0, onClick = {}, expandable = true, expanded = true) {
+    // Not expandable: the root is always open, and a chevron that does nothing when clicked is the
+    // same broken promise the toolbar widgets were making.
+    TreeRow(depth = 0, onClick = {}, expandable = false, expanded = true) {
         IdeIcons.Module(shell.sourceFolderIcon, size = Tokens.IconSize)
         TreeLabel(root.fileName?.toString() ?: root.toString())
         // Clipped from the right so a deep path never pushes the name out, and omitted entirely

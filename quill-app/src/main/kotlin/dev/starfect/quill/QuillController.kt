@@ -502,6 +502,30 @@ public class QuillController(
         }
     }
 
+    /**
+     * Closes every open document except [keep].
+     *
+     * Unsaved work is closed with everything else, exactly as [closeDocument] does one at a time.
+     * The two behaving differently would be the surprise; whichever way Quill decides to guard
+     * against losing an unsaved buffer, it has to decide it in one place.
+     */
+    public fun closeOtherDocuments(keep: Long) {
+        _state.value.documents.map { it.id }.filter { it != keep }.forEach(::closeDocument)
+    }
+
+    /** Closes every open document. */
+    public fun closeAllDocuments() {
+        _state.value.documents.map { it.id }.forEach(::closeDocument)
+    }
+
+    /** Closes the documents to the right of [id] in the tab strip. */
+    public fun closeDocumentsAfter(id: Long) {
+        val documents = _state.value.documents
+        val index = documents.indexOfFirst { it.id == id }
+        if (index < 0) return
+        documents.drop(index + 1).map { it.id }.forEach(::closeDocument)
+    }
+
     public fun selectDocument(id: Long) {
         update { it.copy(activeDocumentId = id) }
     }
@@ -1240,6 +1264,32 @@ public class QuillController(
     }
 
     // ---------------------------------------------------------------- dialogs
+
+    /**
+     * Moves the caret of [id] to [line] and [column], both one-based as a reader counts them.
+     *
+     * Clamped rather than refused. A reader who asks for line 900 of an 800-line document means the
+     * end, and a jump that silently does nothing because the number was one too large is the kind
+     * of thing that gets described as "the button does not work".
+     */
+    public fun goToLine(id: Long, line: Int, column: Int = 1) {
+        val session = _state.value.documents.firstOrNull { it.id == id } ?: return
+        val text = session.text.text
+
+        var offset = 0
+        var remaining = (line - 1).coerceAtLeast(0)
+        while (remaining > 0) {
+            val next = text.indexOf('\n', offset)
+            if (next < 0) break
+            offset = next + 1
+            remaining--
+        }
+
+        val lineEnd = text.indexOf('\n', offset).let { if (it < 0) text.length else it }
+        val target = (offset + (column - 1).coerceAtLeast(0)).coerceIn(offset, lineEnd)
+
+        updateDocument(id) { it.copy(text = it.text.copy(selection = TextRange(target))) }
+    }
 
     public fun showDialog(dialog: Dialog) {
         update { it.copy(dialog = dialog) }

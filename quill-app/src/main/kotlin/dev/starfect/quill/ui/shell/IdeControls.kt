@@ -96,7 +96,15 @@ public fun IdeActionButton(
  */
 @Composable
 public fun IdeWidgetButton(
-    onClick: () -> Unit,
+    /**
+     * What clicking does, or null when the widget only reports something.
+     *
+     * Null is not a shortcut for "nothing happens yet". A widget with a hover fill and a pointer
+     * cursor is a promise, and several here were making it without keeping it — the branch name,
+     * the encoding, the line ending. Passing null takes the promise away rather than leaving it
+     * unkept: no fill, no press state, nothing to click.
+     */
+    onClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
     selected: Boolean = false,
     content: @Composable () -> Unit,
@@ -107,14 +115,24 @@ public fun IdeWidgetButton(
     val pressed by interaction.collectIsPressedAsState()
 
     val state = SurfaceState.ofToggle(hovered = hovered, pressed = pressed, on = selected)
-    val fill by animateColorAsState(state.background(shell), Motion.state(), label = "widgetFill")
+    val fill by animateColorAsState(
+        if (onClick == null && !selected) Color.Transparent else state.background(shell),
+        Motion.state(),
+        label = "widgetFill",
+    )
 
     Row(
         modifier = modifier.height(Tokens.ControlSize)
             .clip(RoundedCornerShape(Tokens.Radius.Control))
             .background(fill)
-            .hoverable(interaction)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .then(if (onClick == null) Modifier else Modifier.hoverable(interaction))
+            .then(
+                if (onClick == null) {
+                    Modifier
+                } else {
+                    Modifier.clickable(interactionSource = interaction, indication = null, onClick = onClick)
+                },
+            )
             .padding(horizontal = Tokens.Spacing.Small),
         verticalAlignment = Alignment.CenterVertically,
     ) {

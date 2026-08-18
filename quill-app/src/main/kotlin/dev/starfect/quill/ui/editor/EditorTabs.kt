@@ -19,6 +19,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.setValue
+import org.jetbrains.jewel.ui.component.MenuSeparator
+import org.jetbrains.jewel.ui.component.PopupMenu
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -72,14 +77,7 @@ public fun EditorTabs(controller: QuillController, workspace: WorkspaceState) {
                 }
             }
 
-            // The IDE parks a tab-actions menu at the right end of the strip; without it the strip
-            // ends in nothing and the row reads as unfinished next to a real editor window.
-            IdeActionButton(
-                onClick = {},
-                tooltip = "Tab Actions",
-                size = Tokens.SmallControlSize,
-                modifier = Modifier.padding(end = Tokens.Spacing.Tiny),
-            ) { tint -> IdeIcons.MoreVertical(tint, size = Tokens.SmallIconSize) }
+            TabActionsButton(controller, workspace)
         }
     }
 }
@@ -211,3 +209,94 @@ private fun TabCloseButton(onClose: () -> Unit) {
 
 /** Width reserved for a tab's close affordance, so callers can align around it. */
 internal val TabCloseWidth = Tokens.TabCloseSize
+
+
+/**
+ * The menu at the right end of the tab strip.
+ *
+ * It was a button that did nothing — the strip needed something at its right end and the icon was
+ * put there to fill it. Every entry below is an action the controller already had or a one-line
+ * addition to it, so the menu is the whole of the fix: nothing here is a placeholder.
+ *
+ * Disabled rather than hidden when an entry cannot apply. "Close Others" with one tab open is a
+ * question with an answer, and a menu whose items move around between openings is harder to use
+ * than one whose items grey out.
+ */
+@Composable
+private fun TabActionsButton(controller: QuillController, workspace: WorkspaceState) {
+    var open by remember { mutableStateOf(false) }
+    val active = workspace.activeDocument
+    val documents = workspace.documents
+    val index = documents.indexOfFirst { it.id == active?.id }
+
+    Box {
+        IdeActionButton(
+            onClick = { open = !open },
+            tooltip = "Tab Actions",
+            selected = open,
+            size = Tokens.SmallControlSize,
+            modifier = Modifier.padding(end = Tokens.Spacing.Tiny),
+        ) { tint -> IdeIcons.MoreVertical(tint, size = Tokens.SmallIconSize) }
+
+        if (open) {
+            PopupMenu(
+                onDismissRequest = {
+                    open = false
+                    true
+                },
+                horizontalAlignment = Alignment.End,
+                modifier = Modifier.width(240.dp),
+            ) {
+                fun act(run: () -> Unit) {
+                    open = false
+                    run()
+                }
+
+                selectableItem(
+                    selected = false,
+                    enabled = active != null,
+                    onClick = { act { active?.let { controller.closeDocument(it.id) } } },
+                ) { Text("Close") }
+
+                selectableItem(
+                    selected = false,
+                    enabled = documents.size > 1,
+                    onClick = { act { active?.let { controller.closeOtherDocuments(it.id) } } },
+                ) { Text("Close Others") }
+
+                selectableItem(
+                    selected = false,
+                    enabled = index >= 0 && index < documents.lastIndex,
+                    onClick = { act { active?.let { controller.closeDocumentsAfter(it.id) } } },
+                ) { Text("Close to the Right") }
+
+                selectableItem(
+                    selected = false,
+                    enabled = documents.isNotEmpty(),
+                    onClick = { act { controller.closeAllDocuments() } },
+                ) { Text("Close All") }
+
+                passiveItem { MenuSeparator() }
+
+                selectableItem(
+                    selected = false,
+                    enabled = active?.path != null,
+                    onClick = {
+                        act {
+                            active?.path?.let { path ->
+                                java.awt.Toolkit.getDefaultToolkit().systemClipboard
+                                    .setContents(java.awt.datatransfer.StringSelection(path.toString()), null)
+                            }
+                        }
+                    },
+                ) { Text("Copy Path") }
+
+                selectableItem(
+                    selected = false,
+                    enabled = active?.path != null,
+                    onClick = { act { active?.path?.parent?.let(controller::openProject) } },
+                ) { Text("Open Containing Folder as Project") }
+            }
+        }
+    }
+}

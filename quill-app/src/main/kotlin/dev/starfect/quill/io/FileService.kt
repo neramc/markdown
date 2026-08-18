@@ -5,6 +5,8 @@ import java.io.IOException
 import java.nio.charset.StandardCharsets
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
+import java.awt.FileDialog
+import java.awt.Frame
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import kotlin.io.path.extension
@@ -16,7 +18,7 @@ import kotlin.streams.asSequence
 /** File-system access for the workspace: reading, writing and scanning a project tree. */
 public class FileService {
 
-    private companion object {
+    public companion object {
         /** Extensions the project tool window shows alongside directories. */
         val TEXT_EXTENSIONS = setOf("md", "markdown", "mdx", "txt", "adoc", "rst")
 
@@ -28,6 +30,42 @@ public class FileService {
 
         /** Cap on entries per directory, so a pathological folder cannot stall the UI. */
         const val MAX_ENTRIES_PER_DIRECTORY = 2_000
+    
+    /**
+     * Asks the platform for a directory.
+     *
+     * AWT's `FileDialog` is used rather than Swing's `JFileChooser` because it is the *native* dialog on
+     * macOS and Windows, and a file picker that does not look like the platform's own is jarring in a
+     * way no amount of theming fixes. The `apple.awt.fileDialogForDirectories` property is what makes it
+     * select directories on macOS; elsewhere the parent of the chosen file is used.
+     */
+    public fun chooseDirectory(): Path? {
+        val previous = System.getProperty("apple.awt.fileDialogForDirectories")
+        System.setProperty("apple.awt.fileDialogForDirectories", "true")
+
+        return try {
+            val dialog = FileDialog(null as Frame?, "Open Folder", FileDialog.LOAD)
+            dialog.isVisible = true
+
+            val directory = dialog.directory ?: return null
+            val file = dialog.file
+
+            val selected = if (file != null) Path.of(directory, file) else Path.of(directory)
+            if (selected.isDirectory()) selected else selected.parent
+        } catch (failure: Exception) {
+            // A headless or otherwise unavailable dialog must not take the application down with it.
+            when (failure) {
+                is java.awt.HeadlessException, is SecurityException -> null
+                else -> throw failure
+            }
+        } finally {
+            if (previous == null) {
+                System.clearProperty("apple.awt.fileDialogForDirectories")
+            } else {
+                System.setProperty("apple.awt.fileDialogForDirectories", previous)
+            }
+        }
+    }
     }
 
     /** Reads a UTF-8 file. */
@@ -106,4 +144,6 @@ public class FileService {
             directory.resolve(base.name.substringBeforeLast('.', base.name) + "." + fileName)
         }
     }
+
+
 }

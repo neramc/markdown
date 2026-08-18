@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.starfect.quill.QuillController
+import dev.starfect.quill.model.Dialog
 import dev.starfect.quill.model.DocumentSession
 import dev.starfect.quill.model.ToolWindow
 import dev.starfect.quill.model.WorkspaceState
@@ -203,10 +204,6 @@ public fun ToolWindowHeader(
 
             actions()
 
-            IdeActionButton(onClick = {}, tooltip = "Options", size = Tokens.SmallControlSize) { tint ->
-                IdeIcons.MoreVertical(tint, size = Tokens.SmallIconSize)
-            }
-
             if (onHide != null) {
                 IdeActionButton(onClick = onHide, tooltip = "Hide", size = Tokens.SmallControlSize) { tint ->
                     IdeIcons.Hide(tint, towardsLeft = hidesTowardsLeft, size = Tokens.SmallIconSize)
@@ -263,19 +260,28 @@ public fun StatusBar(controller: QuillController, workspace: WorkspaceState) {
                     StatusItem(workspace.vim.display, "Vim mode -- Esc returns to normal")
                 }
 
-                StatusItem("${caret.line + 1}:${caret.column + 1}", "Go to line and column")
+                StatusItem(
+                    "${caret.line + 1}:${caret.column + 1}",
+                    "Go to line and column",
+                    onClick = { controller.showDialog(Dialog.GO_TO_LINE) },
+                )
                 StatusItem("${stats.words} words", "Words in prose, excluding code and front matter")
                 StatusItem(readingTime(stats.readingTimeSeconds), "Estimated reading time at 200 wpm")
                 StatusItem("LF", "Line separator")
                 StatusItem("UTF-8", "File encoding")
                 StatusItem("Markdown", "File type")
 
-                IdeActionButton(
-                    onClick = {},
-                    tooltip = "The file is writable",
-                    size = Tokens.SmallControlSize,
-                ) { tint ->
-                    IdeIcons.Lock(tint, locked = false, size = Tokens.SmallIconSize)
+                // An indicator, not a control. Quill has no read-only mode to toggle into, and a
+                // padlock that does nothing when pressed is worse than a padlock that plainly is
+                // not a button.
+                Tooltip(tooltip = { Text("The file is writable") }) {
+                    IdeWidgetButton(onClick = null) {
+                        IdeIcons.Lock(
+                            LocalShellPalette.current.mutedIcon,
+                            locked = false,
+                            size = Tokens.SmallIconSize,
+                        )
+                    }
                 }
             }
         }
@@ -367,11 +373,23 @@ private fun StatusMessage(message: String, color: Color, onDismiss: () -> Unit) 
     }
 }
 
-/** One status bar widget: a label with a hover fill and a tooltip, as every IDE widget is. */
+/**
+ * One status bar widget.
+ *
+ * [onClick] is null for the ones that only report — the encoding, the line ending, the file type.
+ * They used to be buttons with a hover fill, which is a promise the status bar was making four
+ * times over and keeping none of; a reader who clicks "UTF-8" expecting an encoding menu and gets
+ * nothing has been told the application is broken, and was told correctly.
+ */
 @Composable
-private fun StatusItem(label: String, tooltip: String, modifier: Modifier = Modifier) {
+private fun StatusItem(
+    label: String,
+    tooltip: String,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+) {
     Tooltip(tooltip = { Text(tooltip) }) {
-        IdeWidgetButton(onClick = {}, modifier = modifier) {
+        IdeWidgetButton(onClick = onClick, modifier = modifier) {
             Text(
                 label,
                 fontSize = LocalTypeScale.current.medium,

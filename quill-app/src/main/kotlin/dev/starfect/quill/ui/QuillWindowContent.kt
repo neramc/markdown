@@ -178,6 +178,7 @@ public fun QuillWindowContent(
             Dialog.SETTINGS -> SettingsDialog(controller, workspace)
             Dialog.RUN_CONFIGURATIONS -> RunConfigurationsDialog(controller, workspace)
             Dialog.ABOUT -> AboutDialog(controller)
+            Dialog.GO_TO_LINE -> dev.starfect.quill.ui.dialog.GoToLineDialog(controller, workspace)
             Dialog.UPDATE -> dev.starfect.quill.ui.dialog.UpdateDialog(
                 onDismiss = controller::dismissDialog,
                 onRestart = onExit,
