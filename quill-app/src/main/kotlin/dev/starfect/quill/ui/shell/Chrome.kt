@@ -40,6 +40,11 @@ import java.nio.file.Path
 import org.jetbrains.jewel.ui.Orientation
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.Tooltip
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import dev.starfect.quill.ui.theme.interactiveSurface
+import org.jetbrains.jewel.ui.component.PopupMenu
 
 /**
  * A tool window stripe: the narrow icon rail down each edge of the window.
@@ -177,28 +182,80 @@ public fun ToolWindowHeader(
     title: String,
     onHide: (() -> Unit)? = null,
     hidesTowardsLeft: Boolean = true,
+    /**
+     * The other tool windows this dock can show.
+     *
+     * The chevron beside the title is the IDE's view switcher, and it was drawn unconditionally
+     * over a title that opened nothing. It now appears only when there is somewhere to switch to,
+     * and switches there when pressed.
+     */
+    alternatives: List<ToolWindow> = emptyList(),
+    onSelect: (ToolWindow) -> Unit = {},
     actions: @Composable () -> Unit = {},
 ) {
     val shell = LocalShellPalette.current
+    var switcherOpen by remember { mutableStateOf(false) }
+
+    // One alternative is the panel you are already looking at, and a menu with a single entry that
+    // changes nothing is the chevron telling the same lie it told before it opened anything.
+    val switchable = alternatives.size > 1
+
     Column {
         Row(
             modifier = Modifier.fillMaxWidth().height(Tokens.ToolWindowHeaderHeight)
                 .padding(start = Tokens.Spacing.Medium, end = Tokens.Spacing.Tiny),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                // A tool window header is the default size in semibold, not a larger size. That is
-                // what keeps it from reading as a heading in a document: it matches the rows beneath
-                // it and differs only in weight.
-                Text(
-                    text = title,
-                    fontSize = LocalTypeScale.current.default,
-                    fontWeight = LocalTypeScale.current.headerWeight,
-                    color = shell.text,
-                    maxLines = 1,
-                )
-                Box(Modifier.padding(start = Tokens.Spacing.Tiny)) {
-                    IdeIcons.WidgetChevron(shell.mutedIcon, size = Tokens.SmallIconSize)
+            Box(Modifier.weight(1f)) {
+                Row(
+                    modifier = if (!switchable) {
+                        Modifier
+                    } else {
+                        Modifier.interactiveSurface(
+                            onClick = { switcherOpen = !switcherOpen },
+                            palette = shell,
+                            selected = switcherOpen,
+                            cornerRadius = Tokens.Radius.Control,
+                        ).padding(horizontal = Tokens.Spacing.Tiny)
+                    },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    // A tool window header is the default size in semibold, not a larger size. That
+                    // is what keeps it from reading as a heading in a document: it matches the rows
+                    // beneath it and differs only in weight.
+                    Text(
+                        text = title,
+                        fontSize = LocalTypeScale.current.default,
+                        fontWeight = LocalTypeScale.current.headerWeight,
+                        color = shell.text,
+                        maxLines = 1,
+                    )
+                    if (switchable) {
+                        Box(Modifier.padding(start = Tokens.Spacing.Tiny)) {
+                            IdeIcons.WidgetChevron(shell.mutedIcon, size = Tokens.SmallIconSize)
+                        }
+                    }
+                }
+
+                if (switcherOpen) {
+                    PopupMenu(
+                        onDismissRequest = {
+                            switcherOpen = false
+                            true
+                        },
+                        horizontalAlignment = Alignment.Start,
+                        modifier = Modifier.width(220.dp),
+                    ) {
+                        alternatives.forEach { tool ->
+                            selectableItem(
+                                selected = tool.label == title,
+                                onClick = {
+                                    switcherOpen = false
+                                    onSelect(tool)
+                                },
+                            ) { Text(tool.label) }
+                        }
+                    }
                 }
             }
 
@@ -353,22 +410,43 @@ private enum class CrumbKind { PROJECT, FOLDER, FILE, HEADING }
 
 private class Crumb(val label: String, val kind: CrumbKind, val onClick: (QuillController) -> Unit = {})
 
-/** Builds the trail: project, the folders between it and the file, the file, then the heading. */
+/**
+ * Builds the trail: project, the folders between it and the file, the file, then the heading.
+ *
+ * Every crumb carries something to do. They used to be decoration with a hover fill: only the
+ * heading was clickable, and the other three took the pointer and did nothing — four times per
+ * document, along the bottom of the window.
+ */
 private fun buildCrumbs(projectRoot: Path?, document: DocumentSession): List<Crumb> = buildList {
     val path = document.path
 
     if (projectRoot != null) {
-        add(Crumb(projectRoot.fileName?.toString() ?: projectRoot.toString(), CrumbKind.PROJECT))
+        add(
+            Crumb(projectRoot.fileName?.toString() ?: projectRoot.toString(), CrumbKind.PROJECT) {
+                it.revealInProject(projectRoot)
+            }
+        )
     }
 
     if (path != null) {
         val relative = runCatching { projectRoot?.relativize(path) }.getOrNull()
         val parts = (relative ?: path.fileName)?.toList().orEmpty()
-        // Everything except the last element is a directory on the way to the file.
-        parts.dropLast(1).forEach { part -> add(Crumb(part.toString(), CrumbKind.FOLDER)) }
+        // Everything except the last element is a directory on the way to the file. The name alone
+        // is not enough to act on, so the path is rebuilt as the trail is walked.
+        var directory = projectRoot ?: path.parent
+        parts.dropLast(1).forEach { part ->
+            directory = directory?.resolve(part.toString())
+            val target = directory
+            add(Crumb(part.toString(), CrumbKind.FOLDER) { controller -> target?.let(controller::revealInProject) })
+        }
     }
 
-    add(Crumb(document.displayName, CrumbKind.FILE))
+    add(
+        Crumb(document.displayName, CrumbKind.FILE) { controller ->
+            controller.selectDocument(document.id)
+            path?.let(controller::revealInProject)
+        }
+    )
 
     // The heading the caret is inside: the last one that begins at or before the caret.
     val caretOffset = document.caretPosition.offset

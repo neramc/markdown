@@ -808,7 +808,7 @@ private fun MenuScope.projectMenu(
         enabled = root != null,
         onClick = {
             dismiss()
-            root?.let { controller.setLeftToolWindow(ToolWindow.PROJECT) }
+            root?.let(controller::revealInProject)
         },
     ) { Text("Show in Project View") }
 

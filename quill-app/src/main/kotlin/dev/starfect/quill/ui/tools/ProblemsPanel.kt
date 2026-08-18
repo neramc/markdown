@@ -27,6 +27,7 @@ import dev.starfect.quill.QuillController
 import dev.starfect.quill.bridge.wire.Finding
 import dev.starfect.quill.bridge.wire.Severity
 import dev.starfect.quill.model.DocumentSession
+import dev.starfect.quill.model.Dock
 import dev.starfect.quill.model.ToolWindow
 import dev.starfect.quill.model.WorkspaceState
 import dev.starfect.quill.ui.editor.SeverityIcon
@@ -61,6 +62,8 @@ public fun ProblemsPanel(
             title = problemsTitle(document, findings),
             onHide = { controller.setBottomToolWindow(null) },
             hidesTowardsLeft = false,
+            alternatives = ToolWindow.on(Dock.BOTTOM),
+            onSelect = controller::setBottomToolWindow,
         )
 
         when {
@@ -170,6 +173,8 @@ public fun NotificationsPanel(
             },
             onHide = { controller.setRightToolWindow(null) },
             hidesTowardsLeft = false,
+            alternatives = ToolWindow.on(Dock.RIGHT),
+            onSelect = controller::setRightToolWindow,
         )
 
         if (workspace.notifications.isEmpty()) {
@@ -226,11 +231,20 @@ public fun PlaceholderPanel(
     tool: ToolWindow,
     onHide: () -> Unit,
     modifier: Modifier = Modifier,
+    onSelect: (ToolWindow) -> Unit = {},
 ) {
     val shell = LocalShellPalette.current
 
     Column(modifier.fillMaxSize().background(shell.toolWindowBackground)) {
-        ToolWindowHeader(title = tool.label, onHide = onHide, hidesTowardsLeft = false)
+        // The switcher works here too: a dock showing an empty panel is exactly when somebody
+        // wants to get to a different one.
+        ToolWindowHeader(
+            title = tool.label,
+            onHide = onHide,
+            hidesTowardsLeft = false,
+            alternatives = ToolWindow.on(tool.dock),
+            onSelect = onSelect,
+        )
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(
                 text = placeholderMessage(tool),

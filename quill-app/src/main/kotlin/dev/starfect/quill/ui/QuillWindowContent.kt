@@ -249,7 +249,11 @@ private fun RightDock(controller: QuillController, workspace: WorkspaceState) {
         when (tool) {
             ToolWindow.STRUCTURE -> OutlinePanel(controller, workspace)
             ToolWindow.NOTIFICATIONS -> NotificationsPanel(controller, workspace)
-            else -> PlaceholderPanel(tool, onHide = { controller.setRightToolWindow(null) })
+            else -> PlaceholderPanel(
+                tool,
+                onHide = { controller.setRightToolWindow(null) },
+                onSelect = controller::setRightToolWindow,
+            )
         }
     }
 }
@@ -278,7 +282,11 @@ private fun CentreArea(controller: QuillController, workspace: WorkspaceState, m
                 ShellDivider(Orientation.Horizontal)
                 when (bottom) {
                     ToolWindow.PROBLEMS -> ProblemsPanel(controller, workspace)
-                    else -> PlaceholderPanel(bottom, onHide = { controller.setBottomToolWindow(null) })
+                    else -> PlaceholderPanel(
+                        bottom,
+                        onHide = { controller.setBottomToolWindow(null) },
+                        onSelect = controller::setBottomToolWindow,
+                    )
                 }
             }
         },

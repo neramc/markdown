@@ -142,6 +142,21 @@ public object IdeIcons {
         }
     }
 
+    /**
+     * Collapse All: two chevrons folding towards a line between them.
+     *
+     * Both arrows point inwards, which is what distinguishes it from a plain "up" — the tree is
+     * being drawn together, not scrolled.
+     */
+    @Composable
+    public fun CollapseAll(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {
+        IdeIcon(size, modifier) { unit ->
+            polyline(listOf(4.5f to 5.5f, 8f to 2.5f, 11.5f to 5.5f), tint, unit)
+            line(3f, 8f, 13f, 8f, tint, unit)
+            polyline(listOf(4.5f to 10.5f, 8f to 13.5f, 11.5f to 10.5f), tint, unit)
+        }
+    }
+
     /** The overflow menu the IDE puts at the end of a toolbar or tab strip. */
     @Composable
     public fun MoreVertical(tint: Color, modifier: Modifier = Modifier, size: Dp = Tokens.IconSize) {

@@ -117,7 +117,15 @@ public fun ToolWindowFocusScope(
 @Composable
 public fun TreeRow(
     depth: Int,
-    onClick: () -> Unit,
+    /**
+     * What clicking the row does, or null when the row only reports.
+     *
+     * Null is not "nothing wired yet": it removes the hover fill and the click target entirely.
+     * The project root is the case — it is always open, there is nothing to expand, and a row that
+     * lights up under the pointer and then does nothing is the same broken promise the toolbar
+     * widgets were making.
+     */
+    onClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
     selected: Boolean = false,
     expandable: Boolean = false,
@@ -130,13 +138,19 @@ public fun TreeRow(
     Row(
         modifier = modifier.fillMaxWidth()
             .height(Tokens.TreeRowHeight)
-            .interactiveSurface(
-                onClick = onClick,
-                palette = shell,
-                selected = selected,
-                focused = LocalToolWindowFocused.current,
-                cornerRadius = Tokens.Radius.Row,
-                interactionSource = interaction,
+            .then(
+                if (onClick == null) {
+                    Modifier
+                } else {
+                    Modifier.interactiveSurface(
+                        onClick = onClick,
+                        palette = shell,
+                        selected = selected,
+                        focused = LocalToolWindowFocused.current,
+                        cornerRadius = Tokens.Radius.Row,
+                        interactionSource = interaction,
+                    )
+                }
             )
             .indentGuides(depth, shell.border)
             .padding(

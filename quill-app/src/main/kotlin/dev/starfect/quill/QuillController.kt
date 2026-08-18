@@ -1375,6 +1375,90 @@ public class QuillController(
         }
     }
 
+    /**
+     * Shows [path] in the project tool window, opening the panel and every directory above it.
+     *
+     * What "Show in Project View" and the breadcrumbs need. Both used to only open the panel, which
+     * on a project of any depth leaves the file exactly as hidden as it was — the panel is open and
+     * the file is four collapsed directories down.
+     */
+    public fun revealInProject(path: Path) {
+        update { workspace ->
+            workspace.copy(
+                projectTree = workspace.projectTree.map { expandTowards(it, path) },
+                // Set rather than toggled: this is "show me", and a show that closes the panel
+                // when it happens to be open is not one.
+                leftToolWindow = ToolWindow.PROJECT,
+            )
+        }
+    }
+
+    /**
+     * Expands [node] when [target] is inside it, loading its children on the way down.
+     *
+     * Directories are read lazily, so an ancestor that has never been opened has no children to
+     * recurse into yet; they are fetched here rather than left for the click that would have
+     * expanded it, because nothing is going to click it.
+     */
+    private fun expandTowards(node: FileNode, target: Path): FileNode {
+        if (!node.isDirectory) return node
+        if (node.path == target || !target.startsWith(node.path)) return node
+
+        val children = node.children.ifEmpty { fileService.children(node.path, node.depth + 1) }
+        return node.copy(
+            isExpanded = true,
+            children = children.map { expandTowards(it, target) },
+        )
+    }
+
+    /** Collapses every directory in the project tree, which is the IDE's Collapse All. */
+    public fun collapseAllDirectories() {
+        update { workspace -> workspace.copy(projectTree = workspace.projectTree.map(::collapse)) }
+    }
+
+    private fun collapse(node: FileNode): FileNode =
+        if (!node.isDirectory) node else node.copy(isExpanded = false, children = node.children.map(::collapse))
+
+    /**
+     * Re-reads the project from disk, keeping whatever was expanded expanded.
+     *
+     * The tree is read once when the project opens and never again, so a file created in a terminal
+     * — or by an export — is invisible until Quill is restarted. Refresh is the answer, and it has
+     * to preserve the expansion state or it is indistinguishable from reopening the project.
+     */
+    public fun refreshProject() {
+        val root = _state.value.projectRoot ?: return
+        val expanded = expandedPaths(_state.value.projectTree)
+
+        launchTask("Refreshing ${root.fileName ?: root}") {
+            withContext(Dispatchers.IO) { runCatching { fileService.scan(root) } }
+                .onSuccess { nodes ->
+                    update { it.copy(projectTree = nodes.map { node -> restoreExpansion(node, expanded) }) }
+                }
+                .onFailure { failure ->
+                    update { it.copy(notification = "Could not read $root: ${failure.message}") }
+                }
+        }
+    }
+
+    private fun expandedPaths(nodes: List<FileNode>): Set<Path> = buildSet {
+        fun walk(current: List<FileNode>) {
+            current.forEach { node ->
+                if (node.isDirectory && node.isExpanded) {
+                    add(node.path)
+                    walk(node.children)
+                }
+            }
+        }
+        walk(nodes)
+    }
+
+    private fun restoreExpansion(node: FileNode, expanded: Set<Path>): FileNode {
+        if (!node.isDirectory || node.path !in expanded) return node
+        val children = node.children.ifEmpty { fileService.children(node.path, node.depth + 1) }
+        return node.copy(isExpanded = true, children = children.map { restoreExpansion(it, expanded) })
+    }
+
     /** Expands or collapses a directory in the project tool window. */
     public fun toggleDirectory(path: Path) {
         update { workspace -> workspace.copy(projectTree = workspace.projectTree.map { toggle(it, path) }) }

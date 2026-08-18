@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import dev.starfect.quill.QuillController
 import dev.starfect.quill.model.FileNode
+import dev.starfect.quill.model.Dock
 import dev.starfect.quill.model.ToolWindow
 import dev.starfect.quill.model.WorkspaceState
 import dev.starfect.quill.ui.icons.IdeIcons
@@ -41,6 +42,11 @@ import java.nio.file.Path
 import org.jetbrains.jewel.ui.component.Link
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.VerticallyScrollableContainer
+import androidx.compose.ui.unit.dp
+import dev.starfect.quill.io.FileService
+import dev.starfect.quill.ui.shell.IdeActionButton
+import org.jetbrains.jewel.ui.component.PopupMenu
+import org.jetbrains.jewel.ui.component.MenuSeparator
 
 /**
  * The Project tool window: a lazily expanded file tree rooted at the open directory.
@@ -59,6 +65,9 @@ public fun ProjectTree(controller: QuillController, workspace: WorkspaceState) {
         ToolWindowHeader(
             title = "Project",
             onHide = { controller.setLeftToolWindow(ToolWindow.PROJECT) },
+            alternatives = ToolWindow.on(Dock.LEFT),
+            onSelect = controller::setLeftToolWindow,
+            actions = { ProjectActions(controller, workspace) },
         )
 
         if (rows.isEmpty()) {
@@ -125,6 +134,74 @@ public fun ProjectTree(controller: QuillController, workspace: WorkspaceState) {
     }
 }
 
+/**
+ * The Project panel's own actions.
+ *
+ * Refresh is the one that has to be here: the tree is read when the project opens and never again,
+ * so a file created in a terminal is invisible until then. Collapse All earns its place on any
+ * project deep enough to need it, which is the same projects where scrolling to find anything is
+ * the problem.
+ */
+@Composable
+private fun ProjectActions(controller: QuillController, workspace: WorkspaceState) {
+    var open by remember { mutableStateOf(false) }
+
+    IdeActionButton(
+        onClick = controller::collapseAllDirectories,
+        tooltip = "Collapse All",
+        enabled = workspace.projectRoot != null,
+        size = Tokens.SmallControlSize,
+    ) { tint -> IdeIcons.CollapseAll(tint, size = Tokens.SmallIconSize) }
+
+    Box {
+        IdeActionButton(
+            onClick = { open = !open },
+            tooltip = "Options",
+            selected = open,
+            size = Tokens.SmallControlSize,
+        ) { tint -> IdeIcons.MoreVertical(tint, size = Tokens.SmallIconSize) }
+
+        if (open) {
+            PopupMenu(
+                onDismissRequest = {
+                    open = false
+                    true
+                },
+                horizontalAlignment = Alignment.End,
+                modifier = Modifier.width(240.dp),
+            ) {
+                selectableItem(
+                    selected = false,
+                    enabled = workspace.projectRoot != null,
+                    onClick = {
+                        open = false
+                        controller.refreshProject()
+                    },
+                ) { Text("Refresh") }
+
+                selectableItem(
+                    selected = false,
+                    enabled = workspace.projectRoot != null,
+                    onClick = {
+                        open = false
+                        controller.collapseAllDirectories()
+                    },
+                ) { Text("Collapse All") }
+
+                passiveItem { MenuSeparator() }
+
+                selectableItem(
+                    selected = false,
+                    onClick = {
+                        open = false
+                        FileService.chooseDirectory()?.let(controller::openProject)
+                    },
+                ) { Text("Open Folder\u2026") }
+            }
+        }
+    }
+}
+
 /** The project root: an expanded module icon, the project name, and its abbreviated location. */
 @Composable
 private fun ProjectRootRow(root: Path) {
@@ -142,9 +219,10 @@ private fun ProjectRootRow(root: Path) {
         }
     }
 
-    // Not expandable: the root is always open, and a chevron that does nothing when clicked is the
-    // same broken promise the toolbar widgets were making.
-    TreeRow(depth = 0, onClick = {}, expandable = false, expanded = true) {
+    // Neither expandable nor clickable: the root is always open, and there is nothing a click on
+    // it could do that the header's actions do not already do. A null onClick takes the hover fill
+    // away with the action, rather than leaving a row that lights up and then does nothing.
+    TreeRow(depth = 0, onClick = null, expandable = false, expanded = true) {
         IdeIcons.Module(shell.sourceFolderIcon, size = Tokens.IconSize)
         TreeLabel(root.fileName?.toString() ?: root.toString())
         // Clipped from the right so a deep path never pushes the name out, and omitted entirely
@@ -212,6 +290,8 @@ public fun OutlinePanel(controller: QuillController, workspace: WorkspaceState) 
             title = "Structure",
             onHide = { controller.setRightToolWindow(ToolWindow.STRUCTURE) },
             hidesTowardsLeft = false,
+            alternatives = ToolWindow.on(Dock.RIGHT),
+            onSelect = controller::setRightToolWindow,
         )
 
         if (outline.isEmpty()) {
