@@ -58,6 +58,18 @@ public static class ProductInfo
     /// <summary>Name of the manifest written into the install root.</summary>
     public const string ManifestFileName = "install-manifest.json";
 
+    /// <summary>
+    /// The icon Explorer draws next to a Markdown file Quill has claimed, relative to the install
+    /// root.
+    /// </summary>
+    /// <remarks>
+    /// A separate icon from the application's, because the two are shown side by side constantly
+    /// and "a Quill document" and "Quill" being the same picture makes a folder listing unreadable.
+    /// Staged into the payload by <c>tools/build-installer.sh</c>; when it is absent the
+    /// association falls back to the launcher's own icon rather than registering a path to nothing.
+    /// </remarks>
+    public const string DocumentIconFileName = "document.ico";
+
     /// <summary>Support and help links surfaced in Apps &amp; features.</summary>
     public const string HelpLink = "https://github.com/neramc/quill";
 

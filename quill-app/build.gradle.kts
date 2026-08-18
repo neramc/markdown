@@ -43,10 +43,12 @@ tasks.withType<JavaCompile>().configureEach {
     options.release = jvmTargetVersion.toInt()
 }
 
-// The repository's brand assets become classpath resources, so window and title-bar icons load
-// through the normal resource mechanism rather than from a path relative to the working directory.
+// The window and title-bar icon loads as a classpath resource rather than from a path relative to
+// the working directory. Only that one file: the ICO and ICNS beside it in assets/ are inputs to
+// jpackage and weigh five times as much as the PNG, and shipping them inside the jar would put them
+// on every platform to be read by none of it.
 tasks.processResources {
-    from(rootProject.file("assets")) { into("icons") }
+    from(rootProject.file("assets/icon.png")) { into("icons") }
 }
 
 dependencies {
@@ -135,9 +137,11 @@ compose.desktop {
                 "jdk.unsupported",
             )
 
-            // jpackage wants rasterised icons, but the repository ships vector art. Each format is
-            // wired up only when it has been generated (see docs/BUILD.md), so a plain checkout
-            // still packages successfully with the platform default icon.
+            // jpackage takes a different container per platform and silently falls back to a
+            // generic icon when it does not get one — which is how Windows and macOS shipped with
+            // no Quill icon at all while Linux had one. `tools/render-icons.sh` produces all three
+            // from the vectors in assets/; each is wired only when present so a plain checkout
+            // still packages.
             linux {
                 val png = rootProject.file("assets/icon.png")
                 if (png.exists()) iconFile.set(png)
@@ -149,6 +153,14 @@ compose.desktop {
                 bundleID = "dev.starfect.quill"
                 val icns = rootProject.file("assets/icon.icns")
                 if (icns.exists()) iconFile.set(icns)
+            }
+            windows {
+                val ico = rootProject.file("assets/icon.ico")
+                if (ico.exists()) iconFile.set(ico)
+                // A stable upgrade code, so an installed Quill is recognised as the same product
+                // across versions rather than accumulating one entry per release.
+                upgradeUuid = "8F5C1E62-9A3D-4E7B-9C41-2D6F0B7A5E13"
+                menuGroup = "Quill"
             }
         }
     }

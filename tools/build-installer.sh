@@ -89,6 +89,12 @@ else
   mkdir -p "$STAGING"
   cp -a "$APP_IMAGE/." "$STAGING/"
 
+  # The icon Explorer draws next to a .md file. It travels in the payload rather than being written
+  # by the installer, so uninstalling removes it with everything else it lists.
+  if [[ -f "$REPO_ROOT/assets/document.ico" ]]; then
+    cp "$REPO_ROOT/assets/document.ico" "$STAGING/document.ico"
+  fi
+
   echo "==> Packing payload"
   # Packing runs through the same PayloadBuilder the extractor was written against, so the archive
   # and its index can never disagree about format.

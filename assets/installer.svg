@@ -1,8 +1,39 @@
-<svg width="681" height="567" viewBox="0 0 681 567" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path fill-rule="evenodd" clip-rule="evenodd" d="M47.67 124.74L340.5 0L633.33 124.74L340.5 243.816L47.67 124.74Z" fill="#FBF063"/>
-<path fill-rule="evenodd" clip-rule="evenodd" d="M340.52 243.793L47.67 124.74V432.508L340.541 555.626L340.52 243.793Z" fill="#F29C1F"/>
-<path fill-rule="evenodd" clip-rule="evenodd" d="M340.044 555.373L632.914 432.255V124.487L340.064 243.54L340.044 555.373Z" fill="#F0C419"/>
-<path opacity="0.5" fill-rule="evenodd" clip-rule="evenodd" d="M184.115 66.3674L476.911 188.261L492.322 181.996L199.172 59.9546L184.115 66.3674Z" fill="#F29C1F"/>
-<path opacity="0.5" fill-rule="evenodd" clip-rule="evenodd" d="M145.176 83.2016L431.073 206.983L539.965 162.706L243.716 41.2266L145.176 83.2016Z" fill="white"/>
-<path opacity="0.5" fill-rule="evenodd" clip-rule="evenodd" d="M431.155 206.983L539.965 162.655V225.025L431.155 275.018V206.983Z" fill="white"/>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+  <linearGradient id="quill" x1="512" y1="0" x2="512" y2="1024" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#00FFBB"/>
+    <stop offset="1" stop-color="#0091FF"/>
+  </linearGradient>
+    <linearGradient id="plate" x1="512" y1="96" x2="512" y2="928" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1F2733"/>
+      <stop offset="1" stop-color="#141A22"/>
+    </linearGradient>
+    <clipPath id="plateClip">
+      <rect x="96" y="96" width="832" height="832" rx="188"/>
+    </clipPath>
+  </defs>
+
+  <!-- The plate. A squircle rather than a square: it is what every platform's installer shelf
+       renders its neighbours as, and a hard rectangle reads as a missing icon. -->
+  <rect x="96" y="96" width="832" height="832" rx="188" fill="url(#plate)"/>
+  <rect x="96" y="96" width="832" height="832" rx="188" fill="none"
+        stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="8"/>
+
+  <g clip-path="url(#plateClip)">
+    <!-- The mark, scaled into the upper two thirds so the arrow below it is not an afterthought. -->
+    <g transform="translate(512 402) scale(0.62) translate(-512 -512)">
+      <path d="M781.118 137.906C706.068 137.906 634.304 152.036 568.336 177.806C567.307 178.209 566.369 178.812 565.576 179.582C564.783 180.352 564.152 181.272 563.72 182.289L563.703 182.339L563.637 182.505L563.388 183.086L562.442 185.328L559.071 193.547C556.248 200.471 552.429 210.051 548.411 220.661C542.591 235.774 537.341 251.099 532.67 266.605L507.316 231.321C503.71 226.255 498.318 222.744 492.226 221.496C486.135 220.249 479.797 221.356 474.489 224.597C309.311 326.43 198.561 508.113 196.071 715.847C169.355 758.686 147.304 803.318 131.414 849.345C129.991 853.468 129.395 857.831 129.658 862.185C129.921 866.539 131.04 870.799 132.949 874.72C134.859 878.642 137.522 882.149 140.787 885.042C144.052 887.934 147.855 890.155 151.978 891.578C156.102 893 160.465 893.597 164.819 893.334C169.173 893.07 173.432 891.952 177.354 890.042C181.275 888.133 184.782 885.469 187.675 882.204C190.567 878.939 192.788 875.137 194.211 871.013C233.264 757.723 316.252 650.062 417.886 555.534C495.444 483.406 585.09 423.465 678.189 373.337C681.07 371.786 684.227 370.819 687.482 370.489C690.736 370.159 694.024 370.473 697.157 371.413C700.29 372.354 703.207 373.902 705.741 375.97C708.276 378.038 710.379 380.585 711.929 383.465C713.479 386.346 714.447 389.503 714.777 392.758C715.107 396.012 714.793 399.3 713.852 402.433C712.912 405.566 711.363 408.483 709.295 411.017C707.228 413.552 704.681 415.655 701.8 417.205C614.462 464.245 517.129 529.715 433.477 607.505C364.57 671.597 305.907 743.145 269.245 818.677H291.694C400.119 818.677 501.687 789.171 588.759 737.765C605.778 727.703 603.886 703.511 586.866 695.059L551.018 677.21C576.007 675.051 604.467 671.033 629.29 667.048C651.373 663.511 673.407 659.676 695.341 655.325C696.907 655.009 698.348 654.248 699.492 653.133C808.847 546.85 876.792 398.143 876.792 233.546C876.792 214.097 875.856 194.881 873.986 175.897C873.105 166.86 869.113 158.409 862.693 151.988C856.273 145.568 847.822 141.576 838.785 140.696C819.619 138.832 800.374 137.896 781.118 137.89" fill="url(#quill)"/>
+    </g>
+
+    <!-- Into the machine. The shaft is a hairline and the head is solid, so the direction survives
+         being drawn sixteen pixels tall in a browser's download list. -->
+    <g stroke="url(#quill)" stroke-linecap="round" fill="none">
+      <path d="M512 590 L512 742" stroke-width="46"/>
+    </g>
+    <path d="M410 700 L512 806 L614 700" fill="none" stroke="url(#quill)"
+          stroke-width="46" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- The surface it lands on. -->
+    <path d="M330 866 L694 866" stroke="#FFFFFF" stroke-opacity="0.28"
+          stroke-width="40" stroke-linecap="round"/>
+  </g>
 </svg>

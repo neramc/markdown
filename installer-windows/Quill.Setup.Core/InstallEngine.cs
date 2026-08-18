@@ -165,6 +165,13 @@ public sealed class InstallEngine(IPlatformIntegration platform)
             return [];
         }
 
+        // The document icon when the payload carries one, the launcher's own when it does not. A
+        // registry entry pointing at a file that is not there gives every .md file a blank sheet,
+        // which is worse than giving them all the application's feather.
+        var root = Path.GetDirectoryName(executablePath) ?? string.Empty;
+        var documentIcon = Path.Combine(root, ProductInfo.DocumentIconFileName);
+        var iconPath = File.Exists(documentIcon) ? documentIcon : executablePath;
+
         var registered = new List<string>(ProductInfo.MarkdownExtensions.Count);
         foreach (var extension in ProductInfo.MarkdownExtensions)
         {
@@ -173,7 +180,7 @@ public sealed class InstallEngine(IPlatformIntegration platform)
                 ProgId: ProductInfo.ProgId,
                 FriendlyTypeName: "Markdown Document",
                 OpenCommand: $"\"{executablePath}\" \"%1\"",
-                IconPath: executablePath));
+                IconPath: iconPath));
             registered.Add(extension);
         }
 
