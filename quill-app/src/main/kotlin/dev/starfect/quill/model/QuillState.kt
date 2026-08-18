@@ -265,7 +265,7 @@ public enum class RunTask(public val label: String, public val description: Stri
 }
 
 /** The modal dialog on screen, if any. */
-public enum class Dialog { SETTINGS, RUN_CONFIGURATIONS, ABOUT, UNINSTALL }
+public enum class Dialog { SETTINGS, RUN_CONFIGURATIONS, ABOUT, UPDATE, UNINSTALL }
 
 /** The whole application state. */
 @Immutable

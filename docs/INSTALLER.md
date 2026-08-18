@@ -105,6 +105,31 @@ to a script in `%TEMP%` that waits for Quill's process to exit and then removes 
 with plain `rd`, never `rd /s`, so a user who installed into a folder holding their own files keeps
 those files.
 
+## Updating
+
+Quill checks for a newer release from **Help → Check for Updates…**, against its own repository's
+releases feed. What it can do about one depends on who owns the installation:
+
+| Installation | Method | What happens |
+|---|---|---|
+| Portable unpack, or `%LOCALAPPDATA%\Programs\Quill` | Replace | The archive is unpacked beside the installation, Quill closes, a script swaps the directories and starts the new version. |
+| `/opt/quill` from a `.deb` or `.rpm`, `/Applications/Quill.app` | Hand off | The platform's own package is downloaded and opened. |
+
+The line between them is whether the installation *and its parent* are writable. Writing over
+`/opt/quill` would need root and would leave dpkg's database describing files that are no longer
+there, so Quill does not try — and it says which of the two is about to happen before it starts,
+because a user told "Quill will restart" and then handed a `.dmg` has been lied to.
+
+Downloads are verified against the release's `SHA256SUMS` before anything is unpacked, and a file
+that does not match is deleted rather than kept. This is the one place Quill writes an executable
+fetched over a network; a digest treated as advisory would make publishing it decorative.
+
+The swap retires the old image before moving the new one in — `Quill` → `Quill.old`, `Quill.new` →
+`Quill` — so a crash between the two leaves a recoverable directory rather than nothing, and a
+failed move puts the old installation back. Like uninstalling, it runs from a script that waits for
+Quill's process to exit, because Windows will not unlink a running executable and Unix will not
+survive its class files disappearing.
+
 ## Command line
 
 `QuillSetup.exe` and `Quill.exe --uninstall` both accept `/S` for a silent run, which is the
@@ -159,7 +184,20 @@ hands the Windows job's app image to the .NET job.
 
 ## What cannot be verified off Windows
 
-The `win-x64` binaries are *built* on Linux but cannot be *run* there. Registry writes, `IShellLink`
-shortcut creation, file association registration, PATH updates, UAC elevation and the post-exit
-self-delete are all exercised only through `DryRunPlatformIntegration`. Their real behaviour needs a
-Windows machine.
+The `win-x64` binary is *built* on Linux but cannot be *run* there. Registry writes, `IShellLink`
+shortcut creation, file association registration, PATH updates and UAC elevation are all exercised
+only through `DryRunPlatformIntegration`. Their real behaviour needs a Windows machine.
+
+The same line runs through uninstalling and updating. What is tested here is every decision — which
+keys are deleted, which files are in the plan, the order of the renames, the exact `reg.exe`
+arguments, the scripts the two produce — and the parts that are pure I/O: the tar and zip readers
+are checked against a real 74 MB release archive and produce a byte-identical tree to GNU tar, and
+the download path runs against a local HTTP server with a redirect, including the rejection of a
+file whose checksum does not match. What is *not* tested off Windows is the last step of each: that
+`cmd.exe` runs the generated script, that `reg.exe` accepts those arguments against a real hive, and
+that a directory rename succeeds once the process holding it has exited.
+
+Fetching from GitHub itself is unverified for a different reason: the container this was developed
+in denies `api.github.com`. The request is made, TLS completes and the 403 comes back as a readable
+failure rather than a stack trace, which is the designed behaviour — but a successful 200 from the
+real feed has not been observed here.

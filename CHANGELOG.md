@@ -6,6 +6,62 @@ The sections here are the source of the release notes on GitHub: the publish wor
 section matching the tag it was triggered by, so a release whose notes are wrong is a changelog
 whose notes are wrong, and there is only one place to fix it.
 
+## 1.2.0
+
+### The uninstaller is gone, and Quill removes itself
+
+There used to be a second Windows executable whose only job was to delete files. It was a hundred
+and three megabytes of self-contained .NET, it shipped in every release, and it then sat in the
+install folder for the lifetime of the installation — larger than the editor it removed.
+
+Quill now removes itself, from **Help → Uninstall Quill…** or from Apps & features, which runs
+`Quill.exe --uninstall`. Beyond deleting 103 MB from the release this removes a class of failure:
+the remover cannot be missing, be the wrong version, or disagree with what it is removing, because
+it *is* what it is removing.
+
+It is careful about the things an uninstaller can get wrong. A file type another editor has claimed
+since installation is left with that editor; one still registered to Quill is handed back to
+whatever held it before. Directories are removed only when empty, so somebody who installed into a
+folder holding their own files keeps those files. Nothing outside the install root is ever touched,
+whatever the manifest says.
+
+### Updating in place
+
+**Help → Check for Updates…** asks the releases feed what the newest version is, and what it can do
+about the answer depends on who owns the installation. A portable unpack or a per-user Windows
+install is replaced in place: the new version is downloaded, verified, unpacked beside the old one,
+and Quill closes and starts again as the new version. An installation a package manager owns —
+`/opt/quill` from a `.deb`, an `.app` in `/Applications` — is handed its own installer instead,
+because writing over those needs root and would leave the package manager describing files that are
+no longer there.
+
+Downloads are checked against the release's `SHA256SUMS` before anything is unpacked, and a file
+that does not match is deleted rather than kept. The swap moves the old installation aside before
+moving the new one in, so a failure leaves something to go back to rather than nothing.
+
+### A third smaller
+
+An installed Quill was 157 MB. It is now 112 MB, and almost none of either number was ever Quill:
+the bundled Java runtime shipped uncompressed, Skia and the JVM shipped with full symbol tables, and
+the runtime carried forty-three fonts of which Quill opens nine.
+
+- The bundled runtime is compressed — `lib/modules` from 55 MB to 25 MB. It costs about twenty
+  milliseconds of class loading at startup, which is the trade being made deliberately, and it does
+  not make the *download* smaller: gzip was already doing that work on the way to disk. What changes
+  is what the machine keeps.
+- Skia, the JVM and the Rust engine are stripped of symbols nothing in a shipped application reads.
+- The thirty-four fonts nothing references are dropped.
+
+`-J-Dquill.startup.trace=true` prints time to first frame, if you want to see the cost.
+
+### Also
+
+- The Windows installer registered `bin\Quill.exe`. jpackage puts the launcher at the root of a
+  Windows application image — only Linux uses `bin/` — so both shortcuts, the `.md` file handler,
+  the icon in Apps & features and the uninstall command all pointed at a file that was never there
+  while setup reported success. Setup now refuses a payload that does not contain the launcher
+  rather than registering four things that point at nothing.
+
 ## 1.1.0
 
 ### Faster to start

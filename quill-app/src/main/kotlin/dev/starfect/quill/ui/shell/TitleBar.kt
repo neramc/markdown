@@ -485,6 +485,14 @@ private fun MenuScope.mainMenu(
             },
         ) { Text("Settings…") }
 
+        selectableItem(
+            selected = false,
+            onClick = {
+                dismiss()
+                controller.showDialog(Dialog.UPDATE)
+            },
+        ) { Text("Check for Updates…") }
+
         passiveItem { MenuSeparator() }
 
         // Under Help rather than hidden in Settings, and phrased as what it does. An application
