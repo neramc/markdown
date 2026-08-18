@@ -197,7 +197,10 @@ file whose checksum does not match. What is *not* tested off Windows is the last
 `cmd.exe` runs the generated script, that `reg.exe` accepts those arguments against a real hive, and
 that a directory rename succeeds once the process holding it has exited.
 
-Fetching from GitHub itself is unverified for a different reason: the container this was developed
-in denies `api.github.com`. The request is made, TLS completes and the 403 comes back as a readable
-failure rather than a stack trace, which is the designed behaviour — but a successful 200 from the
-real feed has not been observed here.
+The updater's download path *has* been run against a real published release: `SHA256SUMS` and the
+73 MB `Quill-1.2.0-linux-x64.tar.gz` fetched from GitHub through its 302 to the asset host, verified
+against the published digest, unpacked, and the resulting copy launched. What remains unverified is
+narrower than it sounds — the `api.github.com/.../releases/latest` call, which the container this
+was developed in denies. The request is made and TLS completes; the 403 comes back as a readable
+failure rather than a stack trace, which is the designed behaviour, but a successful 200 from that
+one endpoint has not been observed here.

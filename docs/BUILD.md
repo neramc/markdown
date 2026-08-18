@@ -105,8 +105,9 @@ re-measure it.
 
 The compression also does **not** make the download smaller — it makes it slightly larger, because
 `gzip` was already doing this work on the way to disk and now has nothing left to squeeze
-(`lib/modules` through gzip: 17 MB before, 24 MB after). The other two steps roughly cancel that out.
-What changes is what the machine keeps.
+(`lib/modules` through gzip: 17 MB before, 24 MB after). The other two steps nearly cancel that out:
+the published `Quill-linux-x64.tar.gz` went from 71.7 MB in 1.1.0 to 73.1 MB in 1.2.0 while what it
+unpacks to went from 157 MB to 112 MB. What changes is what the machine keeps.
 
 **Native libraries are stripped.** Skia and the JVM arrive with full symbol tables, 8.5 MB between
 them, which nothing in a shipped application reads. A native crash log names fewer frames as a
