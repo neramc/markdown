@@ -82,6 +82,72 @@ public class QuillController(
     private val nextId = AtomicLong(1)
     private val derivationJobs = ConcurrentHashMap<Long, Job>()
 
+    /**
+     * The lines each editor can currently see.
+     *
+     * Deliberately *not* in [WorkspaceState]. It changes on every scroll frame, and the workspace is
+     * one immutable value that every pane in the window is derived from — putting a scroll position
+     * in it would repaint the project tree, the outline and the status bar sixty times a second to
+     * describe something none of them show.
+     */
+    private val visibleLines = ConcurrentHashMap<Long, IntRange>()
+
+    /** Which lines the spans currently in [DocumentSession.spans] cover. */
+    private val highlightedLines = ConcurrentHashMap<Long, IntRange>()
+
+    /** The range to ask the engine for: what the editor can see, plus a margin either side. */
+    private fun highlightWindow(id: Long): IntRange {
+        val visible = visibleLines[id] ?: return 0..INITIAL_HIGHLIGHT_LINES
+        val screenful = visible.last - visible.first + 1
+        val margin = (screenful * HIGHLIGHT_MARGIN_SCREENS).coerceAtLeast(HIGHLIGHT_MIN_MARGIN_LINES)
+        return (visible.first - margin).coerceAtLeast(0)..(visible.last + margin)
+    }
+
+    /**
+     * Tells the controller which lines of [id] are on screen.
+     *
+     * Called by the editor as it scrolls. Cheap and idempotent: when the lines are already inside
+     * the highlighted window this returns without touching anything, which is the case for every
+     * scroll that stays within a few screenfuls of where it started.
+     */
+    public fun onVisibleLinesChanged(id: Long, first: Int, last: Int) {
+        val requested = first.coerceAtLeast(0)..last.coerceAtLeast(first)
+        val previous = visibleLines.put(id, requested)
+        if (previous == requested) return
+
+        val covered = highlightedLines[id]
+        if (covered != null && requested.first >= covered.first && requested.last <= covered.last) return
+
+        refreshHighlighting(id)
+    }
+
+    /**
+     * Re-highlights [id] for its current viewport, without re-deriving anything else.
+     *
+     * Scrolling changes nothing about the document, so the blocks, the outline, the statistics and
+     * the problems are all still correct; asking for them again would be several times the work of
+     * the one thing that did change.
+     */
+    private fun refreshHighlighting(id: Long) {
+        highlightJobs.remove(id)?.cancel()
+        highlightJobs[id] = scope.launch {
+            delay(HIGHLIGHT_DEBOUNCE_MILLIS)
+            val handle = handles[id] ?: return@launch
+            val window = highlightWindow(id)
+            val spans = withContext(Dispatchers.Default) {
+                runCatching { handle.version to handle.spans(window.first, window.last) }.getOrNull()
+            } ?: return@launch
+
+            highlightedLines[id] = window
+            updateDocument(id) { session ->
+                // A newer edit is already re-deriving; its spans will be the right ones.
+                if (session.engineVersion > spans.first) session else session.copy(spans = spans.second)
+            }
+        }
+    }
+
+    private val highlightJobs = ConcurrentHashMap<Long, Job>()
+
     private val stateLock = Any()
     private val _state = mutableStateOf(WorkspaceState())
     public val state: State<WorkspaceState> = _state
@@ -99,8 +165,36 @@ public class QuillController(
          */
         const val DERIVE_DEBOUNCE_MILLIS = 120L
 
-        /** How many lines to highlight; beyond this the viewport would need tracking anyway. */
-        const val HIGHLIGHT_LINE_BUDGET = 5_000
+        /**
+         * Lines highlighted above and below the ones on screen.
+         *
+         * Highlighting is scoped to the viewport because the cost of it is paid by the *text field*,
+         * not by the engine: every style range the editor is handed becomes a run Compose has to
+         * shape separately, and a 500-line document produces around two thousand of them. Measured
+         * on the real window, styling the whole document cost ~240 ms of every keystroke and styling
+         * the visible part costs a fraction of that.
+         *
+         * The margin is what stops a small scroll from needing a new request, and it is measured in
+         * screenfuls rather than lines so that it means the same thing at any font size or window
+         * height. Two either side means ordinary reading never leaves the window; a jump that does
+         * refreshes in the background while the text stays legible — still the right characters in
+         * the right places, just briefly unstyled.
+         */
+        const val HIGHLIGHT_MARGIN_SCREENS = 2
+
+        /** A floor for the margin, so a one-line viewport still gets a workable window. */
+        const val HIGHLIGHT_MIN_MARGIN_LINES = 40
+
+        /** What to highlight before the editor has said what it can see. */
+        const val INITIAL_HIGHLIGHT_LINES = 150
+
+        /**
+         * Settle time before re-highlighting after a scroll.
+         *
+         * Shorter than the parse debounce because this is one cheap call rather than six, and
+         * because unstyled text on screen is the thing the user is waiting to stop looking at.
+         */
+        const val HIGHLIGHT_DEBOUNCE_MILLIS = 40L
 
         /** How many notifications to keep. Older ones are noise nobody scrolls back to. */
         const val MAX_NOTIFICATIONS = 50
@@ -501,6 +595,7 @@ public class QuillController(
             val handle = handles[id] ?: return@launch
 
             val settings = _state.value.settings
+            val window = highlightWindow(id)
 
             withContext(Dispatchers.Default) {
                 runCatching {
@@ -520,11 +615,12 @@ public class QuillController(
                         // window, so a window past the end simply ends with the document. Measured on
                         // a 260KB file the count more than doubled this step — 20.3ms against 8.1ms —
                         // for byte-identical spans.
-                        spans = handle.spans(0, HIGHLIGHT_LINE_BUDGET),
+                        spans = handle.spans(window.first, window.last),
                     )
                 }
             }
                 .onSuccess { result ->
+                    highlightedLines[id] = window
                     updateDocument(id) { session ->
                         // Drop a result that a newer edit has already superseded.
                         if (session.engineVersion > result.version) {

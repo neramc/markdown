@@ -115,6 +115,16 @@ public fun SourceEditor(
     // How many logical lines there are, which is what the gutter has to be wide enough to number.
     val lineCount = remember(document.text.text) { document.text.text.count { it == '\n' } + 1 }
 
+    // Tell the controller what is on screen, so it highlights that and not the whole file. Kept out
+    // of the workspace state on purpose: this changes on every scroll frame, and the workspace is
+    // what every other pane in the window is derived from.
+    val visible = remember(layout, scrollState.value, scrollState.viewportSize, document.text.text) {
+        visibleLineRange(layout, document.text.text, scrollState.value, scrollState.viewportSize)
+    }
+    LaunchedEffect(document.id, visible) {
+        controller.onVisibleLinesChanged(document.id, visible.first, visible.last)
+    }
+
     // The advance of one character in the editor's font, which is what a column-based right margin
     // has to be measured in. Monospace is assumed because the editor font is; a proportional font
     // has no column to draw a guide at.
@@ -267,6 +277,41 @@ public fun SourceEditor(
  * line occupies several visual rows and a document with any wrapping in it would otherwise report a
  * line number that drifts further out the further you scroll.
  */
+/**
+ * The logical lines the editor can currently see.
+ *
+ * What highlighting is scoped to. The cost of syntax colouring is paid per style range by the text
+ * field, so asking the engine for the whole document and handing the result to Compose was most of
+ * the cost of a keystroke — around 240 ms of it on a 500-line file. This is the question that
+ * replaces it.
+ *
+ * Logical lines, not visual ones: the engine counts newlines and the layout counts wrapped rows, and
+ * a document with long paragraphs has several times as many of the latter. Asking for a range in the
+ * wrong unit would under-highlight exactly the documents that wrap most.
+ */
+internal fun visibleLineRange(
+    layout: TextLayoutResult?,
+    text: String,
+    scrollOffset: Int,
+    viewportHeight: Int,
+): IntRange {
+    val result = layout ?: return 0..0
+    if (viewportHeight <= 0) return 0..0
+
+    fun logicalLineAt(y: Float): Int {
+        val visual = runCatching { result.getLineForVerticalPosition(y) }.getOrNull() ?: return 0
+        val offset = runCatching { result.getLineStart(visual) }.getOrNull() ?: return 0
+        var count = 0
+        val limit = offset.coerceIn(0, text.length)
+        for (index in 0 until limit) if (text[index] == '\n') count++
+        return count
+    }
+
+    val top = logicalLineAt(scrollOffset.toFloat().coerceAtLeast(0f))
+    val bottom = logicalLineAt((scrollOffset + viewportHeight).toFloat())
+    return top..maxOf(top, bottom)
+}
+
 private fun firstVisibleLine(layout: TextLayoutResult?, text: String, scrollOffset: Int): Int {
     val result = layout ?: return 0
     if (scrollOffset <= 0) return 0
