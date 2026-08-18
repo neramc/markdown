@@ -5,13 +5,16 @@ import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.ui.Alignment
+import dev.starfect.quill.model.Dock
 
 /**
  * How the shell moves.
@@ -85,4 +88,29 @@ public object Motion {
     public val popupExit: ExitTransition =
         fadeOut(tween(EXIT_MILLIS, easing = Easing)) +
             scaleOut(tween(EXIT_MILLIS, easing = Easing), targetScale = 0.98f)
+
+    /**
+     * A docked tool window opening.
+     *
+     * It grows from the edge it is docked to, so the editor beside it is pushed rather than
+     * covered — the same thing that happens when the animation is not there, only visible. A panel
+     * that slides *over* the editor and then snaps it aside is two motions where there is one
+     * event.
+     *
+     * The fade is deliberately quicker than the expansion and finishes first. Panel contents that
+     * are still translucent while the panel is still growing look like a rendering fault; text that
+     * has arrived inside a container that is still settling looks like the panel opening.
+     */
+    public fun dockEnter(dock: Dock): EnterTransition = when (dock) {
+        Dock.LEFT -> expandHorizontally(tween(ENTER_MILLIS, easing = Easing), expandFrom = Alignment.Start)
+        Dock.RIGHT -> expandHorizontally(tween(ENTER_MILLIS, easing = Easing), expandFrom = Alignment.End)
+        Dock.BOTTOM -> expandVertically(tween(ENTER_MILLIS, easing = Easing), expandFrom = Alignment.Bottom)
+    } + fadeIn(tween(STATE_MILLIS, easing = Easing))
+
+    /** A docked tool window closing. Collapses back into the edge it came from. */
+    public fun dockExit(dock: Dock): ExitTransition = when (dock) {
+        Dock.LEFT -> shrinkHorizontally(tween(EXIT_MILLIS, easing = Easing), shrinkTowards = Alignment.Start)
+        Dock.RIGHT -> shrinkHorizontally(tween(EXIT_MILLIS, easing = Easing), shrinkTowards = Alignment.End)
+        Dock.BOTTOM -> shrinkVertically(tween(EXIT_MILLIS, easing = Easing), shrinkTowards = Alignment.Bottom)
+    } + fadeOut(tween(EXIT_MILLIS, easing = Easing))
 }

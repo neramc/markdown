@@ -6,7 +6,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -14,6 +19,7 @@ import dev.starfect.quill.QuillController
 import dev.starfect.quill.model.Dialog
 import dev.starfect.quill.model.WorkspaceState
 import dev.starfect.quill.ui.theme.LocalShellPalette
+import dev.starfect.quill.ui.theme.Motion
 import dev.starfect.quill.ui.theme.LocalTypeScale
 import org.jetbrains.jewel.ui.component.Text
 
@@ -36,14 +42,26 @@ public fun QuillDialogs(
 ) {
     ConfirmHost(controller, workspace, onExit)
 
-    when (workspace.dialog) {
-        Dialog.SETTINGS -> SettingsDialog(controller, workspace)
-        Dialog.RUN_CONFIGURATIONS -> RunConfigurationsDialog(controller, workspace)
-        Dialog.ABOUT -> AboutDialog(controller)
-        Dialog.GO_TO_LINE -> GoToLineDialog(controller, workspace)
-        Dialog.UPDATE -> UpdateDialog(onDismiss = controller::dismissDialog, onRestart = onExit)
-        Dialog.UNINSTALL -> UninstallDialog(onDismiss = controller::dismissDialog, onFinished = onExit)
-        null -> Unit
+    // Held across the exit so the dialog fades out with its content intact. Reading
+    // `workspace.dialog` inside the transition would empty the panel on the first frame of the
+    // fade, which looks like the dialog breaking rather than closing.
+    var last by remember { mutableStateOf<Dialog?>(null) }
+    workspace.dialog?.let { last = it }
+
+    AnimatedVisibility(
+        visible = workspace.dialog != null,
+        enter = Motion.popupEnter,
+        exit = Motion.popupExit,
+    ) {
+        when (workspace.dialog ?: last) {
+            Dialog.SETTINGS -> SettingsDialog(controller, workspace)
+            Dialog.RUN_CONFIGURATIONS -> RunConfigurationsDialog(controller, workspace)
+            Dialog.ABOUT -> AboutDialog(controller)
+            Dialog.GO_TO_LINE -> GoToLineDialog(controller, workspace)
+            Dialog.UPDATE -> UpdateDialog(onDismiss = controller::dismissDialog, onRestart = onExit)
+            Dialog.UNINSTALL -> UninstallDialog(onDismiss = controller::dismissDialog, onFinished = onExit)
+            null -> Unit
+        }
     }
 }
 

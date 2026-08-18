@@ -44,6 +44,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.draw.alpha
+import dev.starfect.quill.ui.theme.Motion
 
 /**
  * The editor tab strip.
@@ -73,6 +77,10 @@ public fun EditorTabs(controller: QuillController, workspace: WorkspaceState) {
                         selected = session.id == workspace.activeDocumentId,
                         onSelect = { controller.selectDocument(session.id) },
                         onClose = { controller.requestCloseDocument(session.id) },
+                        // Closing a tab in the middle slides the ones after it along rather than
+                        // teleporting them, which is the difference between "that closed" and
+                        // "the strip changed".
+                        modifier = Modifier.animateItem(),
                     )
                 }
             }
@@ -88,6 +96,7 @@ private fun EditorTab(
     selected: Boolean,
     onSelect: () -> Unit,
     onClose: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val shell = LocalShellPalette.current
     val surfaces = LocalSurfaceStyle.current
@@ -108,15 +117,37 @@ private fun EditorTab(
     // has nothing to sit on. The tab becomes a filled, rounded shape instead — which is what the
     // style means by making the active tab more recognisable.
     val filledSelection = surfaces.separated
-    val background = when {
+    val targetBackground = when {
         selected && filledSelection -> shell.hoverBackground
         selected -> shell.tabSelectedBackground
         hovered -> shell.hoverBackground
         else -> Color.Transparent
     }
 
+    // The fill crosses rather than switches, at the same rate as every other hoverable surface in
+    // the shell — a tab that snaps while the tree row beside it fades is the sort of mismatch that
+    // reads as unfinished even when neither is wrong on its own.
+    val background by animateColorAsState(targetBackground, Motion.state(), label = "tabFill")
+
+    // The accent bar fades with the selection instead of jumping between tabs. It is two pixels of
+    // colour, and it is the only thing on the strip that says which document you are in.
+    val underlineAlpha by animateFloatAsState(
+        targetValue = if (selected && !filledSelection) 1f else 0f,
+        animationSpec = Motion.state(),
+        label = "tabUnderline",
+    )
+
+    // Reserving the close button's width even while it is invisible is what stops the strip
+    // twitching as the pointer crosses it; fading rather than swapping is what stops it flickering
+    // when the pointer passes over a tab on the way to another.
+    val closeAlpha by animateFloatAsState(
+        targetValue = if (hovered || selected) 1f else 0f,
+        animationSpec = Motion.state(),
+        label = "tabClose",
+    )
+
     Box(
-        Modifier.height(Tokens.TabHeight)
+        modifier.height(Tokens.TabHeight)
             .then(
                 if (filledSelection) {
                     Modifier.padding(vertical = Tokens.Spacing.Tiny)
@@ -139,12 +170,13 @@ private fun EditorTab(
             // "fill the available width" resolved to zero and the accent line was never on screen
             // in any build. Drawing it reads the tab's resolved width at paint time instead.
             .drawBehind {
-                if (!selected || filledSelection) return@drawBehind
+                if (underlineAlpha <= 0f) return@drawBehind
                 val thickness = underlineThickness.toPx()
                 drawRect(
                     color = underlineColor,
                     topLeft = Offset(0f, size.height - thickness),
                     size = Size(size.width, thickness),
+                    alpha = underlineAlpha,
                 )
             }
             .hoverable(interaction)
@@ -175,12 +207,10 @@ private fun EditorTab(
                 maxLines = 1,
             )
 
-            // The close button only materialises on hover or selection. Reserving its width even
-            // when hidden is what stops the strip twitching as the pointer moves across it.
-            if (hovered || selected) {
-                TabCloseButton(onClose)
-            } else {
-                Spacer(Modifier.size(Tokens.TabCloseSize))
+            // Always laid out, so the tab never changes width; only its opacity moves, and it
+            // stops taking clicks once it has faded out.
+            Box(Modifier.size(Tokens.TabCloseSize).alpha(closeAlpha)) {
+                if (closeAlpha > 0f) TabCloseButton(onClose)
             }
         }
     }

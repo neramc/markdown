@@ -45,6 +45,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import dev.starfect.quill.ui.theme.interactiveSurface
 import org.jetbrains.jewel.ui.component.PopupMenu
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
+import dev.starfect.quill.ui.theme.Motion
 
 /**
  * A tool window stripe: the narrow icon rail down each edge of the window.
@@ -298,12 +304,23 @@ public fun StatusBar(controller: QuillController, workspace: WorkspaceState) {
                 val notification = workspace.notification
                 val error = document?.loadError
 
-                when {
-                    // A message displaces the breadcrumbs while it is showing, the same way the
-                    // IDE's status text does, and clicking it dismisses it.
-                    error != null -> StatusMessage(error, shell.error, controller::dismissNotification)
-                    notification != null -> StatusMessage(notification, shell.text, controller::dismissNotification)
-                    else -> Breadcrumbs(controller, workspace)
+                // A message displaces the breadcrumbs while it is showing, the same way the IDE's
+                // status text does, and clicking it dismisses it. The swap is a cross-fade: the
+                // trail and the message occupy the same strip, and a hard cut there is a flicker
+                // at the exact moment somebody is trying to read what just happened.
+                AnimatedContent(
+                    targetState = error ?: notification,
+                    transitionSpec = {
+                        fadeIn(tween(Motion.ENTER_MILLIS, easing = Motion.Easing)) togetherWith
+                            fadeOut(tween(Motion.EXIT_MILLIS, easing = Motion.Easing))
+                    },
+                    label = "statusText",
+                ) { message ->
+                    when {
+                        message == null -> Breadcrumbs(controller, workspace)
+                        message == error -> StatusMessage(message, shell.error, controller::dismissNotification)
+                        else -> StatusMessage(message, shell.text, controller::dismissNotification)
+                    }
                 }
             }
 

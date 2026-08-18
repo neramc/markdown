@@ -60,6 +60,11 @@ import org.jetbrains.jewel.ui.component.styling.DividerStyle
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.VerticalSplitLayout
 import org.jetbrains.jewel.ui.component.rememberSplitLayoutState
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 /**
  * The IDE layout below the main toolbar: tool window stripes on three edges, docked tool windows,
@@ -115,19 +120,28 @@ public fun QuillWindowContent(
                 // it instead.
                 if (!surfaces.separated) ShellDivider(Orientation.Vertical)
 
-                if (workspace.leftToolWindow == ToolWindow.PROJECT) {
-                    // No separator between panel and editor: they are twelve points apart, and in
-                    // the real window that tone step is the whole boundary. A line here would be the
-                    // first thing anyone saw. The resize handle sits in that boundary instead, and
-                    // shows nothing until it is pointed at.
-                    Box(
-                        Modifier.width(workspace.settings.leftToolWindowWidth.dp)
-                            .fillMaxHeight()
-                            .regionSurface(shell.toolWindowBackground)
-                    ) {
-                        ProjectTree(controller, workspace)
+                // The panel grows out of the rail rather than appearing at full width, so opening
+                // it reads as one event. The resize handle is inside the animation with it —
+                // outside, it would hang in the gap for the whole of the collapse.
+                AnimatedVisibility(
+                    visible = workspace.leftToolWindow == ToolWindow.PROJECT,
+                    enter = Motion.dockEnter(Dock.LEFT),
+                    exit = Motion.dockExit(Dock.LEFT),
+                ) {
+                    Row {
+                        // No separator between panel and editor: they are twelve points apart, and
+                        // in the real window that tone step is the whole boundary. A line here
+                        // would be the first thing anyone saw. The resize handle sits in that
+                        // boundary instead, and shows nothing until it is pointed at.
+                        Box(
+                            Modifier.width(workspace.settings.leftToolWindowWidth.dp)
+                                .fillMaxHeight()
+                                .regionSurface(shell.toolWindowBackground)
+                        ) {
+                            ProjectTree(controller, workspace)
+                        }
+                        ToolWindowResizeHandle(onDrag = { controller.resizeToolWindow(Dock.LEFT, it) })
                     }
-                    ToolWindowResizeHandle(onDrag = { controller.resizeToolWindow(Dock.LEFT, it) })
                 }
 
                 Column(Modifier.weight(1f).fillMaxHeight().regionSurface(shell.tabBarBackground)) {
@@ -163,15 +177,30 @@ public fun QuillWindowContent(
             StatusBar(controller, workspace)
         }
 
-        if (workspace.commandPaletteVisible) {
+        // The three search surfaces arrive the same way: a scrim fade with the panel barely scaled
+        // up behind it. They are the fastest thing in the window to open and the only ones that
+        // appear over the document, so they are the ones where "did that land?" is a real question.
+        AnimatedVisibility(
+            visible = workspace.commandPaletteVisible,
+            enter = Motion.popupEnter,
+            exit = Motion.popupExit,
+        ) {
             CommandPalette(controller, workspace)
         }
 
-        if (workspace.projectSearch.visible) {
+        AnimatedVisibility(
+            visible = workspace.projectSearch.visible,
+            enter = Motion.popupEnter,
+            exit = Motion.popupExit,
+        ) {
             ProjectSearchDialog(controller, workspace)
         }
 
-        if (workspace.featurePaletteVisible) {
+        AnimatedVisibility(
+            visible = workspace.featurePaletteVisible,
+            enter = Motion.popupEnter,
+            exit = Motion.popupExit,
+        ) {
             MarkdownFeaturePalette(controller) { controller.setFeaturePaletteVisible(false) }
         }
 
@@ -236,24 +265,37 @@ private val FocusColumnWidth = 720.dp
 
 /** The right dock's panel, which is whichever of its tool windows is open. */
 @Composable
-private fun RightDock(controller: QuillController, workspace: WorkspaceState) {
-    val tool = workspace.rightToolWindow ?: return
+private fun RowScope.RightDock(controller: QuillController, workspace: WorkspaceState) {
     val shell = LocalShellPalette.current
 
-    ToolWindowResizeHandle(onDrag = { controller.resizeToolWindow(Dock.RIGHT, -it) })
-    Box(
-        Modifier.width(workspace.settings.rightToolWindowWidth.dp)
-            .fillMaxHeight()
-            .regionSurface(shell.toolWindowBackground)
+    // Held across the collapse so the panel has something to draw while it shrinks. Reading
+    // `workspace.rightToolWindow` directly would empty it on the first frame of the exit, and a
+    // panel that goes blank and then shrinks is two events again.
+    var last by remember { mutableStateOf(ToolWindow.STRUCTURE) }
+    workspace.rightToolWindow?.let { last = it }
+
+    AnimatedVisibility(
+        visible = workspace.rightToolWindow != null,
+        enter = Motion.dockEnter(Dock.RIGHT),
+        exit = Motion.dockExit(Dock.RIGHT),
     ) {
-        when (tool) {
-            ToolWindow.STRUCTURE -> OutlinePanel(controller, workspace)
-            ToolWindow.NOTIFICATIONS -> NotificationsPanel(controller, workspace)
-            else -> PlaceholderPanel(
-                tool,
-                onHide = { controller.setRightToolWindow(null) },
-                onSelect = controller::setRightToolWindow,
-            )
+        Row {
+            ToolWindowResizeHandle(onDrag = { controller.resizeToolWindow(Dock.RIGHT, -it) })
+            Box(
+                Modifier.width(workspace.settings.rightToolWindowWidth.dp)
+                    .fillMaxHeight()
+                    .regionSurface(shell.toolWindowBackground)
+            ) {
+                when (val tool = workspace.rightToolWindow ?: last) {
+                    ToolWindow.STRUCTURE -> OutlinePanel(controller, workspace)
+                    ToolWindow.NOTIFICATIONS -> NotificationsPanel(controller, workspace)
+                    else -> PlaceholderPanel(
+                        tool,
+                        onHide = { controller.setRightToolWindow(null) },
+                        onSelect = controller::setRightToolWindow,
+                    )
+                }
+            }
         }
     }
 }
