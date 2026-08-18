@@ -203,6 +203,7 @@ public fun main(arguments: Array<String>) {
                     onPreviewKeyEvent = { event -> handleShortcut(event, controller) },
                 ) {
                     SaveOnFocusLoss(controller, workspace, window)
+                    WatchForExternalChanges(controller, window)
                     AutoSaveAfterDelay(controller, workspace)
                     AcceptDroppedFiles(controller, window)
                     Column(Modifier.fillMaxSize()) {
@@ -221,6 +222,7 @@ public fun main(arguments: Array<String>) {
                     onPreviewKeyEvent = { event -> handleShortcut(event, controller) },
                 ) {
                     SaveOnFocusLoss(controller, workspace, window)
+                    WatchForExternalChanges(controller, window)
                     AutoSaveAfterDelay(controller, workspace)
                     AcceptDroppedFiles(controller, window)
                     Column(Modifier.fillMaxSize()) {
@@ -292,6 +294,33 @@ private fun SaveOnFocusLoss(controller: QuillController, workspace: WorkspaceSta
             }
         }
 
+        window.addWindowFocusListener(listener)
+        window.addWindowListener(listener)
+        onDispose {
+            window.removeWindowFocusListener(listener)
+            window.removeWindowListener(listener)
+        }
+    }
+}
+
+/**
+ * Notices files that changed outside Quill.
+ *
+ * On focus, because that is when the user has just been somewhere else — a terminal, another
+ * editor, a branch switch — and is both when a change is most likely and when hearing about it is
+ * most useful. A watch service would notice sooner and cost a thread per project to tell the user
+ * something they cannot act on until they look at the window anyway.
+ *
+ * Deliberately not tied to the auto-save setting. Whether Quill writes on focus loss is a
+ * preference; whether it silently overwrites somebody else's work is not.
+ */
+@Composable
+private fun WatchForExternalChanges(controller: QuillController, window: java.awt.Window) {
+    DisposableEffect(window) {
+        val listener = object : java.awt.event.WindowAdapter() {
+            override fun windowGainedFocus(event: java.awt.event.WindowEvent) = controller.refreshFromDisk()
+            override fun windowActivated(event: java.awt.event.WindowEvent) = controller.refreshFromDisk()
+        }
         window.addWindowFocusListener(listener)
         window.addWindowListener(listener)
         onDispose {

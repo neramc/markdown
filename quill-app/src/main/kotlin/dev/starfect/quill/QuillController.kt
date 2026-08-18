@@ -28,6 +28,7 @@ import dev.starfect.quill.model.FindState
 import dev.starfect.quill.model.Notification
 import dev.starfect.quill.model.NotificationSeverity
 import dev.starfect.quill.editing.AutoPairs
+import dev.starfect.quill.editing.UndoHistory
 import dev.starfect.quill.editing.CleanPaste
 import dev.starfect.quill.editing.DocumentStructure
 import dev.starfect.quill.editing.MarkdownEdits
@@ -148,6 +149,130 @@ public class QuillController(
 
     private val highlightJobs = ConcurrentHashMap<Long, Job>()
 
+    /**
+     * Undo and redo, per document.
+     *
+     * Here rather than in the editor composable because a history that belongs to a text field is
+     * discarded when the field is — which meant switching tabs and coming back threw away
+     * everything you had written into that tab.
+     */
+    private val histories = ConcurrentHashMap<Long, UndoHistory>()
+
+    private fun history(id: Long): UndoHistory = histories.getOrPut(id) { UndoHistory() }
+
+    /** Whether [session]'s file has changed since Quill last agreed with it. */
+    private fun changedOnDisk(session: DocumentSession): Boolean {
+        val path = session.path ?: return false
+        val recorded = session.diskStamp ?: return false
+        val now = fileService.stamp(path) ?: return false
+        return now != recorded
+    }
+
+    /**
+     * Checks every open document against its file, and acts on what changed.
+     *
+     * Called when the window regains focus, which is when the user has just been somewhere else —
+     * a terminal, another editor, a merge — and is the moment a change is most likely to have
+     * happened and most useful to hear about.
+     *
+     * A buffer with no unsaved edits is reloaded silently. There is nothing to lose and nothing to
+     * decide, and an editor showing stale text while the file says otherwise is the more surprising
+     * of the two behaviours. A buffer *with* unsaved edits is only flagged: the two versions cannot
+     * be merged and Quill will not pick one.
+     */
+    public fun refreshFromDisk() {
+        scope.launch {
+            _state.value.documents.forEach { session ->
+                val path = session.path ?: return@forEach
+                if (!changedOnDisk(session)) return@forEach
+
+                if (session.isModified) {
+                    updateDocument(session.id) { it.copy(conflictsWithDisk = true) }
+                    update {
+                        it.copy(
+                            notification = "${path.fileName} changed on disk, and you have unsaved " +
+                                "edits. Saving will overwrite the file.",
+                        )
+                    }
+                } else {
+                    reloadFromDisk(session.id)
+                }
+            }
+        }
+    }
+
+    /** Discards the buffer and reads the file again. */
+    public fun reloadFromDisk(id: Long) {
+        val session = _state.value.documents.firstOrNull { it.id == id } ?: return
+        val path = session.path ?: return
+
+        scope.launch {
+            withContext(Dispatchers.IO) { runCatching { fileService.read(path) } }
+                .onSuccess { text ->
+                    val stamp = fileService.stamp(path)
+                    handles[id]?.let { handle -> runCatching { handle.setText(text) } }
+                    history(id).reset(TextFieldValue(text))
+                    updateDocument(id) { current ->
+                        current.copy(
+                            text = TextFieldValue(text, TextRange(current.text.selection.start.coerceIn(0, text.length))),
+                            savedText = text,
+                            diskStamp = stamp,
+                            conflictsWithDisk = false,
+                        )
+                    }
+                    derive(id, immediate = true)
+                }
+                .onFailure { failure ->
+                    update { it.copy(notification = "Could not reload ${path.fileName}: ${failure.message}") }
+                }
+        }
+    }
+
+    /**
+     * Saves over a file that changed underneath, because the writer said so.
+     *
+     * The conflict flag is what [save] refuses on, so clearing it first is the whole of "yes, I
+     * mean it" — and it is cleared for this one save rather than for the document, so a later
+     * change on disk stops the next one again.
+     */
+    public fun saveOverwritingDisk(id: Long, onNeedsPath: () -> Path?) {
+        updateDocument(id) { it.copy(diskStamp = null, conflictsWithDisk = false) }
+        save(id, onNeedsPath)
+    }
+
+    /** The document a keyboard action applies to, or null when nothing is open. */
+    public fun activeDocumentId(): Long? = _state.value.activeDocumentId
+
+    /** Whether [id] has anything to step back to. */
+    public fun canUndo(id: Long): Boolean = histories[id]?.canUndo == true
+
+    /** Whether [id] has anything to step forward to. */
+    public fun canRedo(id: Long): Boolean = histories[id]?.canRedo == true
+
+    /** Steps [id] back one edit. */
+    public fun undo(id: Long) {
+        applyHistory(id) { it.undo() }
+    }
+
+    /** Steps [id] forward one edit. */
+    public fun redo(id: Long) {
+        applyHistory(id) { it.redo() }
+    }
+
+    /**
+     * Puts a remembered value back.
+     *
+     * It goes through the same path a typed edit does, so the engine's rope, the derived views and
+     * the modified marker all move with it — and then the history is told the document reads this
+     * way *without* recording a new step, or undo would push what it just undid back onto the stack
+     * and Ctrl+Z would alternate between two states for ever.
+     */
+    private fun applyHistory(id: Long, step: (UndoHistory) -> TextFieldValue?) {
+        val history = histories[id] ?: return
+        val restored = step(history) ?: return
+        applyEdit(id, restored, record = false)
+    }
+
     private val stateLock = Any()
     private val _state = mutableStateOf(WorkspaceState())
     public val state: State<WorkspaceState> = _state
@@ -235,6 +360,7 @@ public class QuillController(
     public fun newDocument() {
         val id = nextId.getAndIncrement()
         handles[id] = engine.openDocument("")
+        history(id).reset(TextFieldValue(""))
         update { workspace ->
             workspace.copy(
                 documents = workspace.documents + DocumentSession(id = id, path = null),
@@ -258,6 +384,8 @@ public class QuillController(
                     val id = nextId.getAndIncrement()
                     val handle = engine.openDocument(text)
                     handles[id] = handle
+                    history(id).reset(TextFieldValue(text))
+                    val stamp = fileService.stamp(path)
 
                     // The extension decides the dialect: a .mdx file has to parse as MDX from the
                     // first render, not after the user finds the setting.
@@ -272,6 +400,7 @@ public class QuillController(
                                 text = TextFieldValue(text),
                                 savedText = text,
                                 flavour = flavour,
+                                diskStamp = stamp,
                             ),
                             activeDocumentId = id,
                         )
@@ -489,6 +618,9 @@ public class QuillController(
         running?.cancel()
         if (running != null) runBlocking { running.join() }
         handles.remove(id)?.close()
+        histories.remove(id)
+        visibleLines.remove(id)
+        highlightedLines.remove(id)
         update { workspace ->
             val remaining = workspace.documents.filterNot { it.id == id }
             workspace.copy(
@@ -538,6 +670,15 @@ public class QuillController(
      * selection change produces no engine call at all.
      */
     public fun onTextChanged(id: Long, incoming: TextFieldValue) {
+        applyEdit(id, incoming, record = true)
+    }
+
+    /**
+     * The one funnel every edit passes through.
+     *
+     * @param record whether the result becomes an undo step. False when the edit *is* an undo.
+     */
+    private fun applyEdit(id: Long, incoming: TextFieldValue, record: Boolean) {
         val session = _state.value.documents.firstOrNull { it.id == id } ?: return
         val settings = _state.value.settings
 
@@ -545,12 +686,24 @@ public class QuillController(
         // funnel every edit passes through: a keystroke, a paste, an input method's commit and a
         // programmatic edit all arrive as a finished value, and comparing against the previous one
         // is the only way to know which it was.
-        val value = AutoPairs.apply(
-            before = session.text,
-            after = incoming,
-            closeBrackets = settings.autoClosingBrackets,
-            surroundSelection = settings.autoSurround,
-        )
+        //
+        // Except when restoring: an undo is not typing. Running a restored value through the pair
+        // logic would let it insert a bracket into text the writer is stepping *back* to, so undo
+        // would produce something that was never in the document.
+        val value = if (record) {
+            AutoPairs.apply(
+                before = session.text,
+                after = incoming,
+                closeBrackets = settings.autoClosingBrackets,
+                surroundSelection = settings.autoSurround,
+            )
+        } else {
+            incoming
+        }
+
+        // Only a real edit becomes a step. On the restore path the history has already moved its
+        // own cursor, and telling it again would push what was just undone back onto the stack.
+        if (record) history(id).record(value)
 
         val previous = session.text.text
         val current = value.text
@@ -697,12 +850,28 @@ public class QuillController(
 
         val text = applySaveActions(session.text.text, _state.value.settings)
 
+        // Refuse to overwrite a file somebody else has changed since Quill read it. Saving used to
+        // be an unconditional write, so a `git checkout`, a formatter or a second editor touching
+        // the file while a document sat open cost that work with no message at all. The writer is
+        // told and given the choice; [saveOverwritingDisk] is the choice.
+        if (session.path == target && changedOnDisk(session)) {
+            updateDocument(id) { it.copy(conflictsWithDisk = true) }
+            update {
+                it.copy(
+                    notification = "${target.fileName} changed on disk since you opened it. " +
+                        "Reload it, or save again to overwrite.",
+                )
+            }
+            return
+        }
+
         scope.launch {
             withContext(Dispatchers.IO) { runCatching { fileService.write(target, text) } }
                 .onSuccess {
                     // The buffer is rewritten to match what went to disk. Skipping this leaves the
                     // document permanently "modified" against a file it is identical to except for
                     // the whitespace the save action just removed.
+                    val written = fileService.stamp(target)
                     if (text != session.text.text) {
                         val caret = session.text.selection.start.coerceIn(0, text.length)
                         updateDocument(id) { current ->
@@ -710,12 +879,21 @@ public class QuillController(
                                 text = current.text.copy(text = text, selection = TextRange(caret)),
                                 path = target,
                                 savedText = text,
+                                diskStamp = written,
+                                conflictsWithDisk = false,
                             )
                         }
                         handles[id]?.let { handle -> runCatching { handle.setText(text) } }
                         derive(id, immediate = true)
                     } else {
-                        updateDocument(id) { it.copy(path = target, savedText = text) }
+                        updateDocument(id) {
+                            it.copy(
+                                path = target,
+                                savedText = text,
+                                diskStamp = written,
+                                conflictsWithDisk = false,
+                            )
+                        }
                     }
                     update { it.copy(notification = "Saved ${target.fileName}") }
                 }

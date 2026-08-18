@@ -260,6 +260,18 @@ public fun StatusBar(controller: QuillController, workspace: WorkspaceState) {
                     StatusItem(workspace.vim.display, "Vim mode -- Esc returns to normal")
                 }
 
+                // A file that changed underneath an edited buffer is the one status the writer has
+                // to act on, so it sits first and offers the two ways out rather than only saying
+                // that something is wrong.
+                if (document?.conflictsWithDisk == true) {
+                    StatusItem(
+                        "Changed on disk",
+                        "This file changed outside Quill and you have unsaved edits. " +
+                            "Click to discard yours and reload.",
+                        onClick = { controller.reloadFromDisk(document.id) },
+                    )
+                }
+
                 StatusItem(
                     "${caret.line + 1}:${caret.column + 1}",
                     "Go to line and column",

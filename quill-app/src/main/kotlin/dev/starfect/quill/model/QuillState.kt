@@ -12,6 +12,7 @@ import dev.starfect.quill.bridge.wire.OutlineEntry
 import dev.starfect.quill.bridge.wire.SearchMatch
 import dev.starfect.quill.bridge.wire.StyleSpan
 import dev.starfect.quill.editing.Vim
+import dev.starfect.quill.io.FileStamp
 import dev.starfect.quill.search.ProjectSearch
 import java.nio.file.Path
 
@@ -84,6 +85,20 @@ public data class DocumentSession(
     val matches: List<SearchMatch> = emptyList(),
     val currentMatch: Int = -1,
     val loadError: String? = null,
+    /**
+     * What was on disk when Quill last read or wrote this file.
+     *
+     * Null for a document that has never been on disk. Compared before every save so that a file
+     * somebody else changed is not overwritten in silence.
+     */
+    val diskStamp: FileStamp? = null,
+    /**
+     * Set when the file changed underneath a buffer that has unsaved edits.
+     *
+     * The two changes cannot be merged and Quill will not guess which to keep, so saving is refused
+     * until the writer says which one wins.
+     */
+    val conflictsWithDisk: Boolean = false,
 ) {
     /** File name, or a placeholder for a document that has never been saved. */
     val displayName: String

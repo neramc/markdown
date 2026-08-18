@@ -97,6 +97,26 @@ internal fun handleShortcut(event: KeyEvent, controller: QuillController): Boole
                 controller.edit { MarkdownEdits.toggleEmphasis(it, "*") }
                 true
             }
+            // Undo and redo, bound here rather than left to the text field.
+            //
+            // Compose's field carries an undo stack of its own, but it belongs to the composable:
+            // switching tabs disposes it, so the history of what you were writing was thrown away
+            // by looking at something else and coming back. It also has no redo. Both now live on
+            // the document, in the controller.
+            //
+            // Ctrl+Shift+Z and Ctrl+Y both redo, because half the world learned each.
+            event.key == Key.Z && !event.isShiftPressed -> {
+                controller.activeDocumentId()?.let(controller::undo)
+                true
+            }
+            event.key == Key.Z && event.isShiftPressed -> {
+                controller.activeDocumentId()?.let(controller::redo)
+                true
+            }
+            event.key == Key.Y && !event.isShiftPressed -> {
+                controller.activeDocumentId()?.let(controller::redo)
+                true
+            }
             // Ctrl+Shift+C rather than Ctrl+C, which is copy and always will be.
             event.key == Key.C && event.isShiftPressed -> {
                 controller.edit { MarkdownEdits.toggleEmphasis(it, "`") }

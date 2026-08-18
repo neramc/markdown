@@ -72,6 +72,21 @@ public class FileService {
     public fun read(path: Path): String = Files.readString(path, StandardCharsets.UTF_8)
 
     /**
+     * What [path] looked like on disk, for noticing that somebody else has changed it.
+     *
+     * Modification time *and* size. Either alone is fooled by an ordinary case: a checkout can
+     * restore a file to a previous version with the same length, and a filesystem with one-second
+     * timestamp resolution can record two edits a moment apart as the same instant. Together they
+     * miss only a change that keeps the size and lands inside the same timestamp tick, which is a
+     * far smaller window than either leaves open on its own.
+     *
+     * Null when the file is not there, which is a state worth distinguishing from "unchanged".
+     */
+    public fun stamp(path: Path): FileStamp? = runCatching {
+        FileStamp(Files.getLastModifiedTime(path).toMillis(), Files.size(path))
+    }.getOrNull()
+
+    /**
      * Writes [content] as UTF-8.
      *
      * The write goes to a sibling temporary file that is then moved into place, so a crash or full
