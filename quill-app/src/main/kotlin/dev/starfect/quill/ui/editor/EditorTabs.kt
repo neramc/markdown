@@ -72,7 +72,7 @@ public fun EditorTabs(controller: QuillController, workspace: WorkspaceState) {
                         session = session,
                         selected = session.id == workspace.activeDocumentId,
                         onSelect = { controller.selectDocument(session.id) },
-                        onClose = { controller.closeDocument(session.id) },
+                        onClose = { controller.requestCloseDocument(session.id) },
                     )
                 }
             }
@@ -255,25 +255,25 @@ private fun TabActionsButton(controller: QuillController, workspace: WorkspaceSt
                 selectableItem(
                     selected = false,
                     enabled = active != null,
-                    onClick = { act { active?.let { controller.closeDocument(it.id) } } },
+                    onClick = { act { active?.let { controller.requestCloseDocument(it.id) } } },
                 ) { Text("Close") }
 
                 selectableItem(
                     selected = false,
                     enabled = documents.size > 1,
-                    onClick = { act { active?.let { controller.closeOtherDocuments(it.id) } } },
+                    onClick = { act { active?.let { controller.requestCloseOtherDocuments(it.id) } } },
                 ) { Text("Close Others") }
 
                 selectableItem(
                     selected = false,
                     enabled = index >= 0 && index < documents.lastIndex,
-                    onClick = { act { active?.let { controller.closeDocumentsAfter(it.id) } } },
+                    onClick = { act { active?.let { controller.requestCloseDocumentsAfter(it.id) } } },
                 ) { Text("Close to the Right") }
 
                 selectableItem(
                     selected = false,
                     enabled = documents.isNotEmpty(),
-                    onClick = { act { controller.closeAllDocuments() } },
+                    onClick = { act { controller.requestCloseAllDocuments() } },
                 ) { Text("Close All") }
 
                 passiveItem { MenuSeparator() }

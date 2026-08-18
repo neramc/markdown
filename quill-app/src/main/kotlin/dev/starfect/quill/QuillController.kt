@@ -20,6 +20,9 @@ import dev.starfect.quill.bridge.wire.OutlineEntry
 import dev.starfect.quill.bridge.wire.Severity
 import dev.starfect.quill.bridge.wire.StyleSpan
 import dev.starfect.quill.io.FileService
+import dev.starfect.quill.model.BackgroundTask
+import dev.starfect.quill.model.Confirm
+import dev.starfect.quill.model.ConfirmChoice
 import dev.starfect.quill.model.Dialog
 import dev.starfect.quill.model.Dock
 import dev.starfect.quill.model.DocumentSession
@@ -238,6 +241,92 @@ public class QuillController(
     public fun saveOverwritingDisk(id: Long, onNeedsPath: () -> Path?) {
         updateDocument(id) { it.copy(diskStamp = null, conflictsWithDisk = false) }
         save(id, onNeedsPath)
+    }
+
+    // ------------------------------------------------------------------ background work
+
+    private val nextTaskId = AtomicLong(1)
+
+    /**
+     * A running task's handle, for reporting what it is doing.
+     *
+     * Passed to the block so progress is reported from inside the work rather than guessed at from
+     * outside it. Every method is safe to call from any thread and cheap enough to call in a loop.
+     */
+    public inner class TaskHandle internal constructor(private val id: Long) {
+
+        /** Sets the fraction complete, or clears it back to indeterminate with null. */
+        public fun progress(fraction: Float?) {
+            mutateTask(id) { it.copy(fraction = fraction?.coerceIn(0f, 1f)) }
+        }
+
+        /** Sets the line under the title: the file being read, the step being run. */
+        public fun detail(text: String?) {
+            mutateTask(id) { it.copy(detail = text) }
+        }
+
+        /** Both at once, which is what a loop over a known number of items wants. */
+        public fun progress(done: Int, total: Int, detail: String? = null) {
+            mutateTask(id) {
+                it.copy(
+                    fraction = if (total > 0) (done.toFloat() / total).coerceIn(0f, 1f) else null,
+                    detail = detail ?: it.detail,
+                )
+            }
+        }
+    }
+
+    private fun mutateTask(id: Long, transform: (BackgroundTask) -> BackgroundTask) {
+        update { workspace ->
+            val index = workspace.tasks.indexOfFirst { it.id == id }
+            if (index < 0) {
+                workspace
+            } else {
+                workspace.copy(tasks = workspace.tasks.toMutableList().also { it[index] = transform(it[index]) })
+            }
+        }
+    }
+
+    /**
+     * Runs [block] as a named background task, so the window can say it is happening.
+     *
+     * The task appears in [WorkspaceState.tasks] for its whole life and is removed when the block
+     * returns, however it returns — the `finally` is the point, because a task that survives its
+     * own failure leaves the status bar claiming work that stopped minutes ago.
+     *
+     * Cancelling the returned job cancels the block, which is what the status bar's stop button
+     * does. Work that cannot be safely interrupted passes `cancellable = false` and is shown
+     * without one rather than being shown with a button that does nothing.
+     */
+    public fun launchTask(
+        title: String,
+        cancellable: Boolean = true,
+        block: suspend TaskHandle.() -> Unit,
+    ): Job {
+        val id = nextTaskId.getAndIncrement()
+        update { it.copy(tasks = it.tasks + BackgroundTask(id = id, title = title, cancellable = cancellable)) }
+
+        return scope.launch {
+            try {
+                TaskHandle(id).block()
+            } finally {
+                update { workspace -> workspace.copy(tasks = workspace.tasks.filterNot { it.id == id }) }
+            }
+        }.also { job -> taskJobs[id] = job; job.invokeOnCompletion { taskJobs.remove(id) } }
+    }
+
+    private val taskJobs = ConcurrentHashMap<Long, Job>()
+
+    /**
+     * Asks a task to stop.
+     *
+     * It is marked as stopping straight away rather than removed, because cancellation is a request
+     * that takes as long as the block's next suspension point — and an indicator that vanishes on
+     * the click while the work carries on is the same lie the silence was.
+     */
+    public fun cancelTask(id: Long) {
+        mutateTask(id) { it.copy(stopping = true) }
+        taskJobs[id]?.cancel()
     }
 
     /** The document a keyboard action applies to, or null when nothing is open. */
@@ -675,6 +764,179 @@ public class QuillController(
         documents.drop(index + 1).map { it.id }.forEach(::closeDocument)
     }
 
+    // ------------------------------------------------- closing, with a question when it costs work
+
+    /**
+     * Closes [id], asking first if that would throw away unsaved edits.
+     *
+     * This is what the tab's close button and Ctrl+W call; [closeDocument] is what actually closes
+     * and asks nothing. Keeping the two apart matters because several callers genuinely must not
+     * ask — resolving the question itself, replaying a Vim `:q!`, shutting the workspace down — and
+     * a single function that sometimes opens a dialog and sometimes does not is a function whose
+     * behaviour no caller can rely on.
+     */
+    public fun requestCloseDocument(id: Long) {
+        requestClose(listOf(id))
+    }
+
+    /** Closes every document except [keep], asking about the unsaved ones. */
+    public fun requestCloseOtherDocuments(keep: Long) {
+        requestClose(_state.value.documents.map { it.id }.filter { it != keep })
+    }
+
+    /** Closes every document, asking about the unsaved ones. */
+    public fun requestCloseAllDocuments() {
+        requestClose(_state.value.documents.map { it.id })
+    }
+
+    /** Closes the documents to the right of [id] in the tab strip, asking about the unsaved ones. */
+    public fun requestCloseDocumentsAfter(id: Long) {
+        val documents = _state.value.documents
+        val index = documents.indexOfFirst { it.id == id }
+        if (index < 0) return
+        requestClose(documents.drop(index + 1).map { it.id })
+    }
+
+    /**
+     * Closes [ids] outright, or raises the question when any of them has unsaved edits.
+     *
+     * One question for the whole batch rather than one per document: "Close All" over twelve tabs
+     * with four modified is one decision to the person making it, and four dialogs in a row is how
+     * a confirmation becomes something you click through without reading.
+     */
+    private fun requestClose(ids: List<Long>) {
+        val documents = _state.value.documents
+        val closing = ids.mapNotNull { id -> documents.firstOrNull { it.id == id } }
+        if (closing.isEmpty()) return
+
+        val unsaved = closing.filter { it.isModified }
+        if (unsaved.isEmpty()) {
+            closing.forEach { closeDocument(it.id) }
+            return
+        }
+
+        update {
+            it.copy(
+                confirm = Confirm.CloseDocuments(
+                    ids = closing.map { session -> session.id },
+                    unsavedNames = unsaved.map { session -> session.displayName },
+                ),
+            )
+        }
+    }
+
+    /** Drops the pending question, doing nothing it asked about. Escape and the close button. */
+    public fun dismissConfirm() {
+        update { it.copy(confirm = null) }
+    }
+
+    /**
+     * Asks about unsaved work before the window closes, and answers whether it may close now.
+     *
+     * Returns true when there is nothing to lose, in which case the caller exits immediately. False
+     * means a question is on screen and the exit is now that question's to perform — which is why
+     * [resolveConfirm] takes the exit action rather than the controller holding one.
+     */
+    public fun requestExit(): Boolean {
+        val unsaved = _state.value.documents.filter { it.isModified }
+        if (unsaved.isEmpty()) return true
+
+        update {
+            it.copy(
+                confirm = Confirm.Exit(
+                    ids = unsaved.map { session -> session.id },
+                    unsavedNames = unsaved.map { session -> session.displayName },
+                ),
+            )
+        }
+        return false
+    }
+
+    /**
+     * Carries out the pending question's [choice].
+     *
+     * [onNeedsPath] is called on the calling thread for any document that has never been saved,
+     * because a file picker is a UI-thread affair; the writes it feeds then happen off it.
+     * [onExit] closes the application, and is only ever reached from a question that asked about
+     * closing it.
+     */
+    public fun resolveConfirm(
+        choice: ConfirmChoice,
+        onNeedsPath: (DocumentSession) -> Path? = { null },
+        onExit: () -> Unit = {},
+    ) {
+        val pending = _state.value.confirm ?: return
+        update { it.copy(confirm = null) }
+
+        when (pending) {
+            is Confirm.CloseDocuments -> when (choice) {
+                ConfirmChoice.CANCEL -> Unit
+                ConfirmChoice.DISCARD -> pending.ids.forEach(::closeDocument)
+                ConfirmChoice.SAVE -> saveThenClose(pending.ids, onNeedsPath)
+            }
+
+            is Confirm.Exit -> when (choice) {
+                ConfirmChoice.CANCEL -> Unit
+                ConfirmChoice.DISCARD -> onExit()
+                ConfirmChoice.SAVE -> saveThenExit(pending.ids, onNeedsPath, onExit)
+            }
+        }
+    }
+
+    /**
+     * Writes every unsaved document and only then leaves.
+     *
+     * The exit waits for the last write, because the process ending mid-write is the one way this
+     * can still lose the work it was asked to save. A cancelled picker abandons the exit entirely
+     * and leaves the window up, which is the only outcome that lets the writer try again.
+     */
+    private fun saveThenExit(ids: List<Long>, onNeedsPath: (DocumentSession) -> Path?, onExit: () -> Unit) {
+        val documents = _state.value.documents
+        val plan = ArrayList<Pair<Long, Path>>(ids.size)
+        for (id in ids) {
+            val session = documents.firstOrNull { it.id == id } ?: continue
+            if (!session.isModified) continue
+            val target = saveTarget(id) { onNeedsPath(session) } ?: return
+            plan += id to target
+        }
+
+        scope.launch {
+            for ((id, target) in plan) {
+                if (!persist(id, target)) return@launch
+            }
+            onExit()
+        }
+    }
+
+    /**
+     * Writes each of [ids] that needs writing and closes it once the bytes have landed.
+     *
+     * Every target is resolved before the first byte is written. A cancelled file picker — or a
+     * file that changed on disk underneath — abandons the whole batch rather than closing the tabs
+     * it got to first, because a half-finished "Save All" leaves no trace of which documents were
+     * saved: the tabs that would have told you are the ones that are gone.
+     */
+    private fun saveThenClose(ids: List<Long>, onNeedsPath: (DocumentSession) -> Path?) {
+        val documents = _state.value.documents
+        val plan = ArrayList<Pair<Long, Path?>>(ids.size)
+        for (id in ids) {
+            val session = documents.firstOrNull { it.id == id } ?: continue
+            if (!session.isModified) {
+                plan += id to null
+                continue
+            }
+            val target = saveTarget(id) { onNeedsPath(session) } ?: return
+            plan += id to target
+        }
+
+        scope.launch {
+            for ((id, target) in plan) {
+                if (target != null && !persist(id, target)) return@launch
+                closeDocument(id)
+            }
+        }
+    }
+
     public fun selectDocument(id: Long) {
         update { it.copy(activeDocumentId = id) }
     }
@@ -857,15 +1119,61 @@ public class QuillController(
 
     // ---------------------------------------------------------------- files
 
+    /**
+     * Where a never-saved document should go, asked with the platform's own save dialog.
+     *
+     * Blocking, and deliberately called on the UI thread: a modal file dialog *is* the UI thread's
+     * job, and answering it asynchronously would mean deciding what the rest of the window does
+     * while it is open.
+     */
+    public fun promptForPath(session: DocumentSession): Path? = FileService.chooseSaveFile(
+        suggestedName = session.path?.fileName?.toString() ?: "untitled.md",
+        directory = session.path?.parent ?: _state.value.projectRoot,
+    )
+
+    /**
+     * Saves a document, asking where to put it when it has never been on disk.
+     *
+     * This is what the menu, the toolbar and Ctrl+S call. [save] with a caller-supplied path stays
+     * for the paths that must not open a dialog — auto-save on focus loss, and save-on-exit, where a
+     * modal picker appearing as the window closes is a hang, not a prompt.
+     */
+    public fun saveWithPrompt(id: Long) {
+        val session = _state.value.documents.firstOrNull { it.id == id } ?: return
+        save(id) { promptForPath(session) }
+    }
+
+    /**
+     * Writes a document somewhere new, and moves the document to it.
+     *
+     * Distinct from [saveWithPrompt] in that it asks *even when the document already has a file* —
+     * that is the entire feature. The document then belongs to the new path: its tab renames, and
+     * the next Ctrl+S writes there.
+     */
+    public fun saveAs(id: Long) {
+        val session = _state.value.documents.firstOrNull { it.id == id } ?: return
+        val target = promptForPath(session) ?: return
+        scope.launch { persist(id, target) }
+    }
+
     /** Saves a document. Documents that have never been saved need [onNeedsPath] to supply one. */
     public fun save(id: Long, onNeedsPath: () -> Path?) {
-        val session = _state.value.documents.firstOrNull { it.id == id } ?: return
+        val target = saveTarget(id, onNeedsPath) ?: return
+        scope.launch { persist(id, target) }
+    }
+
+    /**
+     * Where [id] should be written, or null with the reason already reported.
+     *
+     * Split out from [save] because the answer is needed on the UI thread — a file picker cannot be
+     * opened from a coroutine — while the write itself must not happen there.
+     */
+    private fun saveTarget(id: Long, onNeedsPath: () -> Path?): Path? {
+        val session = _state.value.documents.firstOrNull { it.id == id } ?: return null
         val target = session.path ?: onNeedsPath() ?: run {
             update { it.copy(notification = "This document has no file yet; use File > Export or save it elsewhere") }
-            return
+            return null
         }
-
-        val text = applySaveActions(session.text.text, _state.value.settings)
 
         // Refuse to overwrite a file somebody else has changed since Quill read it. Saving used to
         // be an unconditional write, so a `git checkout`, a formatter or a second editor touching
@@ -879,12 +1187,26 @@ public class QuillController(
                         "Reload it, or save again to overwrite.",
                 )
             }
-            return
+            return null
         }
 
-        scope.launch {
-            withContext(Dispatchers.IO) { runCatching { fileService.write(target, text) } }
-                .onSuccess {
+        return target
+    }
+
+    /**
+     * Writes [id] to [target], reporting the outcome, and answers whether it landed.
+     *
+     * A suspend function rather than something that launches, because callers exist that must not
+     * carry on until the bytes are on disk — closing a document after saving it is the obvious one,
+     * and doing that concurrently would race the write against the handle being freed.
+     */
+    private suspend fun persist(id: Long, target: Path): Boolean {
+        val session = _state.value.documents.firstOrNull { it.id == id } ?: return false
+        val text = applySaveActions(session.text.text, _state.value.settings)
+
+        return withContext(Dispatchers.IO) { runCatching { fileService.write(target, text) } }
+            .fold(
+                onSuccess = {
                     // The buffer is rewritten to match what went to disk. Skipping this leaves the
                     // document permanently "modified" against a file it is identical to except for
                     // the whitespace the save action just removed.
@@ -913,11 +1235,13 @@ public class QuillController(
                         }
                     }
                     update { it.copy(notification = "Saved ${target.fileName}") }
-                }
-                .onFailure { failure ->
+                    true
+                },
+                onFailure = { failure ->
                     update { it.copy(notification = "Could not save ${target.fileName}: ${failure.message}") }
-                }
-        }
+                    false
+                },
+            )
     }
 
     /**
@@ -957,7 +1281,8 @@ public class QuillController(
         val name = session.displayName.substringBeforeLast('.')
         val dark = _state.value.settings.darkTheme
 
-        scope.launch {
+        launchTask("Exporting to ${format.name}", cancellable = false) {
+            detail(target.fileName?.toString())
             val message = withContext(Dispatchers.Default) {
                 runCatching {
                     when (format) {
@@ -1025,7 +1350,8 @@ public class QuillController(
 
     /** Opens a directory as the project root. */
     public fun openProject(root: Path) {
-        scope.launch {
+        launchTask("Scanning ${root.fileName ?: root}") {
+            detail(root.toString())
             withContext(Dispatchers.IO) { runCatching { fileService.scan(root) } }
                 .onSuccess { nodes -> update { it.copy(projectRoot = root, projectTree = nodes) } }
                 .onFailure { failure -> update { it.copy(notification = "Could not read $root: ${failure.message}") } }
@@ -1183,8 +1509,9 @@ public class QuillController(
 
         update { it.copy(projectSearch = it.projectSearch.copy(running = true)) }
 
-        projectSearchJob = scope.launch {
+        projectSearchJob = launchTask("Searching ${root.fileName ?: root}") {
             delay(PROJECT_SEARCH_DEBOUNCE_MILLIS)
+            detail(request.query.takeIf { it.isNotBlank() })
             val results = withContext(Dispatchers.IO) {
                 ProjectSearch.run(
                     root = root,
@@ -1197,7 +1524,7 @@ public class QuillController(
 
             // A result that arrived after the query moved on is not this query's result.
             val current = _state.value.projectSearch
-            if (current.query != request.query || current.scope != request.scope) return@launch
+            if (current.query != request.query || current.scope != request.scope) return@launchTask
             update { it.copy(projectSearch = it.projectSearch.copy(results = results, running = false)) }
         }
     }

@@ -260,6 +260,10 @@ public fun StatusBar(controller: QuillController, workspace: WorkspaceState) {
                     StatusItem(workspace.vim.display, "Vim mode -- Esc returns to normal")
                 }
 
+                // What Quill is doing, where every JetBrains window puts it: the left end of the
+                // right-hand status group.
+                TaskProgress(controller, workspace.tasks)
+
                 // A file that changed underneath an edited buffer is the one status the writer has
                 // to act on, so it sits first and offers the two ways out rather than only saying
                 // that something is wrong.

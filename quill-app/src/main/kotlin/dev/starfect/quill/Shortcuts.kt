@@ -191,11 +191,15 @@ internal fun handleShortcut(event: KeyEvent, controller: QuillController): Boole
             true
         }
         event.key == Key.S && !event.isShiftPressed -> {
-            activeId?.let { controller.save(it) { null } }
+            activeId?.let(controller::saveWithPrompt)
+            true
+        }
+        event.key == Key.S && event.isShiftPressed -> {
+            activeId?.let(controller::saveAs)
             true
         }
         event.key == Key.W -> {
-            activeId?.let(controller::closeDocument)
+            activeId?.let(controller::requestCloseDocument)
             true
         }
         event.key == Key.F && !event.isShiftPressed -> {

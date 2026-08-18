@@ -25,6 +25,7 @@ import dev.starfect.quill.model.Dock
 import dev.starfect.quill.model.ToolWindow
 import dev.starfect.quill.model.ViewMode
 import dev.starfect.quill.model.WorkspaceState
+import dev.starfect.quill.ui.dialog.ConfirmHost
 import dev.starfect.quill.ui.dialog.RunConfigurationsDialog
 import dev.starfect.quill.ui.dialog.SettingsDialog
 import dev.starfect.quill.ui.editor.EditorTabs
@@ -173,6 +174,10 @@ public fun QuillWindowContent(
         if (workspace.featurePaletteVisible) {
             MarkdownFeaturePalette(controller) { controller.setFeaturePaletteVisible(false) }
         }
+
+        // Above the dialogs, because a question about losing work outranks whatever is on screen —
+        // including a settings page that is itself modal.
+        ConfirmHost(controller, workspace, onExit)
 
         when (workspace.dialog) {
             Dialog.SETTINGS -> SettingsDialog(controller, workspace)

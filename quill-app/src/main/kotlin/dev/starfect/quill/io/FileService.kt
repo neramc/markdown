@@ -66,6 +66,41 @@ public class FileService {
             }
         }
     }
+
+    /**
+     * Asks the platform where to write a file, defaulting to [suggestedName].
+     *
+     * `FileDialog.SAVE` is what puts the platform's own overwrite warning in front of the writer,
+     * which is why this is not a directory picker with a text field bolted on. The extension is
+     * appended when the writer did not type one, because a Markdown file called `notes` is a file
+     * neither Quill nor Explorer will offer to open again.
+     */
+    public fun chooseSaveFile(
+        suggestedName: String,
+        directory: Path? = null,
+        title: String = "Save As",
+        extension: String = "md",
+    ): Path? = try {
+        val dialog = FileDialog(null as Frame?, title, FileDialog.SAVE)
+        dialog.file = suggestedName
+        directory?.let { dialog.directory = it.toString() }
+        dialog.isVisible = true
+
+        val chosen = dialog.file
+        val parent = dialog.directory
+        when {
+            chosen == null -> null
+            else -> {
+                val named = if (chosen.contains('.')) chosen else "$chosen.$extension"
+                if (parent != null) Path.of(parent, named) else Path.of(named)
+            }
+        }
+    } catch (failure: Exception) {
+        when (failure) {
+            is java.awt.HeadlessException, is SecurityException -> null
+            else -> throw failure
+        }
+    }
     }
 
     /** Reads a UTF-8 file. */

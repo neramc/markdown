@@ -319,9 +319,19 @@ private fun MenuScope.mainMenu(
             enabled = activeId != null,
             onClick = {
                 dismiss()
-                activeId?.let { id -> controller.save(id) { null } }
+                activeId?.let(controller::saveWithPrompt)
             },
         ) { Text("Save") }
+
+        selectableItem(
+            selected = false,
+            keybinding = setOf("Ctrl", "Shift", "S"),
+            enabled = activeId != null,
+            onClick = {
+                dismiss()
+                activeId?.let(controller::saveAs)
+            },
+        ) { Text("Save As\u2026") }
 
         passiveItem { MenuSeparator() }
 
@@ -361,7 +371,7 @@ private fun MenuScope.mainMenu(
             enabled = activeId != null,
             onClick = {
                 dismiss()
-                activeId?.let(controller::closeDocument)
+                activeId?.let(controller::requestCloseDocument)
             },
         ) { Text("Close Document") }
 
@@ -369,7 +379,9 @@ private fun MenuScope.mainMenu(
             selected = false,
             onClick = {
                 dismiss()
-                onExit()
+                // Same guard as the window's X. Two ways out of the application, one rule about
+                // unsaved work.
+                if (controller.requestExit()) onExit()
             },
         ) { Text("Exit") }
     }) { Text("File") }

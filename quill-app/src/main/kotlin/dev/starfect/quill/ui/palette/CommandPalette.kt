@@ -280,8 +280,9 @@ private fun buildCommands(controller: QuillController, workspace: WorkspaceState
     return buildList {
         add(Command("New Document", "File", "Ctrl+N", controller::newDocument))
         if (activeId != null) {
-            add(Command("Save", "File", "Ctrl+S") { controller.save(activeId) { null } })
-            add(Command("Close Document", "File", "Ctrl+W") { controller.closeDocument(activeId) })
+            add(Command("Save", "File", "Ctrl+S") { controller.saveWithPrompt(activeId) })
+            add(Command("Save As\u2026", "File", "Ctrl+Shift+S") { controller.saveAs(activeId) })
+            add(Command("Close Document", "File", "Ctrl+W") { controller.requestCloseDocument(activeId) })
             add(
                 Command("Export to HTML", "File", null) {
                     controller.exportHtml(activeId, FileService().htmlExportTarget(document?.path))

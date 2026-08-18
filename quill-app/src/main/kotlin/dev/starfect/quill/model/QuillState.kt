@@ -305,6 +305,16 @@ public data class WorkspaceState(
     val selectedRunConfigurationId: Long? = null,
     val notifications: List<Notification> = emptyList(),
     val notification: String? = null,
+    /**
+     * What Quill is doing in the background, newest last.
+     *
+     * Held in the workspace rather than in the status bar because more than the status bar wants
+     * it: an export that is still running is a reason to warn before closing, and a project scan in
+     * flight is why the tree looks empty.
+     */
+    val tasks: List<BackgroundTask> = emptyList(),
+    /** A question Quill is waiting on before doing something it cannot undo. */
+    val confirm: Confirm? = null,
 ) {
     val activeDocument: DocumentSession?
         get() = documents.firstOrNull { it.id == activeDocumentId }
@@ -321,6 +331,49 @@ public data class WorkspaceState(
         get() = runConfigurations.firstOrNull { it.id == selectedRunConfigurationId }
             ?: runConfigurations.firstOrNull()
 }
+
+/**
+ * Something the user has asked for that Quill will not do until they have said so twice.
+ *
+ * Described as data rather than as a callback so the workspace stays comparable and immutable — a
+ * lambda in the state makes every copy unequal to the last and every pane recompose. The controller
+ * reads the description back and performs it, which also means the decision and the action are
+ * testable apart from the dialog.
+ *
+ * The bar for being here is *losing something that cannot be recovered*. Closing a modified
+ * document qualifies; closing an unmodified one does not, and asking about it would train people to
+ * dismiss the question without reading it — which is how a confirmation stops working.
+ */
+@Immutable
+public sealed interface Confirm {
+
+    /** Closing documents with unsaved edits. */
+    @Immutable
+    public data class CloseDocuments(
+        /** Every document being closed, including the saved ones. */
+        public val ids: List<Long>,
+        /** The names with unsaved edits, which is what the question is about. */
+        public val unsavedNames: List<String>,
+    ) : Confirm
+
+    /**
+     * Leaving Quill with unsaved edits.
+     *
+     * Distinct from [CloseDocuments] even though the machinery is the same, because the answer
+     * means something different: Discard here throws away every buffer at once and there is no
+     * window left to notice it in. The wording differs for the same reason.
+     */
+    @Immutable
+    public data class Exit(
+        /** Every document with unsaved edits, which is everything Save has to write. */
+        public val ids: List<Long>,
+        /** Their names. */
+        public val unsavedNames: List<String>,
+    ) : Confirm
+}
+
+/** What the user chose. */
+public enum class ConfirmChoice { SAVE, DISCARD, CANCEL }
 
 /** One entry in the Notifications tool window. */
 @Immutable

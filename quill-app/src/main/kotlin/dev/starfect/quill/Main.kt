@@ -196,7 +196,10 @@ public fun main(arguments: Array<String>) {
         ) {
             if (isJetBrainsRuntime()) {
                 DecoratedWindow(
-                    onCloseRequest = ::exitApplication,
+                    // Not `::exitApplication`: the window's X is the one way out of Quill that used
+                    // to take unsaved work with it. The controller answers whether it may close, and
+                    // when it may not, the question it raised owns the exit.
+                    onCloseRequest = { if (controller.requestExit()) exitApplication() },
                     state = windowState,
                     title = title,
                     icon = painterResource("icons/icon.png"),
@@ -215,7 +218,7 @@ public fun main(arguments: Array<String>) {
                 // Stock JDK: keep the platform's own title bar and render Quill's toolbar inside the
                 // window instead. Everything below the title bar is identical.
                 Window(
-                    onCloseRequest = ::exitApplication,
+                    onCloseRequest = { if (controller.requestExit()) exitApplication() },
                     state = windowState,
                     title = title,
                     icon = painterResource("icons/icon.png"),
