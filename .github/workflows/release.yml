@@ -54,6 +54,7 @@ jobs:
   gate:
     name: Gate
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     outputs:
       version: ${{ steps.resolve.outputs.version }}
       publish: ${{ steps.resolve.outputs.publish }}
@@ -147,6 +148,12 @@ jobs:
     # there is something to release.
     if: needs.gate.outputs.proceed == 'true'
     runs-on: ${{ matrix.runner }}
+    # A ceiling, not an estimate: these take five to thirty minutes. It exists because of what
+    # happens without one — a test that opened a native file dialog on the Windows and macOS
+    # runners left three jobs waiting at a prompt nobody would ever click, and with no timeout they
+    # would have held their runners for the six-hour default while the release sat behind them in
+    # the concurrency group. Failing at ninety minutes turns a lost afternoon into a red job.
+    timeout-minutes: 90
     strategy:
       # One platform failing should not hide whether the others would have worked. On a release,
       # knowing that four of five are fine is most of the diagnosis.
@@ -258,6 +265,7 @@ jobs:
     needs: [gate, build]
     if: needs.gate.outputs.proceed == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -288,6 +296,7 @@ jobs:
     needs: [gate, build, windows-setup]
     if: needs.gate.outputs.proceed == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
