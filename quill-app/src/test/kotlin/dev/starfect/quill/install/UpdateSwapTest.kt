@@ -142,12 +142,18 @@ class UpdateSwapTest {
 
     @Test
     fun `the new version is started and the script deletes itself`() {
-        val windowsScript = UpdateSwap.script(plan(), 1, windows = true)
-        assertTrue(windowsScript.any { it.startsWith("start ") && "bin/Quill" in it.replace('\\', '/') })
+        val plan = plan()
+        // Compared against the plan's own path rather than a "bin/Quill" fragment: `Path.resolve`
+        // uses the running platform's separator, so a hard-coded slash passes on Linux and fails on
+        // Windows for a script that is perfectly correct.
+        val launcher = plan.current.resolve(plan.launcher).toString()
+
+        val windowsScript = UpdateSwap.script(plan, 1, windows = true)
+        assertTrue(windowsScript.any { it.startsWith("start ") && launcher in it })
         assertEquals("del /f /q \"%~f0\"", windowsScript.last())
 
-        val unixScript = UpdateSwap.script(plan(), 1, windows = false)
-        assertTrue(unixScript.any { it.endsWith("&") && "bin/Quill" in it })
+        val unixScript = UpdateSwap.script(plan, 1, windows = false)
+        assertTrue(unixScript.any { it.endsWith("&") && launcher in it })
         assertEquals("rm -f \"\$0\"", unixScript.last())
     }
 
