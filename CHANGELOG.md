@@ -6,6 +6,68 @@ The sections here are the source of the release notes on GitHub: the publish wor
 section matching the tag it was triggered by, so a release whose notes are wrong is a changelog
 whose notes are wrong, and there is only one place to fix it.
 
+## Unreleased
+
+### Typing is between three and four times faster
+
+A keystroke in a 2000-line document cost 1.6 seconds. The parser was not the reason: a bare Compose
+text field with none of Quill around it costs 40 ms at 500 lines, and Quill's editor cost 210. The
+difference was syntax highlighting — the controller asked the engine for the whole document's style
+spans and handed every one of them to the text field, which turns each into a run it has to shape
+separately. Two thousand runs on a document nobody was looking at fifty lines of.
+
+Highlighting now follows the viewport, which is what the engine's line range was always for.
+
+| document | before | after |
+|---|---|---|
+| 100 lines | 54 ms | 34 ms |
+| 500 lines | 211 ms | 114 ms |
+| 2000 lines | 1579 ms | 455 ms |
+
+Closing a tab also stopped freezing the window. It waited for the document's parse on the UI thread,
+so shutting six tabs held the window for seconds.
+
+### Undo and redo
+
+There was no Ctrl+Z binding, so undo fell through to the one Compose's text field carries — which
+belongs to the text field rather than the document and was thrown away by switching tabs. There was
+no redo at all.
+
+The history belongs to the document now, and the feature is the grouping rather than the stack: a
+pause starts a new step, typing and deleting never merge, and whitespace closes a group so undo
+steps back a word at a time. A paste or a reformat is one step however large.
+
+### A file changed outside Quill is no longer overwritten
+
+Saving was an unconditional write, so a `git checkout`, a formatter or a second editor touching a
+file while a document sat open destroyed that work with no message.
+
+Each document remembers what was on disk when Quill last agreed with it. A save that would overwrite
+a changed file is refused and says so. On returning to the window an unmodified buffer reloads
+silently; an edited one is flagged in the status bar with a click to discard and reload. Quill does
+not choose which version wins.
+
+### Controls that do something
+
+Seven controls had no action behind them while advertising otherwise. The tab strip's ⋮ now opens
+the menu it looks like it should — close, close others, close to the right, close all, copy path.
+The project widget opens a project menu. The status bar's caret position opens **Go to Line**, which
+had to be written, because the tooltip had been promising it.
+
+The rest were never controls: the branch name, the encoding, the line ending, the file type and the
+padlock report things Quill has no action for, and they have stopped rendering as buttons.
+
+### Icons
+
+Windows and macOS shipped with no Quill icon at all — jpackage takes a different container per
+platform and only the Linux PNG was ever wired up. The installer's icon was stock clipart of a
+cardboard box.
+
+There is now one family: the application, the installer and the `.md` document all carry the same
+feather, rendered into PNG, multi-size ICO and ICNS from the vectors by `tools/render-icons.sh`.
+Below 32 pixels the installer switches to a simpler drawing, because detail that reads at 256 pixels
+becomes a smudge at 16.
+
 ## 1.2.0
 
 ### The uninstaller is gone, and Quill removes itself
